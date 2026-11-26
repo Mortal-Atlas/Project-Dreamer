@@ -17,7 +17,8 @@ namespace DreamMachine.UnityBridge
         readonly Material[] _skin = new Material[ElbowLab.ReceptorCount];
         readonly System.Collections.Generic.List<Material> _materials = new System.Collections.Generic.List<Material>();
         readonly StringBuilder _readout = new StringBuilder(512);
-        ElbowLab _lab;
+        IElbowFixture _lab;
+        public bool UseNativePhysics;
         TrayWorkspace _workspace;
         Transform _arm, _puck;
         Text _telemetry, _statusLabel;
@@ -25,12 +26,15 @@ namespace DreamMachine.UnityBridge
         string _status = "";
         float _nextRefresh;
         const string Tray = "embodiment.elbow";
-        static string Checkpoint => Path.Combine(Application.persistentDataPath, "elbow-lab.checkpoint");
+        string Checkpoint => Path.Combine(Application.persistentDataPath,
+            UseNativePhysics ? "elbow-native.checkpoint" : "elbow-lab.checkpoint");
 
         void Start()
         {
             _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            TryFile(() => _lab = ElbowLab.LoadCheckpoint(Checkpoint) ?? new ElbowLab(ElbowLab.Settings.Standard, "son"));
+            TryFile(() => _lab = UseNativePhysics
+                ? (IElbowFixture)(NativeElbowLab.LoadCheckpoint(Checkpoint) ?? new NativeElbowLab(ElbowLab.Settings.Standard, "son"))
+                : ElbowLab.LoadCheckpoint(Checkpoint) ?? new ElbowLab(ElbowLab.Settings.Standard, "son"));
             var camera = new GameObject("Laboratory Camera", typeof(Camera)).GetComponent<Camera>();
             camera.transform.SetParent(transform);
             camera.transform.position = new Vector3(0.07f, 0.1f, -2f);
@@ -121,10 +125,18 @@ namespace DreamMachine.UnityBridge
             {
                 if (_lab != null) _lab.RequestTarget(_lab.RequestedTarget > 0 ? -0.55 : 0.9);
             });
-            AddButton(parent, 3, "Save", () => TryFile(() => _lab?.SaveCheckpoint(Checkpoint)));
+            AddButton(parent, 3, "Save", () => TryFile(() =>
+            {
+                if (_lab is NativeElbowLab native) native.SaveCheckpoint(Checkpoint);
+                else if (_lab is ElbowLab reference) reference.SaveCheckpoint(Checkpoint);
+            }));
             AddButton(parent, 4, "Restore", () => TryFile(() =>
             {
-                ElbowLab restored = ElbowLab.LoadCheckpoint(Checkpoint) ?? throw new InvalidDataException("No lab checkpoint.");
+                IElbowFixture restored = UseNativePhysics
+                    ? (IElbowFixture)NativeElbowLab.LoadCheckpoint(Checkpoint)
+                    : ElbowLab.LoadCheckpoint(Checkpoint);
+                if (restored == null) throw new InvalidDataException("No lab checkpoint.");
+                (_lab as IDisposable)?.Dispose();
                 _lab = restored;
                 _clock.Paused = true;
                 DrawBody();
@@ -151,9 +163,10 @@ namespace DreamMachine.UnityBridge
                 return;
             }
             ElbowLab.Proprioception sensed = _lab.Latest.Feedback;
-            _readout.Clear().AppendLine($"Elbow laboratory · planar model · tick {_lab.Tick} · {_lab.SimSeconds:F2} s");
+            _readout.Clear().AppendLine($"Elbow laboratory · {_lab.Backend} · tick {_lab.Tick} · {_lab.SimSeconds:F2} s");
             _readout.AppendLine($"Target {_lab.RequestedTarget:F2} rad · joint {sensed.Angle:F2} rad / {sensed.Velocity:F2} rad/s");
             _readout.AppendLine($"Motor {sensed.Effort:F2} N m · resistance {sensed.Resistance:F2} N m");
+            _readout.AppendLine($"Puck ({_lab.X:F3}, {_lab.Y:F3}) m · contact {_lab.Latest.NormalImpulse:F3} N s");
             for (int i = 0; i < ElbowLab.ReceptorCount; i++)
             {
                 ElbowLab.Receptor region = _lab.ReadRegion(i);
@@ -198,6 +211,7 @@ namespace DreamMachine.UnityBridge
         void OnDestroy()
         {
             _workspace?.Dispose();
+            (_lab as IDisposable)?.Dispose();
             foreach (Material material in _materials) Destroy(material);
         }
     }

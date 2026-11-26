@@ -3,8 +3,29 @@ using DreamMachine.Sim;
 
 namespace DreamMachine.Body
 {
+    public interface IElbowFixture
+    {
+        string Backend { get; }
+        string IndividualId { get; }
+        int Tick { get; }
+        double SimSeconds { get; }
+        bool Finished { get; }
+        double RequestedTarget { get; }
+        double Angle { get; }
+        double X { get; }
+        double Y { get; }
+        double VX { get; }
+        double VY { get; }
+        double ObjectAngle { get; }
+        double Spin { get; }
+        ElbowLab.StepSample Latest { get; }
+        ElbowLab.Receptor ReadRegion(int index);
+        void RequestTarget(double radians);
+        ElbowLab.StepSample Step();
+    }
+
     // Planar reduced-order contact model. Metres, radians, seconds, kilograms and newtons.
-    public sealed partial class ElbowLab
+    public sealed partial class ElbowLab : IElbowFixture
     {
         public const string JointId = "elbow";
         public const string ObjectId = "contact-puck";
@@ -42,7 +63,7 @@ namespace DreamMachine.Body
         {
             public readonly double Force, PressureEstimate, ContactSeconds, SlipSpeed, TangentialForce;
 
-            internal Receptor(double force, double seconds, double slip, double tangential)
+            public Receptor(double force, double seconds, double slip, double tangential)
             {
                 Force = force; PressureEstimate = force / PatchArea; ContactSeconds = seconds;
                 SlipSpeed = slip; TangentialForce = tangential;
@@ -53,7 +74,7 @@ namespace DreamMachine.Body
         {
             public readonly double Angle, Velocity, Effort, Resistance;
 
-            internal Proprioception(double angle, double velocity, double effort, double resistance)
+            public Proprioception(double angle, double velocity, double effort, double resistance)
             {
                 Angle = angle; Velocity = velocity; Effort = effort; Resistance = resistance;
             }
@@ -65,7 +86,7 @@ namespace DreamMachine.Body
             public readonly double Target, PreviousAngle, NormalImpulse, ObjectDeltaX, ObjectDeltaY;
             public readonly Proprioception Feedback;
 
-            internal StepSample(int tick, double target, double previous, double impulse, double dx, double dy,
+            public StepSample(int tick, double target, double previous, double impulse, double dx, double dy,
                 Proprioception feedback)
             {
                 Tick = tick; Target = target; PreviousAngle = previous; NormalImpulse = impulse;
@@ -81,6 +102,7 @@ namespace DreamMachine.Body
         readonly double[] _calibration = new double[ReceptorCount] { 1, 1, 1, 1, 1 };
         public Settings Configuration { get; }
         public string IndividualId { get; }
+        public string Backend => "planar-reference-v1";
         public int Tick { get; private set; }
         public double Angle { get; private set; }
         public double Velocity { get; private set; }
@@ -111,6 +133,8 @@ namespace DreamMachine.Body
         public static bool AreNeighbors(int a, int b) =>
             a >= 0 && a < ReceptorCount && b >= 0 && b < ReceptorCount && Math.Abs(a - b) == 1;
         public Receptor ReadRegion(int index) => _skin[index];
+        public static double ContactRegion(double localTangent) => 2 + 2 * Clamp(localTangent, -1, 1);
+        public static double RegionWeight(double center, int index) => Math.Max(0, 1.5 - Math.Abs(center - index));
 
         public void RequestTarget(double target)
         {
@@ -178,12 +202,12 @@ namespace DreamMachine.Body
                 Array.Clear(_duration, 0, ReceptorCount);
                 return 0;
             }
-            double center = 2 + 2 * Clamp(-armY * nx + armX * ny, -1, 1);
+            double center = ContactRegion(-armY * nx + armX * ny);
             double total = 0;
-            for (int i = 0; i < ReceptorCount; i++) total += Math.Max(0, 1.5 - Math.Abs(center - i));
+            for (int i = 0; i < ReceptorCount; i++) total += RegionWeight(center, i);
             for (int i = 0; i < ReceptorCount; i++)
             {
-                double weight = Math.Max(0, 1.5 - Math.Abs(center - i)) / total;
+                double weight = RegionWeight(center, i) / total;
                 if (weight > 0)
                 {
                     _normalImpulse[i] += impulse * weight;

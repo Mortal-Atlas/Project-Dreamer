@@ -250,7 +250,7 @@ namespace DreamMachine.Sim
             PublishCheckpoint(path, CaptureCheckpoint(), file => LoadPrimaryCheckpoint(file) != null);
         }
 
-        internal static void PublishCheckpoint(string path, byte[] data, Func<string, bool> validate)
+        public static void PublishCheckpoint(string path, byte[] data, Func<string, bool> validate)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path)));
             string pending = path + "." + Guid.NewGuid().ToString("N") + ".pending";
