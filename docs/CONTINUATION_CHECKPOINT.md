@@ -2,6 +2,15 @@
 
 Updated November 26, 2026.
 
+## Active clock slice
+
+- Branch `feature/authoritative-simulation-clock`. Implementation checkpoint `43bc016`, based on `49f148d`. [Draft PR #7](https://github.com/Mortal-Atlas/Project-Dreamer/pull/7) targets protected `main`. The owner’s synchronization rules are in the [Part XXXIII addendum](GITHUB_SYNCHRONIZATION.md).
+- Ran `dotnet test dotnet/DreamMachine.Core.Tests -c Release --nologo` (43 passed) and `dotnet build dotnet/DreamMachine.Cli -c Release --nologo`. Ran `--benchmark --agents 4` and `--benchmark --agents 12` five times each. Ran isolated Unity 6000.3.19f1 Edit Mode tests for `DreamMachine.Tests` (44 passed). [Implementation report](IMPLEMENTATION_PROGRESS.md)
+- Isolated Unity DX12 Play Mode runs used `-executeMethod ClockSmoke.Control` and `ClockSmoke.Observed` from the scratch harness, yielding equal state hashes and learner JSON at tick 24. Artifacts are under the same scratch editor directory listed in the predecessor baseline.
+- Preserve the pre-existing local edits listed below. Next open `WorldSimulation.cs`, inventory mutable environmental, learner, clock and RNG state with their owning classes, and add a versioned checkpoint round trip across a day boundary before exposing restore in the tray.
+
+## Predecessor baseline
+
 - Branch `feature/master-milestone-zero`. Parent `635c55f` on `feature/seeded-growing-rigs`. Implementation commit `529f49359a52ff4421fb9e7d54eadd58f1769723`. Review the open [PR #6](https://github.com/Mortal-Atlas/Project-Dreamer/pull/6) against `main` and its [predecessor PR #5](https://github.com/Mortal-Atlas/Project-Dreamer/pull/5).
 - Scope comprises the master specification and appendix, traceability and evidence registers, the save-file boundary in `LifeCycle.cs`, identity validation in `WorldSimulation.cs`, Unity startup and save integration in `DreamMachineApp.cs`, and shared Edit Mode tests.
 - Local owner files observed before the changes were `Assets/DreamMachine/Resources/appearances.json`, `Assets/DreamMachine/Tests/DreamMachine.Tests.asmdef`, both package manifests, `ProjectSettings/VFXManager.asset`, untracked `Assets/DreamMachine.meta`, `Assets/Plugins*`, `Assets/_Recovery*`, and `ProjectSettings/Packages/com.unity.probuilder/`. Preserve them. The prior rescue reference is `backup/unity-local-2026-11-26` at `e5bacd4`.

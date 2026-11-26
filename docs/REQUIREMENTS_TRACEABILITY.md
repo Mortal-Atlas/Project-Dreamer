@@ -264,6 +264,18 @@ The source is the [consolidated specification](MASTER_IMPLEMENTATION_SPECIFICATI
 
 ## Evidence register
 
+The clock checkpoint extends K evidence for §§5–7, 116, 124, 133 and 169. Pause and single-step have executed regression tests. The control panel is dismissible, and live preview and night display no longer write to authoritative learner state. Complete checkpoint and observer invariance criteria remain open. [Clock results](IMPLEMENTATION_PROGRESS.md)
+
+| Owner addendum | Owner | Dependencies | Status | Evidence |
+| --- | --- | --- | --- | --- |
+| [187 Commit and push](GITHUB_SYNCHRONIZATION.md#187-commit-and-push-after-every-implementation-session) | Repository governance | §§181–186 | Verified for this session | [Draft PR #7](https://github.com/Mortal-Atlas/Project-Dreamer/pull/7) |
+| [188 Remote source of truth](GITHUB_SYNCHRONIZATION.md#188-remote-repository-as-the-source-of-truth) | Repository governance | §187 | Verified for this session | [Continuation](CONTINUATION_CHECKPOINT.md) |
+| [189 Incremental checkpoints](GITHUB_SYNCHRONIZATION.md#189-incremental-checkpoint-commits) | Repository governance | §187 | Verified for this session | [Continuation](CONTINUATION_CHECKPOINT.md) |
+| [190 PR synchronization](GITHUB_SYNCHRONIZATION.md#190-pull-request-synchronization) | Repository governance | §§182–185, 187 | Verified for this session | [Draft PR #7](https://github.com/Mortal-Atlas/Project-Dreamer/pull/7) |
+| [191 End-of-response checks](GITHUB_SYNCHRONIZATION.md#191-mandatory-end-of-response-verification) | Repository governance | §§178–186 | Verified for this session | [Continuity and tests](CONTINUATION_CHECKPOINT.md) |
+| [192 GitHub references](GITHUB_SYNCHRONIZATION.md#192-mandatory-github-references-in-every-implementation-report) | Repository governance | §§187–191 | Verified for this session | [Clock report](IMPLEMENTATION_PROGRESS.md) |
+| [193 Permanent history](GITHUB_SYNCHRONIZATION.md#193-permanent-development-history) | Repository governance | §§181–186 | Verified for this session | [Draft PR #7](https://github.com/Mortal-Atlas/Project-Dreamer/pull/7) |
+
 ### Z evidence
 
 [Milestone report](IMPLEMENTATION_PROGRESS.md), [continuation checkpoint](CONTINUATION_CHECKPOINT.md), [interface inventory](SYSTEM_INTERFACES.md) and [architecture](ARCHITECTURE.md). The baseline includes the five open PRs, known non-release packages and local modifications. Full quality, long-duration, CI and editor/device coverage remain pending.
