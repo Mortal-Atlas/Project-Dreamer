@@ -19,6 +19,91 @@ using NUnit.Framework;
 
 namespace DreamMachine.Tests
 {
+    public class PilotLibraryArchiveTests
+    {
+        string _root;
+
+        [SetUp]
+        public void SetUp() => _root = Path.Combine(Path.GetTempPath(), "dreamer-archive-" + Guid.NewGuid().ToString("N"));
+
+        [TearDown]
+        public void TearDown()
+        {
+            if (Directory.Exists(_root)) Directory.Delete(_root, true);
+        }
+
+        [Test]
+        public void LibrariesExposeRealHistoryAndNavigateAcrossShelves()
+        {
+            var archive = new PilotLibraryArchive(_root, reserve: 0);
+            PilotVolume volume = archive.Capture(12, true, true);
+            var acquired = archive.Search(volume.Id, LibraryShelf.Knowledge);
+            var hypotheses = archive.Search(volume.Id, LibraryShelf.Possibility, "hypothesis");
+            var teacher = archive.Search(volume.Id, LibraryShelf.LivedMemory, "teacher");
+            Assert.IsNotEmpty(acquired);
+            Assert.AreEqual(1, hypotheses.Count);
+            Assert.AreEqual(1, teacher.Count);
+            StringAssert.Contains("probabilityOfEffect", archive.Read(volume.Id, acquired[0].Id));
+
+            LibraryBook hypothesis = hypotheses[0];
+            LibraryBook replay = archive.GetBook(volume.Id, hypothesis.Links[0]);
+            StringAssert.StartsWith("Replay", replay.Title);
+            Assert.AreEqual(LibraryShelf.LivedMemory, replay.Shelf);
+            StringAssert.StartsWith("Probe", archive.ReferencedBy(volume.Id, hypothesis.Id)[0].Title);
+            Assert.AreEqual(LatchRoomSimulation.TeacherTick, teacher[0].Tick);
+
+            PilotVolume empty = archive.Capture(13, true, true, 0);
+            Assert.Throws<KeyNotFoundException>(() => archive.Read(empty.Id, teacher[0].Id));
+            Assert.AreEqual(PilotLibraryArchive.PageSize, archive.Search(volume.Id, LibraryShelf.LivedMemory).Count);
+            Assert.IsNotEmpty(archive.Search(volume.Id, LibraryShelf.LivedMemory, after: 40));
+        }
+
+        [Test]
+        public void RestorationReplaysTheSameStateAndContinuesAfterBrowsing()
+        {
+            var archive = new PilotLibraryArchive(_root, reserve: 0);
+            PilotVolume volume = archive.Capture(12, true, true, LatchRoomSimulation.WakeTick);
+            var restored = archive.Restore(volume.Id);
+            Assert.AreEqual(LatchRoomSimulation.WakeTick, restored.TickCount);
+            foreach (LibraryBook book in archive.Search(volume.Id, LibraryShelf.Knowledge)) archive.Read(volume.Id, book.Id);
+            restored.RunTicks(LatchRoomSimulation.EndTick);
+            var original = new LatchRoomSimulation(12, true, true);
+            original.RunTicks(LatchRoomSimulation.EndTick);
+            CollectionAssert.AreEqual(original.Trace, restored.Trace);
+            CollectionAssert.AreEqual(original.LivedMemory, restored.LivedMemory);
+        }
+
+        [Test]
+        public void DuplicateBodiesUseOneBlobAndRejectedCapturePreservesPriorRecords()
+        {
+            var archive = new PilotLibraryArchive(_root, reserve: 0);
+            PilotVolume first = archive.Capture(50, false, false, 1);
+            LibraryStorage before = archive.Storage();
+            Assert.AreEqual(first.Id, archive.Capture(50, false, false, 1).Id);
+            archive.Capture(51, false, false, 1);
+            LibraryStorage shared = archive.Storage();
+            Assert.AreEqual(before.Blobs, shared.Blobs);
+            Assert.AreEqual(before.Books * 2, shared.Books);
+
+            var full = new PilotLibraryArchive(_root, shared.PhysicalBytes, 0);
+            Assert.Throws<IOException>(() => full.Capture(52, true, true));
+            Assert.AreEqual(shared.PhysicalBytes, full.Storage().PhysicalBytes);
+            Assert.IsNotEmpty(full.Read(first.Id, 1));
+        }
+
+        [Test]
+        public void InterruptedCatalogIsInvisibleAndCorruptedBodiesReportFailure()
+        {
+            var archive = new PilotLibraryArchive(_root, reserve: 0);
+            PilotVolume volume = archive.Capture(1, false, false, 1);
+            File.WriteAllText(Path.Combine(_root, "volumes", "interrupted.pending"), "incomplete");
+            Assert.AreEqual(1, archive.Volumes().Count);
+            foreach (string blob in Directory.GetFiles(Path.Combine(_root, "blobs")))
+                File.WriteAllText(blob, "bad gzip");
+            Assert.Throws<InvalidDataException>(() => archive.Read(volume.Id, 1));
+        }
+    }
+
     public class DiscoveryRoomTests
     {
         [Test]

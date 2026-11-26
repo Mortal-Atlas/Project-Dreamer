@@ -8,6 +8,8 @@ Run the latch-room pilot with `dotnet run --project dotnet/DreamMachine.Cli -c R
 
 Phase II adds an opt-in two-stage Discovery Room through `--discover`. See the [room protocol and developmental design](docs/PHASE_II.md) and [held-out results](docs/PHASE_II_RESULTS.md).
 
+Open **Dream Machine → Library Observatory** to archive a latch pilot, browse its three libraries, and verify its checkpoint. See the [archive format and controls](docs/LIBRARY_OBSERVATORY.md).
+
 ## Open and press Play
 
 1. Install **Unity 6000.3.19f1** with the **Universal Render Pipeline** (the editor version in `ProjectSettings/ProjectVersion.txt`).

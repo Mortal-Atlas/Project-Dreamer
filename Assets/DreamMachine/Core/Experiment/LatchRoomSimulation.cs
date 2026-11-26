@@ -65,6 +65,8 @@ namespace DreamMachine.Experiment
         public IReadOnlyList<RoomEvent> Trace { get; }
         public IReadOnlyList<RoomEvent> LivedMemory { get; }
 
+        public float EffectProbability(RoomObject obj, RoomAction action) => _predictions[Index(obj, action)].Probability;
+
         public LatchRoomSimulation(int seed, bool curiosity, bool reflectiveReplay)
         {
             _curiosity = curiosity;
