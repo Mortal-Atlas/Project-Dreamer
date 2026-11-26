@@ -1,0 +1,9 @@
+{
+  "homeName": "Home",
+  "members": [
+    { "id": "father", "role": "Father", "name": "Father", "sex": "Male" },
+    { "id": "mother", "role": "Mother", "name": "Mother", "sex": "Female" },
+    { "id": "son", "role": "Son", "name": "Son", "sex": "Male" },
+    { "id": "daughter", "role": "Daughter", "name": "Daughter", "sex": "Female" }
+  ]
+}
