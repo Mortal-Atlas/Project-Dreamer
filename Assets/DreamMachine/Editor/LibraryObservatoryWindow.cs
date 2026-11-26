@@ -158,7 +158,7 @@ namespace DreamMachine.EditorTools
             if (_storage.HasValue)
             {
                 LibraryStorage data = _storage.Value;
-                EditorGUILayout.LabelField("Volumes / books / unique bodies", $"{data.Volumes} / {data.Books} / {data.Blobs}");
+                EditorGUILayout.LabelField("Volumes / books / blobs", $"{data.Volumes} / {data.Books} / {data.Blobs}");
                 EditorGUILayout.LabelField("Archive file bytes", data.PhysicalBytes.ToString("N0"));
                 EditorGUILayout.LabelField("Logical book body bytes", data.LogicalContentBytes.ToString("N0"));
                 EditorGUILayout.LabelField("Available disk bytes", data.AvailableBytes.ToString("N0"));
