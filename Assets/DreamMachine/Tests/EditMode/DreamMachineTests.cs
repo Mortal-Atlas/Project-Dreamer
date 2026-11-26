@@ -19,6 +19,111 @@ using NUnit.Framework;
 
 namespace DreamMachine.Tests
 {
+    public class ElbowLabTests
+    {
+        static ElbowLab Create(double x, double y, double mass = 0.25, double friction = 0.4) =>
+            new ElbowLab(new ElbowLab.Settings(-1.1, 1.3, 0, mass, friction, x, y, 80), "son");
+
+        [Test]
+        public void FreeMotionTracksTheJointWithoutFalseTactileSignals()
+        {
+            ElbowLab lab = Create(1, 1);
+            for (int i = 0; i < 35; i++)
+            {
+                ElbowLab.StepSample sample = lab.Step(0.9);
+                Assert.AreEqual(lab.Angle, sample.Feedback.Angle);
+                Assert.AreEqual(lab.Velocity, sample.Feedback.Velocity);
+                Assert.That(Math.Abs(sample.Feedback.Effort), Is.LessThanOrEqualTo(2));
+                Assert.AreEqual(0, sample.NormalImpulse);
+                Assert.AreEqual(0, sample.Feedback.Resistance);
+                for (int j = 0; j < ElbowLab.ReceptorCount; j++) Assert.AreEqual(0, lab.ReadRegion(j).Force);
+            }
+            Assert.That(lab.Angle, Is.EqualTo(0.9).Within(0.02));
+            Assert.AreEqual(1, lab.X);
+        }
+
+        [Test]
+        public void ContactDisplacesThePuckAndLocalizesToNeighboringRegions()
+        {
+            ElbowLab front = Create(0.28, 0.20);
+            ElbowLab back = Create(0.28, -0.20);
+            var a = FirstContact(front, 0.9);
+            var b = FirstContact(back, -0.9);
+            Assert.That(a.Feedback.Resistance, Is.LessThan(0));
+            Assert.That(b.Feedback.Resistance, Is.GreaterThan(0));
+            Assert.That(a.ObjectDeltaY, Is.GreaterThan(0));
+            Assert.That(b.ObjectDeltaY, Is.LessThan(0));
+            Assert.That(front.ReadRegion(4).Force, Is.GreaterThan(front.ReadRegion(0).Force));
+            Assert.That(back.ReadRegion(0).Force, Is.GreaterThan(back.ReadRegion(4).Force));
+            Assert.That(front.ReadRegion(3).Force, Is.GreaterThan(0));
+            Assert.IsTrue(ElbowLab.AreNeighbors(3, 4));
+        }
+
+        [Test]
+        public void MassPositionAndFrictionAffectObservedInteraction()
+        {
+            ElbowLab light = Create(0.28, 0.20, 0.1), heavy = Create(0.28, 0.20, 0.9);
+            Assert.That(FirstContact(light, 0.9).ObjectDeltaY, Is.GreaterThan(FirstContact(heavy, 0.9).ObjectDeltaY));
+            Assert.That(FirstContact(Create(0.30, 0.12), 0.9).Tick,
+                Is.LessThan(FirstContact(Create(0.28, 0.20), 0.9).Tick));
+            var smooth = Create(0.28, 0.20, friction: 0);
+            var rough = Create(0.28, 0.20, friction: 0.8);
+            FirstContact(smooth, 0.9);
+            FirstContact(rough, 0.9);
+            Assert.AreEqual(0, smooth.Spin);
+            Assert.That(Math.Abs(rough.Spin), Is.GreaterThan(0));
+        }
+
+        [Test]
+        public void DiskRestorePreservesExactContactTraceAndPendingCommand()
+        {
+            ElbowLab control = Create(0.28, 0.20), observed = Create(0.28, 0.20);
+            while (control.Tick < 22)
+            {
+                control.Step(0.9);
+                observed.Step(0.9);
+                for (int i = 0; i < ElbowLab.ReceptorCount; i++) observed.ReadRegion(i);
+            }
+            observed.RequestTarget(-0.55);
+            control.RequestTarget(-0.55);
+            string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".elbow");
+            try
+            {
+                observed.SaveCheckpoint(path);
+                observed = ElbowLab.LoadCheckpoint(path);
+                Assert.AreEqual("son", observed.IndividualId);
+                Assert.AreEqual(-0.55, observed.RequestedTarget);
+                while (!control.Finished)
+                {
+                    control.Step();
+                    observed.Step();
+                    Assert.AreEqual(control.Angle, observed.Angle, "joint angle");
+                    Assert.AreEqual(control.X, observed.X, "puck X");
+                    Assert.AreEqual(control.Spin, observed.Spin, "puck spin");
+                    CollectionAssert.AreEqual(control.CaptureCheckpoint(), observed.CaptureCheckpoint());
+                }
+                byte[] bad = File.ReadAllBytes(path);
+                bad[bad.Length - 1] ^= 1;
+                File.WriteAllBytes(path, bad);
+                Assert.Throws<InvalidDataException>(() => ElbowLab.LoadCheckpoint(path));
+                Assert.Throws<InvalidDataException>(() => observed.SaveCheckpoint(path));
+                CollectionAssert.AreEqual(bad, File.ReadAllBytes(path));
+            }
+            finally { File.Delete(path); }
+        }
+
+        static ElbowLab.StepSample FirstContact(ElbowLab lab, double target)
+        {
+            while (!lab.Finished)
+            {
+                ElbowLab.StepSample sample = lab.Step(target);
+                if (sample.NormalImpulse > 0) return sample;
+            }
+            Assert.Fail("Expected contact in the configured movement.");
+            return default;
+        }
+    }
+
     public class WorldCheckpointTests
     {
         [Test]

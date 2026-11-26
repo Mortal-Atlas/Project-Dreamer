@@ -35,6 +35,7 @@ namespace DreamMachine.Cli
                 {
                     if (args[i] == "--room") return RoomExperimentCommand.Run(args);
                     if (args[i] == "--discover") return DiscoveryCommand.Run(args);
+                    if (args[i] == "--elbow-lab" && i + 1 < args.Length) return ElbowLabCommand.Run(args[i + 1]);
                     if (args[i] == "--archive-pilots") return ArchivePilotCommand.Run(args, i);
                     if (args[i] == "--benchmark")
                     {

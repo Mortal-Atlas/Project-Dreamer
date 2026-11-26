@@ -247,7 +247,11 @@ namespace DreamMachine.Sim
 
         public void SaveCheckpoint(string path)
         {
-            byte[] data = CaptureCheckpoint();
+            PublishCheckpoint(path, CaptureCheckpoint(), file => LoadPrimaryCheckpoint(file) != null);
+        }
+
+        internal static void PublishCheckpoint(string path, byte[] data, Func<string, bool> validate)
+        {
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path)));
             string pending = path + "." + Guid.NewGuid().ToString("N") + ".pending";
             try
@@ -257,8 +261,8 @@ namespace DreamMachine.Sim
                     stream.Write(data, 0, data.Length);
                     stream.Flush(true);
                 }
-                LoadCheckpoint(pending);
-                if (LoadPrimaryCheckpoint(path) != null) File.Replace(pending, path, path + ".previous");
+                if (!validate(pending)) throw new InvalidDataException("Pending checkpoint is missing.");
+                if (validate(path)) File.Replace(pending, path, path + ".previous");
                 else File.Move(pending, path);
             }
             finally

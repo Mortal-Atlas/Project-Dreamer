@@ -103,6 +103,7 @@ namespace DreamMachine.UnityBridge
         static void AutoBoot()
         {
             if (Application.isBatchMode) return;
+            if (Object.FindAnyObjectByType<ElbowLabView>() != null) return;
 #if UNITY_2023_1_OR_NEWER
             if (Object.FindAnyObjectByType<DreamMachineApp>() != null) return;
 #else
