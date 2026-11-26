@@ -2,6 +2,12 @@
 
 Updated November 26, 2026.
 
+## Active workspace and recovery slice
+
+- Branch `feature/authoritative-simulation-clock`. Implementation commit `4489675e07f6061fa3a5ea6e8db9bede286c0c11`. [Draft PR #7](https://github.com/Mortal-Atlas/Project-Dreamer/pull/7) depends on open PR #6 and targets protected main. Neither had GitHub reviews or inline findings at session start. [Dependency and local exclusion audit](WORLD_CHECKPOINT.md)
+- Ran `dotnet test dotnet/DreamMachine.Core.Tests -c Release --nologo` (50 passed) and isolated Unity Edit Mode tests (51 passed). Reproduction commands and harness for the paired Unity Play Mode experiment are in [tools/unity](../tools/unity/README.md). See the progress report for the produced evidence and limits.
+- Start the next implementation with a fixed-step supported elbow and single constrained contact object in a separate test scene. Define joint/receptor IDs and an authoritative pre/post-physics tick boundary. Verify repeatable contact and checkpoint of the object before adding a learned contact predictor. [Exact fixture and acceptance](EMBODIMENT_NEXT_SLICE.md)
+
 ## Active persistence slice
 
 - Branch `feature/authoritative-simulation-clock`, kernel and Unity implementation commit `dbd49e8f5e89c9ce0774adc86e1f00855bb3bf8d`, [draft PR #7](https://github.com/Mortal-Atlas/Project-Dreamer/pull/7). Base is protected main. PR #6 is an ancestor. [Local exclusions and owner inventory](WORLD_CHECKPOINT.md)

@@ -2,6 +2,8 @@
 
 This Unity **6.3 LTS** project (`6000.3.19f1`, URP 17.3.0) contains the Dream Machine family simulation.
 
+The authoritative implementation requirements are in the [master specification](docs/MASTER_IMPLEMENTATION_SPECIFICATION.md) and [mandatory GitHub synchronization addendum, §§187–193](docs/GITHUB_SYNCHRONIZATION.md). The [traceability map](docs/REQUIREMENTS_TRACEABILITY.md) records the evidence and remaining work.
+
 The November 2026 audit documents the [current architecture](docs/ARCHITECTURE.md), [research and licenses](docs/RESEARCH_INTEGRATION.md), [benchmarks](docs/PERFORMANCE_BENCHMARKS.md), [roadmap](docs/DEVELOPMENT_ROADMAP.md), and [first room experiment](docs/EXPERIMENTAL_PROTOCOLS.md).
 
 Run the latch-room pilot with `dotnet run --project dotnet/DreamMachine.Cli -c Release -- --room` or open **Dream Machine → Latch Room Trace** in the Unity Editor. The [pilot protocol](docs/EXPERIMENTAL_PROTOCOLS.md#latch-room-pilot) explains the controls and measured results.
@@ -19,7 +21,7 @@ Open **Dream Machine → Body Observatory** to inspect a live rig or compare see
 3. Open `Assets/Scenes/DreamMachine.unity`.
 4. Press **Play**.
 
-You should see one house, four people (Father, Mother, Son, Daughter), and a panel of beliefs and feelings. The names are placeholders in `Assets/DreamMachine/Resources/family.json`. Drag the yard to look around. The top bar changes simulation speed. Nothing inside the body is drawn.
+You should see one house, four people, and a panel of beliefs and feelings. The displayed names come from `Assets/DreamMachine/Resources/family.json`. Drag the yard to look around. Open **Simulation** to pause, step, change speed, save, or restore. The workspace remembers whether the tray was open independently of the world checkpoint.
 
 The rest of this file is the research notes for the kernel, the experiment, and the limits of the prototype.
 
