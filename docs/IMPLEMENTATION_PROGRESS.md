@@ -1,5 +1,11 @@
 # Implementation progress
 
+## Milestone Two Phase A · elbow and tactile contact
+
+Draft PR #8 introduces the isolated fixed-step numerical elbow and puck, sensor records, fixture checkpoint, and shared Unity laboratory tray. It stacks on PR #7 at `e9ceeaf`, which depends on PR #6. GitHub showed no submitted or inline reviews on either prerequisite at the audit. Compare the milestone with `git diff origin/feature/authoritative-simulation-clock...origin/feature/embodiment-contact-lab`. PRs remain unmerged. The [local exclusion inventory](WORLD_CHECKPOINT.md) still applies and the isolated build required none of those local files.
+
+54 Release .NET tests passed in a clean checkout, 55 isolated Unity Edit Mode tests passed, and the DX12 lab Play Mode smoke matched the unobserved model through 15 steps. The trace matrix demonstrated force-driven contact, localization, mass and friction effects, and exact checkpoint continuation on the Windows numerical implementation. The native solver, retained observer cost, actual rendered alignment, and learned prediction are open. [Experiments and reproduction](ELBOW_LAB.md)
+
 ## Modular workspace and recovery · November 26, 2026
 
 The Simulation panel is now registered as `simulation`. The shared [tray workspace](../Assets/DreamMachine/Unity/TrayWorkspace.cs) owns its Canvas, minimum dimensions, open, close and visible-only refresh callbacks. Versioned PlayerPrefs keep normalized layout and visibility independent of the simulation checkpoint. Closing destroys the tray and removes its telemetry update. Presentation quality now releases and destroys superseded render textures. Interactive docking, drag/resize, tab grouping, and named presets remain outside this first registry.

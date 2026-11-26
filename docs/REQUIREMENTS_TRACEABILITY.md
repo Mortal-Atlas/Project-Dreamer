@@ -264,6 +264,8 @@ The source is the [consolidated specification](MASTER_IMPLEMENTATION_SPECIFICATI
 
 ## Evidence register
 
+Phase A adds partial evidence for §§14–21, 57, 116, 124, 128–129, 148, 157 and 170. Same-runtime numerical contact, tactile localization and proprioception are verified in the bounded fixture, as are physical checkpoint continuation and read-only observation. The Unity view renders the shared numerical model. A native solver comparison and learned sensorimotor checkpoints remain open. [Phase A matrix and reproducible traces](ELBOW_LAB.md)
+
 The workspace and filesystem follow-up adds evidence for §§57, 124, 125, 133, 150, 153, 157, 162 and 169. The Simulation tray has a stable registration, persisted visibility and normalized anchors, shared styling, and open/close/refresh hooks. Windows replacement tests and the [isolated Unity observer harness](../tools/unity/README.md) exercise the owned paths. Docking, live resizing, grouped tabs, presets and a household memory inspection interface remain separate work. The [embodiment plan](EMBODIMENT_NEXT_SLICE.md) documents future physical ownership, sensory and checkpoint acceptance under §§12–21, 119, 128–129 and 170.
 
 The embedded v1 checkpoint adds evidence for §§5, 6, 10, 52, 57, 116, 133, 150, 157, 162 and 169. Three kernel continuations match after disk restore across a day boundary, and one paired Unity observer run matches all serialized state. The reset intervention ledger is persisted. Wider observer coverage, workspace controls, movable physics state, mobile filesystem behavior and cross-process recovery remain partial. [Checkpoint owner inventory](WORLD_CHECKPOINT.md) · [Verification results](IMPLEMENTATION_PROGRESS.md) · [Performance](PERFORMANCE_BENCHMARKS.md)

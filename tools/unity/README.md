@@ -10,3 +10,5 @@ Run separate Unity 6000.3.19f1 processes for each condition and seed:
 ```
 
 Add `-dreamerSeed101` to both commands for the second seed. Pass separate `-logFile` values. The harness steps from tick 690 to 1140, compares save and restore within each process, and prints a digest of all serialized fields. The observed run also reconstructs a workspace from its independent preferences. Compare `CLOCK_SMOKE` digests within each seed. The digest is labeled `learner` for continuity with the initial smoke. It includes the full embedded world checkpoint. Kernel regression tests provide named field assertions after restore. Camera screenshots depend on the batch graphics target.
+
+For the elbow fixture, copy `ElbowSmoke.cs` to `Assets/Editor/ElbowSmoke.cs` in the same disposable project and use `-executeMethod ElbowSmoke.Run`. It replaces only the isolated elbow checkpoint and its matching workspace preference. Verify the `ELBOW_SMOKE` completion line. The experiment compares the visible Unity path to an unobserved model every tick and exercises Save, Restore and Close.

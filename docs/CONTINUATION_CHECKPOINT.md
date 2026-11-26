@@ -2,6 +2,12 @@
 
 Updated November 26, 2026.
 
+## Active Phase A embodiment branch
+
+- Branch `feature/embodiment-contact-lab` at the implementation checkpoint `d18bd74d1f2207d49851d2315ace2942296c3af6`. [Draft PR #8](https://github.com/Mortal-Atlas/Project-Dreamer/pull/8) targets protected main and stacks on PR #7 at `e9ceeaf`. The pre-existing owner changes and local-only assets remain excluded as documented in [WORLD_CHECKPOINT.md](WORLD_CHECKPOINT.md).
+- Ran the clean checkout .NET suite (54 passed), CLI `--elbow-lab` matrix, Unity Edit Mode suites (55 passed), and isolated DX12 Play Mode `-executeMethod ElbowSmoke.Run` (15 exact ticks and successful contact, save, restore and dismissal). Reproduce through the [lab protocol](ELBOW_LAB.md) and [isolated harness instructions](../tools/unity/README.md).
+- Next, add a standalone Unity native-physics backend with a supported elbow and puck, using an isolated physics scene stepped in explicit substeps. Compare angle, contact onset and puck state against the numerical baseline and report same-platform checkpoint tolerances. Only then train a sensory-only predictor against nonlearning baselines.
+
 ## Active workspace and recovery slice
 
 - Branch `feature/authoritative-simulation-clock`. Implementation commit `4489675e07f6061fa3a5ea6e8db9bede286c0c11`. [Draft PR #7](https://github.com/Mortal-Atlas/Project-Dreamer/pull/7) depends on open PR #6 and targets protected main. Neither had GitHub reviews or inline findings at session start. [Dependency and local exclusion audit](WORLD_CHECKPOINT.md)
