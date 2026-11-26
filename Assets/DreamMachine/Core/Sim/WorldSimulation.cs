@@ -537,11 +537,26 @@ namespace DreamMachine.Sim
         public bool Paused;
         public bool CatchingUp;
         public LifeStage CatchStage;
+        bool _singleStepPending;
+
+        public void RequestSingleStep()
+        {
+            Paused = true;
+            _singleStepPending = true;
+        }
+
+        public bool TakeSingleStep()
+        {
+            bool step = _singleStepPending && Paused;
+            _singleStepPending = false;
+            return step;
+        }
+
         public const int HardCap = 4000;
 
         public int Plan(float realDt, float fixedDt, int budgetTicks)
         {
-            if (Paused && !CatchingUp)
+            if (Paused)
             {
                 AchievedScale = 0f;
                 return 0;

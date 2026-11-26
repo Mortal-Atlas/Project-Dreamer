@@ -19,6 +19,32 @@ using NUnit.Framework;
 
 namespace DreamMachine.Tests
 {
+    public class SimulationClockTests
+    {
+        [Test]
+        public void PausedCatchupRetainsDebtAndOnlyOneExplicitStepRuns()
+        {
+            var world = WorldSimulation.Create(PopulationConfig.CreateDefault(), QualityPreset.Phone, 7);
+            var expected = WorldSimulation.Create(PopulationConfig.CreateDefault(), QualityPreset.Phone, 7);
+            var governor = new TimeGovernor { CatchingUp = true, Paused = true, Accumulator = 0.025f };
+            string before = world.StateHash().ToString();
+            Assert.AreEqual(0, governor.Plan(1f, WorldSimulation.Dt, 64));
+            Assert.AreEqual(before, world.StateHash().ToString());
+            governor.RequestSingleStep();
+            if (governor.TakeSingleStep()) world.Tick();
+            expected.Tick();
+            Assert.AreEqual(expected.StateHash(), world.StateHash());
+            Assert.AreEqual(1, world.TickCount);
+            Assert.AreEqual(WorldSimulation.Dt, world.SimSeconds);
+            Assert.IsTrue(governor.Paused);
+            Assert.IsTrue(governor.CatchingUp);
+            Assert.IsFalse(governor.TakeSingleStep());
+            Assert.AreEqual(0.025f, governor.Accumulator);
+            governor.Paused = false;
+            Assert.AreEqual(64, governor.Plan(1f, WorldSimulation.Dt, 64));
+        }
+    }
+
     public class AgentSaveFileTests
     {
         [Test]

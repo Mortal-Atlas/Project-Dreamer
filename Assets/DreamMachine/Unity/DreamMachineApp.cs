@@ -64,7 +64,6 @@ namespace DreamMachine.UnityBridge
         Camera _seg;
         RenderTexture _eyeRt;
         RenderTexture _segRt;
-        Texture2D _readback;
         Light _sun;
         Material _unlit;
         Shader _idShader;
@@ -88,6 +87,7 @@ namespace DreamMachine.UnityBridge
         bool _ready;
         int _replayRows;
         WorldSimulation _sim;
+        GameObject _simulationTray;
         TimeGovernor _governor = new TimeGovernor();
         QualityPreset _preset = QualityPreset.Phone;
         float _achieved = 1f;
@@ -156,7 +156,6 @@ namespace DreamMachine.UnityBridge
                 _replayRows = wet.Rows.Count;
             }
             BuildHome();
-            BuildTimeBar();
             _ready = true;
             SelectBaby(0);
         }
@@ -176,10 +175,12 @@ namespace DreamMachine.UnityBridge
             HandleTimeKeys();
             if (_remote != null && _remote.Active && _remote.Latest != null && _remote.Latest.Length > 0)
             {
-                ApplyRemote(_remote.Latest);
-                _night = _sim.IsNight;
-                float dtRemote = Mathf.Min(0.05f, real);
-                StepActors(dtRemote);
+                if (!_governor.Paused)
+                {
+                    ApplyRemote(_remote.Latest);
+                    _night = _sim.IsNight;
+                    StepActors(Mathf.Min(0.05f, real));
+                }
                 OrbitCamera();
                 BillboardLabels();
                 RefreshHud();
@@ -190,7 +191,12 @@ namespace DreamMachine.UnityBridge
             float budgetMs = _preset == QualityPreset.Phone ? 8f : _preset == QualityPreset.Laptop ? 14f : 22f;
             int ran = 0;
             var watch = System.Diagnostics.Stopwatch.StartNew();
-            if (_governor.CatchingUp)
+            if (_governor.TakeSingleStep())
+            {
+                _sim.Tick();
+                ran = 1;
+            }
+            else if (_governor.CatchingUp && !_governor.Paused)
             {
                 float goal = WorldSimulation.AgeOf(_governor.CatchStage);
                 while (ran < budget && watch.Elapsed.TotalMilliseconds < budgetMs && _sim.MinAgeDays() < goal)
@@ -223,8 +229,8 @@ namespace DreamMachine.UnityBridge
             _clock = _sim.SimSeconds % WorldSimulation.DayLength;
             if (_night && !wasNight) BeginNight();
             if (!_night && wasNight) EndNight();
-            float dt = Mathf.Min(0.05f, real);
-            StepActors(dt);
+            float dt = Mathf.Min(0.1f, ran * WorldSimulation.Dt);
+            if (ran > 0) StepActors(dt);
             OrbitCamera();
             BillboardLabels();
             _visionTimer += dt;
@@ -277,7 +283,7 @@ namespace DreamMachine.UnityBridge
             if (n > 0) lag /= n;
             GroupGoal goal = group == GroupId.Boys ? _groups.BoysGoal : _groups.GirlsGoal;
             float speed = (_night || goal == GroupGoal.Rest || lag > 2.8f) ? 0f : 0.4f;
-            float ang = Time.time * 0.18f + groupIndex;
+            float ang = _sim.SimSeconds * 0.18f + groupIndex;
             Vector3 desired = home + new Vector3(Mathf.Sin(ang) * 2.4f, 0f, Mathf.Cos(ang) * 2.4f);
             Vector3 dir = desired - _anchors[groupIndex];
             dir.y = 0f;
@@ -490,23 +496,6 @@ namespace DreamMachine.UnityBridge
                 var rng = new SeededRandom(baby.Spec.BirthSeed + _day * 13 + 5);
                 List<DreamProp> props = new DreamRecombinator().Remix(baby.State.Observations, new LibraryTwo(), rng);
                 if (i == _focus) ShowDream(baby, props);
-                PersonSpec leader = _pop.LeaderOf(baby.Spec.Group);
-                Actor leaderActor;
-                if (leader != null && _actors.TryGetValue(leader.Id, out leaderActor) && leaderActor.Seen.Count > 0)
-                {
-                    baby.State.Walker.BlendToward(CopyTrace(leaderActor, baby.Mapper), 0.22f);
-                }
-                if (baby.State.Observations.Count > 0)
-                {
-                    VisualObservation last = baby.State.Observations[baby.State.Observations.Count - 1];
-                    baby.State.Library.NoteIdea(
-                        "dream:" + last.Color + "+" + last.Shape,
-                        "harmful",
-                        0.15f,
-                        _day,
-                        "library-II-dream");
-                }
-                baby.State.Emotions.Excite(-0.02f, -0.08f, 0.04f, -0.1f, -0.35f);
                 LogGrowth(baby, "night");
             }
         }
@@ -517,11 +506,9 @@ namespace DreamMachine.UnityBridge
             _dreams.Clear();
             _night = false;
             _clock = 0f;
-            _day++;
             _banner.text = "Day " + (_day + 1) + ". Awake. Touch the world and try the legs again.";
             for (int i = 0; i < _babies.Count; i++) LogGrowth(_babies[i], "awake");
             SaveAll();
-            WriteGrowth();
         }
 
         void ShowDream(Actor baby, List<DreamProp> props)
@@ -556,55 +543,7 @@ namespace DreamMachine.UnityBridge
             _seg.transform.position = _eye.transform.position;
             _seg.transform.rotation = _eye.transform.rotation;
             _eye.Render();
-            if (_idShader != null)
-            {
-                _seg.Render();
-                RenderTexture previous = RenderTexture.active;
-                RenderTexture.active = _segRt;
-                _readback.ReadPixels(new Rect(0, 0, _segRt.width, _segRt.height), 0, 0);
-                _readback.Apply();
-                RenderTexture.active = previous;
-                Color32[] pixels = _readback.GetPixels32();
-                var bytes = new byte[pixels.Length * 4];
-                for (int i = 0; i < pixels.Length; i++)
-                {
-                    bytes[i * 4] = pixels[i].r;
-                    bytes[i * 4 + 1] = pixels[i].g;
-                    bytes[i * 4 + 2] = pixels[i].b;
-                    bytes[i * 4 + 3] = pixels[i].a;
-                }
-                List<MaskRegion> regions = IdMaskDecoder.Decode(bytes, _segRt.width, _segRt.height);
-                for (int i = 0; i < regions.Count; i++)
-                {
-                    if (regions[i].PixelCount < 4) continue;
-                    string id = "obj-" + regions[i].NumericId;
-                    ObjectInstance match = null;
-                    for (int p = 0; p < _pool.Count; p++)
-                    {
-                        if (_pool[p].Id == id) match = _pool[p];
-                    }
-                    if (match == null) continue;
-                    baby.State.Observations.Add(new VisualObservation
-                    {
-                        ObjectId = match.Id,
-                        Category = match.CategoryLabel,
-                        Color = match.Color,
-                        Shape = match.Shape,
-                        Day = _day,
-                        Trial = _encounters,
-                        BoundX = regions[i].MinX,
-                        BoundY = regions[i].MinY,
-                        BoundW = regions[i].Width,
-                        BoundH = regions[i].Height,
-                        PixelCount = regions[i].PixelCount,
-                        WorldX = match.WorldX,
-                        WorldY = match.WorldY,
-                        WorldZ = match.WorldZ,
-                        Appearance = match.CategoryLabel + " mask"
-                    });
-                }
-                Trim(baby);
-            }
+            if (_idShader != null) _seg.Render();
             _hud.SetPreviews(_eyeRt, _segRt);
         }
 
@@ -625,7 +564,7 @@ namespace DreamMachine.UnityBridge
         void RememberPose(Actor actor)
         {
             float[] measured = actor.Body.Measure();
-            actor.Seen.Add(new PoseFrame { SourceId = actor.Spec.Id, Time = Time.time, Angles = measured });
+            actor.Seen.Add(new PoseFrame { SourceId = actor.Spec.Id, Time = _sim.SimSeconds, Angles = measured });
             if (actor.Seen.Count > 18) actor.Seen.RemoveAt(0);
         }
 
@@ -749,7 +688,6 @@ namespace DreamMachine.UnityBridge
             int h = _performance ? 64 : 120;
             _eyeRt = new RenderTexture(w, h, 16);
             _segRt = new RenderTexture(w, h, 16);
-            _readback = new Texture2D(w, h, TextureFormat.RGBA32, false);
             _eye = new GameObject("Baby Eye").AddComponent<Camera>();
             _eye.clearFlags = CameraClearFlags.SolidColor;
             _eye.backgroundColor = new Color(0.62f, 0.78f, 0.90f);
@@ -774,7 +712,7 @@ namespace DreamMachine.UnityBridge
                 _hud.AddPersonButton(_babies[i].Spec.DisplayName, delegate { SelectBaby(index); });
             }
             _hud.AddActionButton("Experiment", RunShortExperiment);
-            _hud.AddActionButton("Save", SaveAll);
+            _hud.AddActionButton("Simulation", ToggleSimulationTray);
             _hud.AddActionButton(_performance ? "Detail" : "Fast", TogglePerformance);
             _hud.AddActionButton("Reset", ResetBabies);
             _hud.AddActionButton("Quality", CyclePreset);
@@ -802,8 +740,6 @@ namespace DreamMachine.UnityBridge
             _segRt = new RenderTexture(w, h, 16);
             _eye.targetTexture = _eyeRt;
             _seg.targetTexture = _segRt;
-            Destroy(_readback);
-            _readback = new Texture2D(w, h, TextureFormat.RGBA32, false);
             if (_sun != null) _sun.shadows = _performance ? LightShadows.None : LightShadows.Soft;
         }
 
@@ -1197,9 +1133,18 @@ namespace DreamMachine.UnityBridge
             roof.GetComponent<Renderer>().sharedMaterial = CharacterFactory.MakeMaterial(_unlit, new Color(0.45f, 0.22f, 0.18f), 0);
         }
 
-        void BuildTimeBar()
+        void ToggleSimulationTray()
         {
-            var canvasGo = new GameObject("TimeBar");
+            if (_simulationTray != null)
+            {
+                _simulationTray.SetActive(false);
+                Destroy(_simulationTray);
+                _simulationTray = null;
+                _timeLabel = null;
+                return;
+            }
+            var canvasGo = new GameObject("Simulation controls");
+            _simulationTray = canvasGo;
             var canvas = canvasGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 20;
@@ -1220,13 +1165,13 @@ namespace DreamMachine.UnityBridge
             var clock = _timeLabel.rectTransform;
             clock.anchorMin = new Vector2(0.02f, 0.45f);
             clock.anchorMax = new Vector2(0.98f, 0.98f);
-            AddTimeButton(bar.transform, "Pause", 0.00f, 0.16f, delegate { _governor.Paused = !_governor.Paused; });
-            AddTimeButton(bar.transform, "0.1x", 0.16f, 0.30f, delegate { SetScale(0.1f); });
-            AddTimeButton(bar.transform, "1x", 0.30f, 0.42f, delegate { SetScale(1f); });
-            AddTimeButton(bar.transform, "10x", 0.42f, 0.54f, delegate { SetScale(10f); });
-            AddTimeButton(bar.transform, "100x", 0.54f, 0.68f, delegate { SetScale(100f); });
-            AddTimeButton(bar.transform, "1000x", 0.68f, 0.84f, delegate { SetScale(1000f); });
-            AddTimeButton(bar.transform, "Stage", 0.84f, 1f, JumpNextStage);
+            AddTimeButton(bar.transform, "Pause", 0f, 0.14f, () => _governor.Paused = true);
+            AddTimeButton(bar.transform, "Resume", 0.14f, 0.28f, () => _governor.Paused = false);
+            AddTimeButton(bar.transform, "Step", 0.28f, 0.40f, RequestLocalStep);
+            AddTimeButton(bar.transform, "Slower", 0.40f, 0.55f, () => SetScale(Mathf.Max(0.1f, _governor.TargetScale / 10f)));
+            AddTimeButton(bar.transform, "Faster", 0.55f, 0.70f, () => SetScale(Mathf.Min(1000f, _governor.TargetScale * 10f)));
+            AddTimeButton(bar.transform, "Save", 0.70f, 0.85f, SaveAll);
+            AddTimeButton(bar.transform, "Close", 0.85f, 1f, ToggleSimulationTray);
         }
 
         Text _timeLabel;
@@ -1270,27 +1215,19 @@ namespace DreamMachine.UnityBridge
 
         void SetScale(float scale)
         {
-            _governor.Paused = false;
             _governor.CatchingUp = false;
             _governor.TargetScale = scale;
             _governor.Accumulator = 0f;
         }
 
-        void JumpNextStage()
+        void RequestLocalStep()
         {
-            float age = _sim.MinAgeDays();
-            LifeStage stage = LifeStage.Toddler;
-            if (age >= WorldSimulation.AgeOf(LifeStage.Adult)) stage = LifeStage.Adult;
-            else if (age >= WorldSimulation.AgeOf(LifeStage.Teen)) stage = LifeStage.Adult;
-            else if (age >= WorldSimulation.AgeOf(LifeStage.Child)) stage = LifeStage.Teen;
-            else if (age >= WorldSimulation.AgeOf(LifeStage.Toddler)) stage = LifeStage.Child;
-            _governor.CatchStage = stage;
-            _governor.CatchingUp = true;
-            _governor.Paused = false;
+            if (_remote == null || !_remote.Active) _governor.RequestSingleStep();
         }
 
         void HandleTimeKeys()
         {
+            if (DreamInput.WasPressed(KeyCode.N)) RequestLocalStep();
             if (DreamInput.WasPressed(KeyCode.Space)) _governor.Paused = !_governor.Paused;
             if (DreamInput.WasPressed(KeyCode.Comma)) SetScale(Mathf.Max(0.1f, _governor.TargetScale * 0.1f));
             if (DreamInput.WasPressed(KeyCode.Period)) SetScale(Mathf.Min(1000f, Mathf.Max(0.1f, _governor.TargetScale) * 10f));
@@ -1312,7 +1249,7 @@ namespace DreamMachine.UnityBridge
 
         string SpeedLabel()
         {
-            string mode = _governor.Paused ? "paused" : _governor.CatchingUp ? "full-sim to " + _governor.CatchStage : _governor.TargetScale.ToString("0.##") + "x asked";
+            string mode = _governor.Paused ? "paused (" + _governor.TargetScale.ToString("0.##") + "x)" : _governor.CatchingUp ? "full-sim to " + _governor.CatchStage : _governor.TargetScale.ToString("0.##") + "x asked";
             return mode + "  achieved " + _achieved.ToString("0.0") + "x  " + _ticksPerSec.ToString("0") + " ticks/s  " + _preset;
         }
 
@@ -1352,9 +1289,8 @@ namespace DreamMachine.UnityBridge
             for (int i = shown; i < _elementMarks.Count; i++) _elementMarks[i].SetActive(false);
             if (_timeLabel != null)
             {
-                float age = _sim.MinAgeDays();
                 _timeLabel.text = "Day " + (_sim.DayIndex + 1)
-                    + "   youngest " + age.ToString("0.00") + " days   "
+                    + "   tick " + _sim.TickCount + "   " + _sim.SimSeconds.ToString("0.00") + " sim s   "
                     + SpeedLabel();
             }
         }
