@@ -19,6 +19,81 @@ using NUnit.Framework;
 
 namespace DreamMachine.Tests
 {
+    public class DiscoveryRoomTests
+    {
+        [Test]
+        public void FixedTicksPreserveQuestionsAcrossNightAndKeepProbesOutOfTraining()
+        {
+            var room = new DiscoveryRoom(14, 9, true, true);
+            room.RunTicks(LatchRoomSimulation.NightTick);
+            var question = room.Questions[0];
+            int evidenceBeforeSleep = question.Evidence.Count;
+            room.RunTicks(LatchRoomSimulation.WakeTick - LatchRoomSimulation.NightTick);
+            Assert.AreSame(question, room.Questions[0]);
+            Assert.AreEqual(evidenceBeforeSleep, question.Evidence.Count);
+
+            while (room.TickCount < DiscoveryRoom.EndTick - 1) room.RunTicks(1);
+            Assert.AreEqual(18, room.Attempts.Count);
+            Assert.IsNull(room.Transferred);
+            bool followedRehearsal = false;
+            foreach (DiscoveryAttempt attempt in room.Attempts)
+            {
+                Assert.AreNotEqual(DiscoveryRoom.HeldOutCue, attempt.Cue);
+                if (!attempt.ReplaySource.HasValue) continue;
+                var remembered = room.Attempts[attempt.ReplaySource.Value - 1];
+                Assert.Less(remembered.Tick, LatchRoomSimulation.NightTick);
+                Assert.Greater(attempt.Tick, LatchRoomSimulation.WakeTick);
+                Assert.AreEqual(remembered.Control, attempt.Control);
+                Assert.AreEqual(remembered.Cue, attempt.Cue);
+                Assert.AreNotEqual(remembered.Movement, attempt.Movement);
+                followedRehearsal = true;
+            }
+            Assert.IsTrue(followedRehearsal);
+            room.RunTicks(1);
+            Assert.IsNotNull(room.Retained);
+            Assert.IsNotNull(room.Transferred);
+            Assert.AreEqual(18, room.Attempts.Count);
+        }
+
+        [Test]
+        public void BatchedRunsMatchAndAblationsKeepTheSameOpportunities()
+        {
+            var full = new DiscoveryRoom(51, 8, true, true);
+            var batched = new DiscoveryRoom(51, 8, true, true);
+            var baseline = new DiscoveryRoom(51, 8, false, false);
+            full.RunTicks(DiscoveryRoom.EndTick);
+            baseline.RunTicks(DiscoveryRoom.EndTick);
+            while (batched.TickCount < DiscoveryRoom.EndTick) batched.RunTicks(37);
+
+            CollectionAssert.AreEqual(full.Attempts, batched.Attempts);
+            Assert.AreEqual(full.Transferred, batched.Transferred);
+            Assert.AreEqual(full.Attempts.Count, baseline.Attempts.Count);
+            for (int i = 0; i < full.Attempts.Count; i++)
+            {
+                var a = full.Attempts[i];
+                var b = baseline.Attempts[i];
+                Assert.AreEqual(a.Tick, b.Tick);
+                Assert.AreEqual(a.Cue, b.Cue);
+                if (a.Control == b.Control && a.Movement == b.Movement) Assert.AreEqual(a.Effect, b.Effect);
+            }
+        }
+
+        [Test]
+        public void MaximumTrainingBudgetKeepsProbabilitiesFinite()
+        {
+            var room = new DiscoveryRoom(75, DiscoveryRoom.MaximumAttemptsPerDay, false, false);
+            room.RunTicks(DiscoveryRoom.EndTick);
+            Assert.AreEqual(2 * DiscoveryRoom.MaximumAttemptsPerDay, room.Attempts.Count);
+            foreach (DiscoveryQuestion question in room.Questions)
+            {
+                double total = question.NoiseProbability;
+                for (int model = 0; model < DiscoveryQuestion.MechanismCount; model++)
+                    total += question.MechanismProbability(model);
+                Assert.AreEqual(1d, total, 1e-12);
+            }
+        }
+    }
+
     public class LatchRoomTests
     {
         [Test]

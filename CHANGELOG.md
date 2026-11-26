@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a two-stage Discovery Room with persistent in-run questions, matched curiosity and replay comparisons, a noise panel and held-out probes. Documented the Phase II mimicry, hearing and voice design and evaluated candidate speech dependencies.
+- Added actor and event filters, physical timestamps and playback to the latch-room trace window. Verified the live Edit Mode display.
 - Added a fixed-tick latch-room pilot, paired curiosity and replay controls, CSV reports, and a Unity Editor inspector for the actual event trace.
 - Audited the merged family simulation, current dependencies and research options. Documented the implementation sequence, approval points, benchmark and first curiosity/replay experiment in `docs/`.
 - Corrected shared batch timing so wall-clock budgets and throughput span every executed full tick. Added a regression test for the budget and same-seed replay.

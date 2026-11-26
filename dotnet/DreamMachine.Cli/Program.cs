@@ -34,6 +34,7 @@ namespace DreamMachine.Cli
                 for (int i = 0; i < args.Length; i++)
                 {
                     if (args[i] == "--room") return RoomExperimentCommand.Run(args);
+                    if (args[i] == "--discover") return DiscoveryCommand.Run(args);
                     if (args[i] == "--benchmark")
                     {
                         int agents = 4;
