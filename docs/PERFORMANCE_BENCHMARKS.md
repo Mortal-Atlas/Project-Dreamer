@@ -64,3 +64,7 @@ Release .NET, Laptop preset, 16×16 grid, seed 7, after 1,140 ticks. Nine repeti
 | 12 | 142,838 bytes | Read and restore | 5.14 | 4.24–6.10 | 2,990,600 bytes |
 
 An isolated Play Mode panel creation took 4.565 ms and coincided with a 216 KiB managed-memory increase. Allocated bytes include temporaries and are not retained-memory measurements. The single panel sample includes concurrent allocations. There is no fresh process-isolated throughput or retained-memory comparison. The existing CLI has four- and twelve-person cases. A one-individual comparison requires a supported single-individual scenario.
+
+## Modular tray follow-up
+
+In isolated Unity Play Mode, first open took 5.815 ms (seed 18) and 4.832 ms (seed 101), each with an immediate 216 KiB managed-memory increase. Timings include preference publication. After eleven repeated close/open cycles and a final close, forced-GC managed memory was 3,280,896 and 3,313,664 bytes above each run's start reading. World state advanced by 450 ticks, memories grew and camera textures changed quality during each interval. These readings include application and editor state and cannot isolate retained tray memory or establish a leak. Native GPU memory was not measured. Older checkpoint capture and restore baselines above remain applicable as historical measurements. The owner's Unity editor remained open, so the clean throughput rerun remains pending.

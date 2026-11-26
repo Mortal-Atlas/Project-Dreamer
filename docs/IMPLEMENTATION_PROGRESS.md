@@ -1,5 +1,22 @@
 # Implementation progress
 
+## Modular workspace and recovery · November 26, 2026
+
+The Simulation panel is now registered as `simulation`. The shared [tray workspace](../Assets/DreamMachine/Unity/TrayWorkspace.cs) owns its Canvas, minimum dimensions, open, close and visible-only refresh callbacks. Versioned PlayerPrefs keep normalized layout and visibility independent of the simulation checkpoint. Closing destroys the tray and removes its telemetry update. Presentation quality now releases and destroys superseded render textures. Interactive docking, drag/resize, tab grouping, and named presets remain outside this first registry.
+
+**50 .NET Release tests and 51 isolated Unity Edit Mode tests passed.** Windows tests exercised manifest damage, truncated payloads, and a read-sharing lock that prevents file replacement. The primary and backup were preserved and the pending file cleaned on the tested failure. The prior Windows tests also cover missing primary with backup, incomplete pending files and incompatible versions. Storage exhaustion, process termination during publication, and power-loss durability remain unverified. [Recovery details](WORLD_CHECKPOINT.md)
+
+Four DX12 Unity Play Mode runs paired control and observation for seeds 18 and 101. Each began at tick 690 and ended at tick 1140. Each observed run opened the tray, switched the selected learner and display quality, rendered previews, and repeated open/close through the day transition. The workspace reopened with its saved geometry and closed with exactly one shutdown callback. Its changes left per-seed full checkpoint digests identical. The existing fast hash was `d5b13b29` in both seeds and did not distinguish their checkpoint digests.
+
+| Seed | Full checkpoint SHA-256, equal in control and observed runs |
+| ---: | --- |
+| 18 | `13ffff7d9d089b331554ad08adae22171ababf3cb56bf45c3f8dd7565dee562d` |
+| 101 | `c45f59dd2fa02044c1427e6bedef11d3d6b32f73a0948b3c277880d58c4f1cb1` |
+
+Both conditions verified save and restore in the running app. The serialized fields include current learner memories, interventions, motor state, and ordered physiology records. The embedded random streams used in this scenario are derived from seed and tick. The household has no live read-only memory browser. The existing Library Observatory browses separate archived experiment data and was outside this experiment. Batch graphics did not produce the requested screenshot. Controls and resource lifecycle were exercised programmatically, and visual clipping and alignment remain unverified. [Reproduction harness](../tools/unity/README.md)
+
+See the [observer resource measurements](PERFORMANCE_BENCHMARKS.md). The next slice is a dedicated supported elbow and constrained object fixture with measured contact and position feedback before any adaptive model is trained. [Embodiment preparation and physical ownership](EMBODIMENT_NEXT_SLICE.md)
+
 ## Atomic world-and-learner checkpoint · November 26, 2026
 
 [Draft PR #7](https://github.com/Mortal-Atlas/Project-Dreamer/pull/7) now contains the embedded kernel checkpoint, load-on-start and in-place Unity restore, atomic stage export, and a persisted intervention ledger for explicit learner resets. The previous valid primary stays recoverable after publication. An invalid primary blocks startup and remains on disk. A failed in-place restore preserves the active world. Legacy individual files remain available for first-run migration when no world checkpoint exists. [State inventory, repository audit and recovery](WORLD_CHECKPOINT.md)
