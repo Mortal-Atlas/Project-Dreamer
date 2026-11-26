@@ -19,6 +19,64 @@ using NUnit.Framework;
 
 namespace DreamMachine.Tests
 {
+    public class AgentSaveFileTests
+    {
+        [Test]
+        public void AtomicReplacementRestoresLatestBodyAndIgnoresInterruptedWrite()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            string path = Path.Combine(directory, "son.json");
+            try
+            {
+                Assert.IsNull(AgentSaveFile.Load(path));
+                PersonSpec spec = PopulationConfig.CreateDefault().Find("son");
+                AgentPersistentState state = AgentPersistentState.CreateNew(spec);
+                AgentSaveFile.Save(path, state);
+                Assert.AreEqual(0, AgentSaveFile.Load(path).Physiology.AgeDays);
+                state.Physiology.AgeDays = 2.5f;
+                AgentSaveFile.Save(path, state);
+                Assert.That(Directory.GetFiles(directory), Is.EquivalentTo(new[] { path }));
+                File.WriteAllText(path + ".interrupted.pending", "{");
+                var world = WorldSimulation.Create(PopulationConfig.CreateDefault(), QualityPreset.Phone, 7,
+                    person => AgentSaveFile.Load(Path.Combine(directory, person.Id + ".json")));
+                Assert.AreEqual(spec.BirthSeed, world.Find("son").State.BirthSeed);
+                Assert.AreEqual(2.5f, world.Find("son").State.Physiology.AgeDays);
+                Assert.AreEqual(0f, world.Find("daughter").State.Physiology.AgeDays);
+            }
+            finally
+            {
+                if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            }
+        }
+
+        [TestCase("{")]
+        [TestCase("null")]
+        [TestCase("{\"agentId\":\"son\",\"displayName\":\"Arthur\",\"birthSeed\":303,\"generation\":0,\"day\":0,\"ageDays\":-1}")]
+        public void InvalidSaveStaysOnDisk(string contents)
+        {
+            string path = Path.GetTempFileName();
+            try
+            {
+                File.WriteAllText(path, contents);
+                Assert.Throws<InvalidDataException>(() => AgentSaveFile.Load(path));
+                Assert.AreEqual(contents, File.ReadAllText(path));
+            }
+            finally { File.Delete(path); }
+        }
+
+        [Test]
+        public void RestoreRejectsAnotherIndividualOrBirthSeed()
+        {
+            PopulationConfig population = PopulationConfig.CreateDefault();
+            AgentPersistentState saved = AgentPersistentState.CreateNew(population.Find("daughter"));
+            Assert.Throws<InvalidDataException>(() => WorldSimulation.Create(population, QualityPreset.Phone, 7,
+                spec => spec.Id == "son" ? saved : null));
+            saved.AgentId = "son";
+            Assert.Throws<InvalidDataException>(() => WorldSimulation.Create(population, QualityPreset.Phone, 7,
+                spec => spec.Id == "son" ? saved : null));
+        }
+    }
+
     public class HumanoidAnatomyTests
     {
         [Test]

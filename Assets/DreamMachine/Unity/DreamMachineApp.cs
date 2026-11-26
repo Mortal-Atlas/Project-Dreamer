@@ -71,6 +71,7 @@ namespace DreamMachine.UnityBridge
         Font _font;
         Transform _dreamAnchor;
         TextMesh _banner;
+        string _startupFailure;
 
         int _focus;
         int _day;
@@ -111,6 +112,22 @@ namespace DreamMachine.UnityBridge
 
         void Start()
         {
+            TextAsset familyFile = Resources.Load<TextAsset>("family");
+            _pop = familyFile != null ? PopulationConfig.FromJson(familyFile.text) : PopulationConfig.CreateDefault();
+            try
+            {
+                _sim = WorldSimulation.Create(_pop, _preset, 7, spec => AgentSaveFile.Load(AgentPath(spec.Id)));
+            }
+            catch (System.Exception error) when (error is IOException || error is InvalidDataException ||
+                error is System.UnauthorizedAccessException)
+            {
+                _startupFailure = "Simulation paused. A saved individual could not be restored.\n" + error.Message
+                    + "\nInspect the save or restore a known-good copy, then restart.\n"
+                    + Path.Combine(Application.persistentDataPath, "agents");
+                Debug.LogError(_startupFailure, this);
+                return;
+            }
+
             _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             if (_font == null) _font = Resources.GetBuiltinResource<Font>("Arial.ttf");
             EnsureEventSystem();
@@ -120,14 +137,11 @@ namespace DreamMachine.UnityBridge
             if (visible == null) visible = Shader.Find("Unlit/Color");
             _unlit = new Material(visible);
             _idShader = Shader.Find("DreamMachine/IdColor");
-            TextAsset familyFile = Resources.Load<TextAsset>("family");
-            _pop = familyFile != null ? PopulationConfig.FromJson(familyFile.text) : PopulationConfig.CreateDefault();
             _groups = new GroupMind();
             _groups.Step(0, 0, 7);
             _world = new HiddenRuleWorld { ShiftAt = 18 };
             _pool = HiddenRuleWorld.StandardPool();
             var looks = LoadLooks();
-            _sim = WorldSimulation.Create(_pop, _preset, 7, LoadOrCreate);
             BuildProps();
             BuildPeople(looks);
             BuildCameras();
@@ -145,6 +159,13 @@ namespace DreamMachine.UnityBridge
             BuildTimeBar();
             _ready = true;
             SelectBaby(0);
+        }
+
+        void OnGUI()
+        {
+            if (string.IsNullOrEmpty(_startupFailure)) return;
+            var style = new GUIStyle(GUI.skin.label) { wordWrap = true };
+            GUI.Label(new Rect(16, 16, Mathf.Max(16, Screen.width - 32), 180), _startupFailure, style);
         }
 
         void Update()
@@ -668,23 +689,6 @@ namespace DreamMachine.UnityBridge
             actor.Wetware = child.Wetware;
         }
 
-        AgentPersistentState LoadOrCreate(PersonSpec spec)
-        {
-            string path = AgentPath(spec.Id);
-            if (File.Exists(path))
-            {
-                try
-                {
-                    return AgentPersistentState.FromJson(File.ReadAllText(path), true);
-                }
-                catch (System.Exception)
-                {
-                    // A damaged save should not block the nursery. Start this baby again.
-                }
-            }
-            return AgentPersistentState.CreateNew(spec);
-        }
-
         void BuildProps()
         {
             var parent = new GameObject("Yard").transform;
@@ -830,14 +834,21 @@ namespace DreamMachine.UnityBridge
 
         void SaveAll()
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(AgentPath("x")) ?? Application.persistentDataPath);
-            for (int i = 0; i < _babies.Count; i++)
+            try
             {
-                Actor baby = _babies[i];
-                baby.State.Day = _day;
-                File.WriteAllText(AgentPath(baby.Spec.Id), baby.State.ToJson());
+                for (int i = 0; i < _babies.Count; i++)
+                {
+                    Actor baby = _babies[i];
+                    baby.State.Day = _day;
+                    AgentSaveFile.Save(AgentPath(baby.Spec.Id), baby.State);
+                }
+                WriteGrowth();
             }
-            WriteGrowth();
+            catch (System.Exception error) when (error is IOException || error is System.UnauthorizedAccessException)
+            {
+                _banner.text = "Save interrupted. See the console for the affected file.";
+                Debug.LogError(error, this);
+            }
         }
 
         void ResetBabies()

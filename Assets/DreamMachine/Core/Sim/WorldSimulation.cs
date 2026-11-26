@@ -125,8 +125,9 @@ namespace DreamMachine.Sim
                 var child = new SimChild();
                 child.Spec = spec;
                 AgentPersistentState saved = restore?.Invoke(spec);
-                BindChildState(child, saved != null && saved.AgentId == spec.Id && saved.BirthSeed == spec.BirthSeed
-                    ? saved : AgentPersistentState.CreateNew(spec));
+                if (saved != null && (saved.AgentId != spec.Id || saved.BirthSeed != spec.BirthSeed))
+                    throw new System.IO.InvalidDataException("Save identity or birth seed does not match " + spec.Id + ".");
+                BindChildState(child, saved ?? AgentPersistentState.CreateNew(spec));
                 child.X = spec.Id == "daughter" ? 0.7f : -0.7f;
                 child.Z = 0.4f;
                 world.Children.Add(child);
