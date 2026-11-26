@@ -30,6 +30,12 @@ dotnet run --project dotnet/DreamMachine.Cli -c Release --no-build -- --seeds 12
 - The rolling Edit Mode `QuaternionToEuler` error traced to the main camera's serialized rotation. After normalization and scene reload the live log stopped recording that error. An Edit Mode test now checks the scene camera's unit rotation. In an isolated project copy using the same Unity version and DX12, five 12-second batch Play Mode runs initialized the family and returned to Edit Mode with no observed crash. The batch harness explicitly bootstrapped the family app. The isolated desktop editor also returned to Edit Mode five times, with the harness confirming family startup and runtime checks in two of those cycles. The desktop editor reported JobTempAlloc warnings during process shutdown. The underlying cause of the original native crash remains unconfirmed.
 - The Android APK, target-device performance and detailed CPU/GPU allocation profiles are pending. Current benchmark numbers describe the headless shared kernel on this PC.
 
+### Latch-room pilot verification
+
+The opt-in room pilot introduces no calls in the family tick loop. Nine alternating Release process launches per build and cast measured the audit branch at 54,569 family ticks/s and 34,693 twelve-person ticks/s. The pilot branch measured 53,435 and 34,778 respectively. These are median short-process timings on the same machine. The family ranges overlapped, and the median difference was −2.1%.
+
+The pilot passed 27 Release .NET and 28 isolated Unity Edit Mode tests. Two fresh 32-seed runs produced byte-identical event and summary CSVs. The [protocol](EXPERIMENTAL_PROTOCOLS.md#pilot-results) records the evidence and limitations of the comparison.
+
 ## Connectome feasibility
 
 Approximate sizing uses 27 directed weighted neuron pairs per neuron for reduced test graphs. The full reference row uses about 3.7 million connected pairs as an illustrative aggregate, based on published analysis thresholds. The source also has around 54.5 million individual chemical contacts. Recompute counts from the specific release and filter and preserve them in the experiment manifest. Storage estimates cover 8 bytes per edge for shared indexed connectivity and base weight, plus 4 bytes per edge for each of two learners. CSR row offsets, metadata, delays, activity traces, checkpoints and scratch memory are extra. [FlyWire paper](https://doi.org/10.1038/s41586-024-07558-y) · [v783 dataset](https://zenodo.org/records/10676866)

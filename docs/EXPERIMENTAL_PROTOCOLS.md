@@ -23,6 +23,26 @@ The first room can use a constrained deterministic actuator in the shared kernel
 
 Start with a paired 2×2 comparison (curiosity off/on and reflective replay off/on). The full condition and the condition with both off address the milestone, and the other two help attribute effects. Equalize action opportunities and compute budgets. Introduce instruction-only, random, novelty, prediction-error and progress policies in the same harness as data allow. Pre-register trial count, seeds, effect threshold and exclusions from pilot variance, then use held-out seeds for evaluation. Failure includes no attributable autonomous episode, comparable or worse unassisted probe performance, persistent attraction to unsolvable feedback, or renderer-dependent scientific outcomes. Record negative results and uncertainty.
 
+## Latch-room pilot
+
+`LatchRoomSimulation` implements a bounded fixture in the shared C# assembly. The child observes two controls, then moves one position per 0.05-second tick until contact. Pressing or sliding the latch emits a feedback signal according to a per-seed action rule. The noise panel emits a seeded signal independent of the child's action. Each run gets nine daytime investigations, one scripted demonstration of pressing at tick 40, an overnight interval, and two unassisted waking probes. The second probe moves the latch. The teacher demonstrates the same action regardless of the hidden rule, so the effect can be present or absent.
+
+With curiosity enabled, the child asks an action–object question before investigating and scores choices using a diminishing novelty term, observed outcome consistency and recent reduction in prediction loss. The baseline explores randomly. Both observe the same teacher and update a probability for each action–object pair from feedback. Observed teacher feedback updates prediction without adding a child encounter to lived memory. When replay is on, the child reconstructs its most recent failed latch action from lived memory and proposes the alternative movement. The first waking probe tests that proposal if available. The later moved-latch test uses predictions updated by the first waking probe.
+
+```sh
+dotnet run --project dotnet/DreamMachine.Cli -c Release -- --room --seeds 32 --out ExperimentOutput/room
+```
+
+- `room_events.csv` is the observer trace. Each event has schema version, seed, condition, tick, kind, and event ID. Parent IDs refer to earlier records in the same run and connect questions, physical contact, feedback, memory, replay and probes. The action records capture predictions before feedback. The trace reports the current one-dimensional fixture positions when relevant.
+- `room_summary.csv` has one row per seed and condition. Daytime Brier loss averages squared prediction error on each of the child's nine daytime attempts. Next-day and transfer success score observed effects on the first and second waking probes respectively.
+- **Dream Machine → Latch Room Trace** runs the same kernel in Unity Edit Mode. Select a seed and condition, run, then scrub the event index or follow a source link. The window reads actual room events and works independently of the family scene.
+
+### Pilot results
+
+The same 32 seeds ran under each condition. Both replay conditions generated a hypothesis in 32/32 runs. Each condition achieved 32/32 next-day and 32/32 moved-latch successes. With curiosity disabled the child used 143 of 288 daytime attempts on the noise panel and averaged 0.191 Brier loss. With curiosity enabled it used 145 of 288 and averaged 0.196. The task reached a ceiling on both probes, and the curiosity policy did not suppress noise-panel sampling in this pilot.
+
+These are development seeds and descriptive results. The moved-latch test keeps the same action rule. The pilot has one-dimensional motion and a local append-only encounter ledger. Full embodiment, a persistent Library III episode schema, and the 3D Neural Observatory remain later increments. Before evaluating benefits, use a harder held-out task with several action rules, record learning curves, and pre-register effect and noise-allocation thresholds.
+
 ## Broader experiment backlog
 
 | Experiment | Controls and measured outcomes |

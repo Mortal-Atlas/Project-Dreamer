@@ -19,6 +19,78 @@ using NUnit.Framework;
 
 namespace DreamMachine.Tests
 {
+    public class LatchRoomTests
+    {
+        [Test]
+        public void SameSeedAndSettingsProduceIdenticalTraceInDifferentBatches()
+        {
+            var whole = new LatchRoomSimulation(12, true, true);
+            var batched = new LatchRoomSimulation(12, true, true);
+            whole.RunTicks(LatchRoomSimulation.EndTick);
+            while (batched.TickCount < LatchRoomSimulation.EndTick) batched.RunTicks(17);
+            batched.RunTicks(17);
+
+            Assert.AreEqual(whole.TickCount, batched.TickCount);
+            Assert.AreEqual(whole.Trace, batched.Trace);
+            Assert.AreEqual(whole.LivedMemory, batched.LivedMemory);
+        }
+
+        [Test]
+        public void DreamComesFromOwnFeedbackAndNextDayProbeTestsIt()
+        {
+            var room = new LatchRoomSimulation(12, true, true);
+            room.RunTicks(LatchRoomSimulation.NightTick);
+            int wakingMemories = room.LivedMemory.Count;
+            room.RunTicks(LatchRoomSimulation.WakeTick - LatchRoomSimulation.NightTick);
+
+            Assert.AreEqual(wakingMemories, room.LivedMemory.Count);
+            RoomEvent idea = Find(room.Trace, RoomEventKind.Hypothesis);
+            RoomEvent replay = room.Trace[idea.ParentId.Value - 1];
+            RoomEvent memory = room.Trace[replay.ParentId.Value - 1];
+            RoomEvent feedback = room.Trace[memory.ParentId.Value - 1];
+            Assert.AreEqual(RoomEventKind.Feedback, feedback.Kind);
+            Assert.AreEqual(RoomEventKind.Memory, memory.Kind);
+            Assert.Less(memory.Tick, LatchRoomSimulation.NightTick);
+            Assert.AreNotEqual(memory.Action, idea.Action);
+
+            room.RunTicks(LatchRoomSimulation.EndTick - LatchRoomSimulation.WakeTick);
+            RoomEvent probe = Find(room.Trace, RoomEventKind.Probe);
+            Assert.AreEqual(idea.Id, probe.ParentId);
+            Assert.AreEqual(idea.Action, probe.Action);
+            Assert.AreEqual(LatchRoomSimulation.WakeTick, probe.Tick);
+            Assert.IsTrue(room.LivedMemory[room.LivedMemory.Count - 1].Transfer);
+        }
+
+        [Test]
+        public void ExperimentalSwitchesChangePolicyWithoutChangingOpportunitiesOrDemonstration()
+        {
+            var baseline = new LatchRoomSimulation(12, false, false);
+            var integrated = new LatchRoomSimulation(12, true, true);
+            baseline.RunTicks(LatchRoomSimulation.EndTick);
+            integrated.RunTicks(LatchRoomSimulation.EndTick);
+
+            Assert.AreEqual(baseline.LivedMemory.Count, integrated.LivedMemory.Count);
+            foreach (RoomEvent entry in baseline.Trace)
+            {
+                Assert.AreNotEqual(RoomEventKind.Question, entry.Kind);
+                Assert.AreNotEqual(RoomEventKind.Hypothesis, entry.Kind);
+            }
+            Assert.AreEqual(1, Find(integrated.Trace, RoomEventKind.Question).Tick);
+            RoomEvent baselineTeacher = Find(baseline.Trace, RoomEventKind.TeacherDemonstration);
+            RoomEvent integratedTeacher = Find(integrated.Trace, RoomEventKind.TeacherDemonstration);
+            Assert.AreEqual(baselineTeacher.Tick, integratedTeacher.Tick);
+            Assert.AreEqual(baselineTeacher.Action, integratedTeacher.Action);
+            Assert.AreEqual(baselineTeacher.Effect, integratedTeacher.Effect);
+        }
+
+        static RoomEvent Find(IReadOnlyList<RoomEvent> trace, RoomEventKind kind)
+        {
+            foreach (RoomEvent entry in trace)
+                if (entry.Kind == kind) return entry;
+            throw new AssertionException("Missing room event " + kind);
+        }
+    }
+
     public class SeedAndAtlasTests
     {
         [Test]
