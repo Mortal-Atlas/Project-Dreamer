@@ -173,6 +173,24 @@ namespace DreamMachine.Affect
             if (data.ContainsKey("baselineFatigue")) BaselineFatigue = MiniJson.AsFloat(data["baselineFatigue"]);
         }
 
+        internal void WriteCheckpoint(System.IO.BinaryWriter writer)
+        {
+            writer.Write(_vC);
+            writer.Write(_vFr);
+            writer.Write(_vS);
+            writer.Write(_vFear);
+            writer.Write(_vFat);
+        }
+
+        internal void ReadCheckpoint(System.IO.BinaryReader reader)
+        {
+            _vC = reader.ReadSingle();
+            _vFr = reader.ReadSingle();
+            _vS = reader.ReadSingle();
+            _vFear = reader.ReadSingle();
+            _vFat = reader.ReadSingle();
+        }
+
         static void Spring(ref float value, ref float velocity, float target, float dt)
         {
             const float stiffness = 4.5f;

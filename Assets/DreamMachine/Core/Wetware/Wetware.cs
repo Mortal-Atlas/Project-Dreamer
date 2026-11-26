@@ -94,6 +94,18 @@ namespace DreamMachine.Wetware
             }
         }
 
+        internal void WriteCheckpoint(System.IO.BinaryWriter writer)
+        {
+            for (int i = 0; i < _weights.Length; i++) writer.Write(_weights[i]);
+            for (int i = 0; i < _rates.Length; i++) writer.Write(_rates[i]);
+        }
+
+        internal void ReadCheckpoint(System.IO.BinaryReader reader)
+        {
+            for (int i = 0; i < _weights.Length; i++) _weights[i] = reader.ReadSingle();
+            for (int i = 0; i < _rates.Length; i++) _rates[i] = reader.ReadSingle();
+        }
+
         public WetwareSnapshot Snapshot()
         {
             var copy = new float[_weights.Length];

@@ -29,6 +29,36 @@ namespace DreamMachine.Elements
         public float WindX = 0.15f;
         public float WindY = 0.05f;
 
+        internal void WriteCheckpoint(System.IO.BinaryWriter writer)
+        {
+            writer.Write(WindX);
+            writer.Write(WindY);
+            for (int i = 0; i < Temperature.Length; i++) writer.Write(Temperature[i]);
+            for (int i = 0; i < Fuel.Length; i++) writer.Write(Fuel[i]);
+            for (int i = 0; i < Oxygen.Length; i++) writer.Write(Oxygen[i]);
+            for (int i = 0; i < Water.Length; i++) writer.Write(Water[i]);
+            for (int i = 0; i < Ice.Length; i++) writer.Write(Ice[i]);
+            for (int i = 0; i < Steam.Length; i++) writer.Write(Steam[i]);
+            for (int i = 0; i < Smoke.Length; i++) writer.Write(Smoke[i]);
+            for (int i = 0; i < Material.Length; i++) writer.Write(Material[i]);
+            for (int i = 0; i < Burning.Length; i++) writer.Write(Burning[i]);
+        }
+
+        internal void ReadCheckpoint(System.IO.BinaryReader reader)
+        {
+            WindX = reader.ReadSingle();
+            WindY = reader.ReadSingle();
+            for (int i = 0; i < Temperature.Length; i++) Temperature[i] = reader.ReadSingle();
+            for (int i = 0; i < Fuel.Length; i++) Fuel[i] = reader.ReadSingle();
+            for (int i = 0; i < Oxygen.Length; i++) Oxygen[i] = reader.ReadSingle();
+            for (int i = 0; i < Water.Length; i++) Water[i] = reader.ReadSingle();
+            for (int i = 0; i < Ice.Length; i++) Ice[i] = reader.ReadSingle();
+            for (int i = 0; i < Steam.Length; i++) Steam[i] = reader.ReadSingle();
+            for (int i = 0; i < Smoke.Length; i++) Smoke[i] = reader.ReadSingle();
+            for (int i = 0; i < Material.Length; i++) Material[i] = reader.ReadByte();
+            for (int i = 0; i < Burning.Length; i++) Burning[i] = reader.ReadByte();
+        }
+
         public ElementGrid(int width, int height)
         {
             if (width < 4) width = 4;

@@ -46,7 +46,7 @@ namespace DreamMachine.Sim
     /// One fixed-step tick of the whole household.
     /// Fast-forward calls this same method. It never coarsens the step.
     /// </summary>
-    public sealed class WorldSimulation
+    public sealed partial class WorldSimulation
     {
         public const float Dt = 0.05f;
         public const float DayLength = 52f;
@@ -66,7 +66,6 @@ namespace DreamMachine.Sim
         readonly float[] _parentA = new float[10];
         readonly float[] _parentB = new float[10];
         readonly float[] _wetIn = new float[4];
-        readonly Stopwatch _clock = new Stopwatch();
         int _lastLoggedDay = -1;
 
         public bool IsNight
@@ -94,9 +93,12 @@ namespace DreamMachine.Sim
             if (stage == LifeStage.Toddler) return 0.2f;
             if (stage == LifeStage.Child) return 1f;
             if (stage == LifeStage.Teen) return 3f;
-            if (stage == LifeStage.Adult) return 6f;
+            if (stage == LifeStage.Adult) return HumanoidAnatomy.AdultAgeDays;
             return 0f;
         }
+
+        public static float AnatomyAge(float chronologicalDays) =>
+            HumanoidAnatomy.SleepAge(chronologicalDays, AwakeLength / DayLength);
 
         public static int GridFor(QualityPreset preset)
         {
@@ -106,6 +108,10 @@ namespace DreamMachine.Sim
         }
 
         public static WorldSimulation Create(PopulationConfig population, QualityPreset preset, int worldSeed)
+            => Create(population, preset, worldSeed, null);
+
+        public static WorldSimulation Create(PopulationConfig population, QualityPreset preset, int worldSeed,
+            Func<PersonSpec, AgentPersistentState> restore)
         {
             var world = new WorldSimulation();
             world.Population = population;
@@ -118,17 +124,33 @@ namespace DreamMachine.Sim
                 PersonSpec spec = babies[i];
                 var child = new SimChild();
                 child.Spec = spec;
-                child.State = AgentPersistentState.CreateNew(spec);
-                child.Body = child.State.Physiology;
-                child.Mind = new AgentMind(spec.BirthSeed, MindCondition.Full);
-                child.Mind.Library = child.State.Library;
-                child.Wetware = new HebbianWetware(4, 3, spec.BirthSeed);
-                child.State.Walker.RecordRolloutRom = false;
+                AgentPersistentState saved = restore?.Invoke(spec);
+                if (saved != null && (saved.AgentId != spec.Id || saved.BirthSeed != spec.BirthSeed))
+                    throw new System.IO.InvalidDataException("Save identity or birth seed does not match " + spec.Id + ".");
+                BindChildState(child, saved ?? AgentPersistentState.CreateNew(spec));
                 child.X = spec.Id == "daughter" ? 0.7f : -0.7f;
                 child.Z = 0.4f;
                 world.Children.Add(child);
             }
             return world;
+        }
+
+        static void BindChildState(SimChild child, AgentPersistentState state)
+        {
+            child.State = state;
+            child.Body = state.Physiology;
+            child.Mind = new AgentMind(child.Spec.BirthSeed, MindCondition.Full) { Library = state.Library };
+            child.Wetware = new HebbianWetware(4, 3, child.Spec.BirthSeed);
+            state.Walker.RecordRolloutRom = false;
+        }
+
+        public SimChild ResetChild(string id)
+        {
+            SimChild child = Find(id);
+            if (child == null) return null;
+            BindChildState(child, AgentPersistentState.CreateNew(child.Spec));
+            child.SawParentPour = false;
+            return child;
         }
 
         public SimChild Find(string id)
@@ -142,9 +164,7 @@ namespace DreamMachine.Sim
 
         public void Tick()
         {
-            long t0 = _clock.ElapsedTicks;
             Elements.Step(Dt);
-            long t1 = _clock.ElapsedTicks;
             bool night = IsNight;
             FamilyRoutine routine = PopulationConfig.RoutineAt(SimSeconds, DayLength, AwakeLength);
             string parentClip = ClipFor(routine, night);
@@ -158,7 +178,6 @@ namespace DreamMachine.Sim
             {
                 StepChild(Children[i], night, routine);
             }
-            long t2 = _clock.ElapsedTicks;
             SimSeconds += Dt;
             TickCount++;
             int day = DayIndex;
@@ -170,36 +189,33 @@ namespace DreamMachine.Sim
                     PhysiologyLog.Add(PhysiologySample.From(Children[i], day, night ? "night" : "awake"));
                 }
             }
-            _clock.Stop();
         }
 
         public int RunTicks(int count)
         {
-            _clock.Restart();
             int n = 0;
             while (n < count)
             {
                 Tick();
                 n++;
             }
-            _clock.Stop();
             return n;
         }
 
         public SimProfile RunBudget(int hardCap, double budgetMs, float realDt, float requestedScale, bool catchUp, float catchAge)
         {
             var profile = new SimProfile();
-            _clock.Restart();
+            var clock = Stopwatch.StartNew();
             int n = 0;
-            while (n < hardCap && _clock.Elapsed.TotalMilliseconds < budgetMs)
+            while (n < hardCap && clock.Elapsed.TotalMilliseconds < budgetMs)
             {
                 if (catchUp && MinAgeDays() >= catchAge) break;
                 Tick();
                 n++;
             }
-            _clock.Stop();
+            clock.Stop();
             profile.Ticks = n;
-            double seconds = _clock.Elapsed.TotalSeconds;
+            double seconds = clock.Elapsed.TotalSeconds;
             profile.TicksPerSecond = seconds > 0 ? (float)(n / seconds) : 0f;
             profile.AchievedScale = realDt > 0.000001f ? (float)((n * Dt) / realDt) : 0f;
             if (!catchUp && requestedScale > 0f && profile.AchievedScale > requestedScale)
@@ -486,6 +502,44 @@ namespace DreamMachine.Sim
         public float WalkForceScale;
         public float NerveDelaySeconds;
 
+        internal void WriteCheckpoint(System.IO.BinaryWriter writer)
+        {
+            writer.Write(AgeDays);
+            writer.Write(Maturity);
+            writer.Write(HeartRate);
+            writer.Write(BreathingRate);
+            writer.Write(Energy);
+            writer.Write(Hunger);
+            writer.Write(Cortisol);
+            writer.Write(Oxytocin);
+            writer.Write(Melatonin);
+            writer.Write(Pain);
+            writer.Write(MeanActivation);
+            writer.Write(MeanForce);
+            writer.Write(MeanFatigue);
+            writer.Write(WalkForceScale);
+            writer.Write(NerveDelaySeconds);
+        }
+
+        internal void ReadCheckpoint(System.IO.BinaryReader reader)
+        {
+            AgeDays = reader.ReadSingle();
+            Maturity = reader.ReadSingle();
+            HeartRate = reader.ReadSingle();
+            BreathingRate = reader.ReadSingle();
+            Energy = reader.ReadSingle();
+            Hunger = reader.ReadSingle();
+            Cortisol = reader.ReadSingle();
+            Oxytocin = reader.ReadSingle();
+            Melatonin = reader.ReadSingle();
+            Pain = reader.ReadSingle();
+            MeanActivation = reader.ReadSingle();
+            MeanForce = reader.ReadSingle();
+            MeanFatigue = reader.ReadSingle();
+            WalkForceScale = reader.ReadSingle();
+            NerveDelaySeconds = reader.ReadSingle();
+        }
+
         public static PhysiologySample From(SimChild child, int day, string phase)
         {
             PhysiologyState body = child.Body;
@@ -521,11 +575,26 @@ namespace DreamMachine.Sim
         public bool Paused;
         public bool CatchingUp;
         public LifeStage CatchStage;
+        bool _singleStepPending;
+
+        public void RequestSingleStep()
+        {
+            Paused = true;
+            _singleStepPending = true;
+        }
+
+        public bool TakeSingleStep()
+        {
+            bool step = _singleStepPending && Paused;
+            _singleStepPending = false;
+            return step;
+        }
+
         public const int HardCap = 4000;
 
         public int Plan(float realDt, float fixedDt, int budgetTicks)
         {
-            if (Paused && !CatchingUp)
+            if (Paused)
             {
                 AchievedScale = 0f;
                 return 0;
