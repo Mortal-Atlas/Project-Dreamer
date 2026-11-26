@@ -16,6 +16,83 @@ namespace DreamMachine.UnityBridge
         readonly Dictionary<string, Transform> _pivots = new Dictionary<string, Transform>();
         TextMesh _label;
         Transform _rootSpin;
+        Transform _pelvis, _chest, _neck, _head, _torsoMesh, _neckMesh;
+        readonly List<Limb> _limbs = new List<Limb>(4);
+        HumanoidAnatomy _anatomy;
+        float _sampledAge = -1f;
+
+        public HumanoidDimensions Dimensions { get; private set; }
+        public int AnatomySeed => _anatomy.BirthSeed;
+        public float SampledDevelopmentDays => _sampledAge;
+
+        internal sealed class Limb
+        {
+            public bool Arm;
+            public float Side;
+            public Transform Root, Hinge, End, Grip, FirstMesh, SecondMesh, EndMesh;
+        }
+
+        internal void BindAnatomy(HumanoidAnatomy anatomy, Transform pelvis, Transform chest, Transform neck,
+            Transform head, Transform torsoMesh, Transform neckMesh)
+        {
+            _anatomy = anatomy;
+            _pelvis = pelvis;
+            _chest = chest;
+            _neck = neck;
+            _head = head;
+            _torsoMesh = torsoMesh;
+            _neckMesh = neckMesh;
+        }
+
+        internal void AddLimb(Limb limb) => _limbs.Add(limb);
+
+        /// <summary>View-only sampling. The kernel owns age and the anatomy curve.</summary>
+        public void ApplyDevelopmentAge(float developmentDays)
+        {
+            float age = Mathf.Floor(Mathf.Clamp(developmentDays, 0f, HumanoidAnatomy.AdultAgeDays) * 64f) / 64f;
+            if (age == _sampledAge) return;
+            _sampledAge = age;
+            HumanoidDimensions d = _anatomy.AtAge(age);
+            Dimensions = d;
+            _pelvis.localPosition = Vector3.up * d.PelvisHeight;
+            _chest.localPosition = Vector3.up * (d.Torso * 0.82f);
+            _neck.localPosition = Vector3.up * (d.Torso * 0.18f);
+            _head.localPosition = Vector3.up * (d.Neck + d.Head * 0.5f);
+            _head.localScale = Vector3.one * (d.Head / 0.24f);
+            _torsoMesh.localScale = new Vector3(d.ShoulderWidth, d.Torso, d.HipWidth);
+            _neckMesh.localPosition = Vector3.up * (d.Neck * 0.5f);
+            _neckMesh.localScale = new Vector3(d.Head * 0.42f, d.Neck * 0.5f, d.Head * 0.42f);
+            if (_label != null) _label.transform.localPosition = Vector3.up * (d.Height + 0.16f);
+            foreach (Limb limb in _limbs)
+            {
+                float first = limb.Arm ? d.UpperArm : d.Thigh;
+                float second = limb.Arm ? d.Forearm : d.Shin;
+                limb.Root.localPosition = Vector3.right * (limb.Side * (limb.Arm ? d.ShoulderWidth : d.HipWidth) * 0.5f);
+                limb.Hinge.localPosition = Vector3.down * first;
+                limb.End.localPosition = Vector3.down * second;
+                ResizeCapsule(limb.FirstMesh, first, limb.Arm ? d.ShoulderWidth * 0.23f : d.HipWidth * 0.48f);
+                ResizeCapsule(limb.SecondMesh, second, limb.Arm ? d.ShoulderWidth * 0.18f : d.HipWidth * 0.34f);
+                if (limb.Arm)
+                {
+                    limb.EndMesh.localPosition = Vector3.down * (d.Hand * 0.5f);
+                    limb.EndMesh.localScale = new Vector3(d.Hand * 0.58f, d.Hand, d.Hand * 0.44f);
+                    limb.Grip.localPosition = limb.EndMesh.localPosition;
+                }
+                else
+                {
+                    limb.EndMesh.localPosition = new Vector3(0f, -d.AnkleHeight * 0.5f, d.Foot * 0.24f);
+                    limb.EndMesh.localScale = new Vector3(d.Foot * 0.47f, d.AnkleHeight, d.Foot);
+                }
+            }
+        }
+
+        static void ResizeCapsule(Transform mesh, float length, float diameter)
+        {
+            mesh.localPosition = Vector3.down * (length * 0.5f);
+            mesh.localScale = new Vector3(diameter, length * 0.5f, diameter);
+        }
+
+        public Transform RigPivot(string joint) => _pivots.TryGetValue(joint, out Transform pivot) ? pivot : null;
 
         public void Bind(Transform rootSpin, TextMesh label)
         {
@@ -72,16 +149,12 @@ namespace DreamMachine.UnityBridge
             _label.color = color;
         }
 
-        public Transform HeadPivot()
-        {
-            Transform head;
-            return _pivots.TryGetValue("head", out head) ? head : transform;
-        }
     }
 
     public static class CharacterFactory
     {
-        public static SegmentedBody Build(Transform parent, AppearanceProfile look, Material source)
+        public static SegmentedBody Build(Transform parent, AppearanceProfile look, Material source,
+            HumanoidAnatomy anatomy, float developmentDays)
         {
             var root = new GameObject(look.DisplayName);
             root.transform.SetParent(parent, false);
@@ -93,42 +166,40 @@ namespace DreamMachine.UnityBridge
             spin.SetParent(root.transform, false);
             body.Bind(spin, null);
 
-            float shoulder = 0.16f * look.Shoulder;
-            float hip = 0.09f * look.Hip;
-            float torsoH = look.IsBaby ? 0.34f : 0.52f;
-            float headR = (look.IsBaby ? 0.13f : 0.12f) * look.Head;
+            const float headR = 0.12f;
             Color skin = Hex(look.Skin);
             Color hair = Hex(look.Hair);
             Color cloth = Hex(look.Cloth);
             Color accent = Hex(look.Accent);
 
-            Transform torso = Pivot(body, spin, "torso", Vector3.up * (torsoH * 0.55f));
-            Primitive(torso, PrimitiveType.Capsule, source, skin, Vector3.zero, new Vector3(0.28f * look.Shoulder, torsoH * 0.5f, 0.18f * look.Hip), 0);
-            Primitive(torso, PrimitiveType.Capsule, source, cloth, new Vector3(0f, -0.02f, 0.02f), new Vector3(0.30f * look.Shoulder, torsoH * 0.42f, 0.20f), 0);
+            Transform pelvis = Pivot(body, spin, "pelvis", Vector3.zero);
+            Transform torso = Pivot(body, pelvis, "torso", Vector3.zero);
+            Transform chest = Pivot(body, torso, "chest", Vector3.zero);
+            Transform neck = Pivot(body, chest, "neck", Vector3.zero);
+            Transform torsoGeometry = Pivot(body, torso, "torsoGeometry", Vector3.zero);
+            Primitive(torsoGeometry, PrimitiveType.Capsule, source, cloth, Vector3.up * 0.51f,
+                new Vector3(0.92f, 0.49f, 0.58f), 0, true);
             if (look.Outfit == "wrap" || look.Outfit == "robe")
             {
-                Primitive(torso, PrimitiveType.Cube, source, cloth, new Vector3(0f, -torsoH * 0.42f, 0f), new Vector3(0.34f * look.Hip, 0.16f, 0.22f), 0);
+                Primitive(torsoGeometry, PrimitiveType.Cube, source, cloth,
+                    new Vector3(0f, 0.16f, 0f), new Vector3(0.94f, 0.29f, 0.62f), 0);
             }
             if (look.IsLeader)
             {
-                Primitive(torso, PrimitiveType.Cube, source, accent, new Vector3(0f, 0.02f, -0.12f), new Vector3(0.34f, torsoH * 0.7f, 0.04f), 0);
-                Primitive(torso, PrimitiveType.Cube, source, accent, new Vector3(0f, torsoH * 0.2f, 0.16f), new Vector3(0.12f, 0.28f, 0.04f), 0);
+                Primitive(torsoGeometry, PrimitiveType.Cube, source, accent, new Vector3(0f, 0.50f, -0.30f), new Vector3(0.91f, 0.66f, 0.10f), 0);
+                Primitive(torsoGeometry, PrimitiveType.Cube, source, accent, new Vector3(0f, 0.58f, 0.32f), new Vector3(0.29f, 0.48f, 0.08f), 0);
             }
 
-            Transform head = Pivot(body, torso, "head", Vector3.up * (torsoH * 0.55f + headR * 0.2f));
-            Primitive(head, PrimitiveType.Sphere, source, skin, Vector3.zero, Vector3.one * headR * 2f, 0);
-            AddFace(head, source, skin, hair, headR, look);
+            Transform head = Pivot(body, neck, "head", Vector3.zero);
+            Transform neckMesh = Primitive(neck, PrimitiveType.Capsule, source, skin, Vector3.zero, Vector3.one, 0, true);
+            Primitive(head, PrimitiveType.Sphere, source, skin, Vector3.zero, Vector3.one * headR * 2f, 0, true);
+            AddFace(body, head, source, skin, hair, headR, look);
             AddHair(head, source, hair, accent, headR, look);
 
-            float armLen = look.IsBaby ? 0.18f : 0.26f;
-            float foreLen = look.IsBaby ? 0.16f : 0.22f;
-            BuildArm(body, torso, source, skin, cloth, "left", new Vector3(-shoulder, torsoH * 0.28f, 0f), armLen, foreLen);
-            BuildArm(body, torso, source, skin, cloth, "right", new Vector3(shoulder, torsoH * 0.28f, 0f), armLen, foreLen);
-
-            float thigh = look.IsBaby ? 0.20f : 0.32f;
-            float shin = look.IsBaby ? 0.18f : 0.30f;
-            BuildLeg(body, torso, source, skin, cloth, "left", new Vector3(-hip, -torsoH * 0.42f, 0f), thigh, shin);
-            BuildLeg(body, torso, source, skin, cloth, "right", new Vector3(hip, -torsoH * 0.42f, 0f), thigh, shin);
+            BuildLimb(body, chest, source, skin, cloth, "left", -1f, true);
+            BuildLimb(body, chest, source, skin, cloth, "right", 1f, true);
+            BuildLimb(body, pelvis, source, skin, cloth, "left", -1f, false);
+            BuildLimb(body, pelvis, source, skin, cloth, "right", 1f, false);
 
             var labelGo = new GameObject("Label");
             labelGo.transform.SetParent(root.transform, false);
@@ -142,45 +213,50 @@ namespace DreamMachine.UnityBridge
             label.color = look.IsLeader ? accent : Color.white;
             body.Bind(spin, label);
 
-            root.transform.localScale = Vector3.one * look.Height;
+            body.BindAnatomy(anatomy, pelvis, chest, neck, head, torsoGeometry, neckMesh);
+            body.ApplyDevelopmentAge(developmentDays);
             return body;
         }
 
-        static void BuildArm(SegmentedBody body, Transform torso, Material source, Color skin, Color cloth, string side, Vector3 origin, float upper, float fore)
+        static void BuildLimb(SegmentedBody body, Transform parent, Material source, Color skin, Color cloth,
+            string side, float sign, bool arm)
         {
-            string shoulder = side + "Shoulder";
-            string elbow = side + "Elbow";
-            Transform shoulderPivot = Pivot(body, torso, shoulder, origin);
-            Primitive(shoulderPivot, PrimitiveType.Capsule, source, cloth, new Vector3(0f, -upper * 0.5f, 0f), new Vector3(0.09f, upper * 0.5f, 0.09f), 0);
-            Transform elbowPivot = Pivot(body, shoulderPivot, elbow, new Vector3(0f, -upper, 0f));
-            Primitive(elbowPivot, PrimitiveType.Capsule, source, skin, new Vector3(0f, -fore * 0.5f, 0f), new Vector3(0.07f, fore * 0.5f, 0.07f), 0);
-            Primitive(elbowPivot, PrimitiveType.Sphere, source, skin, new Vector3(0f, -fore, 0f), Vector3.one * 0.08f, 0);
+            if (arm) parent = Pivot(body, parent, side + "Clavicle", Vector3.zero);
+            Transform root = Pivot(body, parent, side + (arm ? "Shoulder" : "Hip"), Vector3.zero);
+            Transform hinge = Pivot(body, root, side + (arm ? "Elbow" : "Knee"), Vector3.zero);
+            Transform end = Pivot(body, hinge, side + (arm ? "Wrist" : "Ankle"), Vector3.zero);
+            Transform tip = Pivot(body, end, side + (arm ? "Hand" : "Foot"), Vector3.zero);
+            body.AddLimb(new SegmentedBody.Limb
+            {
+                Arm = arm, Side = sign, Root = root, Hinge = hinge, End = end,
+                Grip = arm ? Pivot(body, tip, side + "Grip", Vector3.zero) : null,
+                FirstMesh = Primitive(root, PrimitiveType.Capsule, source, cloth, Vector3.zero, Vector3.one, 0, true),
+                SecondMesh = Primitive(hinge, PrimitiveType.Capsule, source, skin, Vector3.zero, Vector3.one, 0, true),
+                EndMesh = Primitive(tip, arm ? PrimitiveType.Sphere : PrimitiveType.Cube, source,
+                    arm ? skin : Hex("#2B2B2B"), Vector3.zero, Vector3.one, 0, true)
+            });
         }
 
-        static void BuildLeg(SegmentedBody body, Transform torso, Material source, Color skin, Color cloth, string side, Vector3 origin, float thigh, float shin)
-        {
-            string hip = side + "Hip";
-            string knee = side + "Knee";
-            Transform hipPivot = Pivot(body, torso, hip, origin);
-            Primitive(hipPivot, PrimitiveType.Capsule, source, cloth, new Vector3(0f, -thigh * 0.5f, 0f), new Vector3(0.12f, thigh * 0.5f, 0.12f), 0);
-            Transform kneePivot = Pivot(body, hipPivot, knee, new Vector3(0f, -thigh, 0f));
-            Primitive(kneePivot, PrimitiveType.Capsule, source, skin, new Vector3(0f, -shin * 0.5f, 0f), new Vector3(0.09f, shin * 0.5f, 0.09f), 0);
-            Primitive(kneePivot, PrimitiveType.Cube, source, Hex("#2B2B2B"), new Vector3(0f, -shin, 0.04f), new Vector3(0.10f, 0.05f, 0.16f), 0);
-        }
-
-        static void AddFace(Transform head, Material source, Color skin, Color hair, float headR, AppearanceProfile look)
+        static void AddFace(SegmentedBody body, Transform head, Material source, Color skin, Color hair, float headR, AppearanceProfile look)
         {
             Color eyeWhite = Hex("#F7F4EF");
             Color pupil = Hex("#1B1B1B");
             Color mouth = Hex("#8C3B4A");
             float z = headR * 0.78f;
-            Primitive(head, PrimitiveType.Sphere, source, eyeWhite, new Vector3(-headR * 0.32f, headR * 0.12f, z), Vector3.one * headR * 0.38f, 0);
-            Primitive(head, PrimitiveType.Sphere, source, eyeWhite, new Vector3(headR * 0.32f, headR * 0.12f, z), Vector3.one * headR * 0.38f, 0);
-            Primitive(head, PrimitiveType.Sphere, source, pupil, new Vector3(-headR * 0.32f, headR * 0.12f, z + headR * 0.12f), Vector3.one * headR * 0.18f, 0);
-            Primitive(head, PrimitiveType.Sphere, source, pupil, new Vector3(headR * 0.32f, headR * 0.12f, z + headR * 0.12f), Vector3.one * headR * 0.18f, 0);
+            Pivot(body, head, "gaze", new Vector3(0f, headR * 0.12f, headR * 1.06f));
+            Pivot(body, head, "leftEar", Vector3.left * headR);
+            Pivot(body, head, "rightEar", Vector3.right * headR);
+            Transform jaw = Pivot(body, head, "jaw", new Vector3(0f, -headR * 0.28f, z));
+            Transform leftEye = Pivot(body, head, "leftEye", new Vector3(-headR * 0.32f, headR * 0.12f, z));
+            Transform rightEye = Pivot(body, head, "rightEye", new Vector3(headR * 0.32f, headR * 0.12f, z));
+            foreach (Transform eye in new[] { leftEye, rightEye })
+            {
+                Primitive(eye, PrimitiveType.Sphere, source, eyeWhite, Vector3.zero, Vector3.one * headR * 0.38f, 0);
+                Primitive(eye, PrimitiveType.Sphere, source, pupil, Vector3.forward * (headR * 0.12f), Vector3.one * headR * 0.18f, 0);
+            }
             Primitive(head, PrimitiveType.Cube, source, hair, new Vector3(-headR * 0.32f, headR * 0.38f, z), new Vector3(headR * 0.28f, headR * 0.08f, headR * 0.08f), 0);
             Primitive(head, PrimitiveType.Cube, source, hair, new Vector3(headR * 0.32f, headR * 0.38f, z), new Vector3(headR * 0.28f, headR * 0.08f, headR * 0.08f), 0);
-            Primitive(head, PrimitiveType.Cube, source, mouth, new Vector3(0f, -headR * 0.28f, z), new Vector3(headR * 0.36f, headR * 0.08f, headR * 0.08f), 0);
+            Primitive(jaw, PrimitiveType.Cube, source, mouth, Vector3.zero, new Vector3(headR * 0.36f, headR * 0.08f, headR * 0.08f), 0);
             if (look.FacialHair == "short-beard")
             {
                 Primitive(head, PrimitiveType.Cube, source, hair, new Vector3(0f, -headR * 0.55f, z * 0.7f), new Vector3(headR * 0.7f, headR * 0.28f, headR * 0.35f), 0);
@@ -233,7 +309,8 @@ namespace DreamMachine.UnityBridge
             return go.transform;
         }
 
-        public static Transform Primitive(Transform parent, PrimitiveType type, Material source, Color color, Vector3 localPos, Vector3 localScale, int numericId)
+        public static Transform Primitive(Transform parent, PrimitiveType type, Material source, Color color,
+            Vector3 localPos, Vector3 localScale, int numericId, bool anatomyEnvelope = false)
         {
             var go = GameObject.CreatePrimitive(type);
             go.name = type.ToString();
@@ -241,7 +318,11 @@ namespace DreamMachine.UnityBridge
             go.transform.localPosition = localPos;
             go.transform.localScale = localScale;
             var collider = go.GetComponent<Collider>();
-            if (collider != null) Object.Destroy(collider);
+            if (collider != null)
+            {
+                if (anatomyEnvelope) collider.enabled = false;
+                else Object.Destroy(collider);
+            }
             var renderer = go.GetComponent<Renderer>();
             renderer.sharedMaterial = MakeMaterial(source, color, numericId);
             return go.transform;

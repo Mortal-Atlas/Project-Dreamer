@@ -93,9 +93,12 @@ namespace DreamMachine.Sim
             if (stage == LifeStage.Toddler) return 0.2f;
             if (stage == LifeStage.Child) return 1f;
             if (stage == LifeStage.Teen) return 3f;
-            if (stage == LifeStage.Adult) return 6f;
+            if (stage == LifeStage.Adult) return HumanoidAnatomy.AdultAgeDays;
             return 0f;
         }
+
+        public static float AnatomyAge(float chronologicalDays) =>
+            HumanoidAnatomy.SleepAge(chronologicalDays, AwakeLength / DayLength);
 
         public static int GridFor(QualityPreset preset)
         {
@@ -105,6 +108,10 @@ namespace DreamMachine.Sim
         }
 
         public static WorldSimulation Create(PopulationConfig population, QualityPreset preset, int worldSeed)
+            => Create(population, preset, worldSeed, null);
+
+        public static WorldSimulation Create(PopulationConfig population, QualityPreset preset, int worldSeed,
+            Func<PersonSpec, AgentPersistentState> restore)
         {
             var world = new WorldSimulation();
             world.Population = population;
@@ -117,17 +124,32 @@ namespace DreamMachine.Sim
                 PersonSpec spec = babies[i];
                 var child = new SimChild();
                 child.Spec = spec;
-                child.State = AgentPersistentState.CreateNew(spec);
-                child.Body = child.State.Physiology;
-                child.Mind = new AgentMind(spec.BirthSeed, MindCondition.Full);
-                child.Mind.Library = child.State.Library;
-                child.Wetware = new HebbianWetware(4, 3, spec.BirthSeed);
-                child.State.Walker.RecordRolloutRom = false;
+                AgentPersistentState saved = restore?.Invoke(spec);
+                BindChildState(child, saved != null && saved.AgentId == spec.Id && saved.BirthSeed == spec.BirthSeed
+                    ? saved : AgentPersistentState.CreateNew(spec));
                 child.X = spec.Id == "daughter" ? 0.7f : -0.7f;
                 child.Z = 0.4f;
                 world.Children.Add(child);
             }
             return world;
+        }
+
+        static void BindChildState(SimChild child, AgentPersistentState state)
+        {
+            child.State = state;
+            child.Body = state.Physiology;
+            child.Mind = new AgentMind(child.Spec.BirthSeed, MindCondition.Full) { Library = state.Library };
+            child.Wetware = new HebbianWetware(4, 3, child.Spec.BirthSeed);
+            state.Walker.RecordRolloutRom = false;
+        }
+
+        public SimChild ResetChild(string id)
+        {
+            SimChild child = Find(id);
+            if (child == null) return null;
+            BindChildState(child, AgentPersistentState.CreateNew(child.Spec));
+            child.SawParentPour = false;
+            return child;
         }
 
         public SimChild Find(string id)

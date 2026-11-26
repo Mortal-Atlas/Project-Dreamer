@@ -10,6 +10,8 @@ Phase II adds an opt-in two-stage Discovery Room through `--discover`. See the [
 
 Open **Dream Machine → Library Observatory** to archive a latch pilot, browse its three libraries, and verify its checkpoint. See the [archive format and controls](docs/LIBRARY_OBSERVATORY.md).
 
+Open **Dream Machine → Body Observatory** to inspect a live rig or compare seeded body profiles across growth. See the [anatomy and rig design](docs/HUMANOID_RIG.md).
+
 ## Open and press Play
 
 1. Install **Unity 6000.3.19f1** with the **Universal Render Pipeline** (the editor version in `ProjectSettings/ProjectVersion.txt`).

@@ -66,6 +66,7 @@ namespace DreamMachine.Development
         public string AgentId;
         public string DisplayName;
         public int BirthSeed;
+        public HumanoidAnatomy Anatomy => new HumanoidAnatomy(BirthSeed);
         public int Generation;
         public int Day;
         public LibraryThree Library = new LibraryThree();
@@ -142,6 +143,7 @@ namespace DreamMachine.Development
                 { "agentId", AgentId ?? "" },
                 { "displayName", DisplayName ?? "" },
                 { "birthSeed", BirthSeed },
+                { "anatomyVersion", HumanoidAnatomy.GeneratorVersion },
                 { "generation", Generation },
                 { "day", Day },
                 { "sex", Sex ?? "" },
@@ -162,6 +164,9 @@ namespace DreamMachine.Development
         public static AgentPersistentState FromJson(string json, bool beginNewSession)
         {
             var data = MiniJson.AsObject(MiniJson.Parse(json));
+            if (data.TryGetValue("anatomyVersion", out object anatomyVersion) &&
+                MiniJson.AsInt(anatomyVersion) != HumanoidAnatomy.GeneratorVersion)
+                throw new System.FormatException("Unsupported humanoid anatomy generator version.");
             var state = new AgentPersistentState
             {
                 AgentId = MiniJson.AsString(data["agentId"]),

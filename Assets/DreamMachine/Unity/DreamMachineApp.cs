@@ -127,6 +127,7 @@ namespace DreamMachine.UnityBridge
             _world = new HiddenRuleWorld { ShiftAt = 18 };
             _pool = HiddenRuleWorld.StandardPool();
             var looks = LoadLooks();
+            _sim = WorldSimulation.Create(_pop, _preset, 7, LoadOrCreate);
             BuildProps();
             BuildPeople(looks);
             BuildCameras();
@@ -139,15 +140,6 @@ namespace DreamMachine.UnityBridge
                 var wet = new ReplayFileWetware();
                 wet.LoadText(replay.text);
                 _replayRows = wet.Rows.Count;
-            }
-            _sim = WorldSimulation.Create(_pop, _preset, 7);
-            for (int i = 0; i < _babies.Count; i++)
-            {
-                SimChild child = _sim.Find(_babies[i].Spec.Id);
-                if (child == null) continue;
-                _babies[i].State = child.State;
-                _babies[i].Mind = child.Mind;
-                _babies[i].Wetware = child.Wetware;
             }
             BuildHome();
             BuildTimeBar();
@@ -312,6 +304,7 @@ namespace DreamMachine.UnityBridge
 
         void StepBaby(Actor actor, float dt)
         {
+            actor.Body.ApplyDevelopmentAge(WorldSimulation.AnatomyAge(actor.State.Physiology.AgeDays));
             if (_sim != null)
             {
                 SimChild child = _sim.Find(actor.Spec.Id);
@@ -537,9 +530,8 @@ namespace DreamMachine.UnityBridge
         {
             if (_eye == null || _seg == null || _babies.Count == 0) return;
             Actor baby = _babies[_focus];
-            Transform head = baby.Body.HeadPivot();
-            _eye.transform.position = head.position + head.forward * 0.12f + Vector3.up * 0.05f;
-            _eye.transform.rotation = Quaternion.LookRotation(baby.Body.transform.forward + Vector3.down * 0.05f, Vector3.up);
+            Transform gaze = baby.Body.RigPivot("gaze");
+            _eye.transform.SetPositionAndRotation(gaze.position, gaze.rotation);
             _seg.transform.position = _eye.transform.position;
             _seg.transform.rotation = _eye.transform.rotation;
             _eye.Render();
@@ -643,7 +635,10 @@ namespace DreamMachine.UnityBridge
                 PersonSpec spec = _pop.People[i];
                 AppearanceProfile look;
                 if (!looks.TryGetValue(spec.Id, out look)) look = AppearanceCatalog.For(spec);
-                SegmentedBody body = CharacterFactory.Build(parent, look, _unlit);
+                SimChild child = _sim.Find(spec.Id);
+                HumanoidAnatomy anatomy = child == null ? new HumanoidAnatomy(spec.BirthSeed) : child.State.Anatomy;
+                float developmentAge = child == null ? HumanoidAnatomy.AdultAgeDays : WorldSimulation.AnatomyAge(child.Body.AgeDays);
+                SegmentedBody body = CharacterFactory.Build(parent, look, _unlit, anatomy, developmentAge);
                 var actor = new Actor
                 {
                     Spec = spec,
@@ -654,12 +649,9 @@ namespace DreamMachine.UnityBridge
                 };
                 int groupIndex = spec.Group == GroupId.Boys ? 0 : 1;
                 actor.Pos = _anchors[groupIndex] + Slot(spec);
-                if (spec.Role == MemberRole.Baby)
+                if (child != null)
                 {
-                    actor.State = LoadOrCreate(spec);
-                    actor.Mind = new AgentMind(spec.BirthSeed, MindCondition.Full);
-                    actor.Mind.Library = actor.State.Library;
-                    actor.Wetware = new HebbianWetware(4, 3, spec.BirthSeed);
+                    BindChild(actor, child);
                     actor.NextPractice = 0.4f * _babies.Count;
                     actor.NextEncounter = 1.5f + _babies.Count;
                     _babies.Add(actor);
@@ -667,6 +659,13 @@ namespace DreamMachine.UnityBridge
                 body.transform.position = actor.Pos;
                 _actors[spec.Id] = actor;
             }
+        }
+
+        static void BindChild(Actor actor, SimChild child)
+        {
+            actor.State = child.State;
+            actor.Mind = child.Mind;
+            actor.Wetware = child.Wetware;
         }
 
         AgentPersistentState LoadOrCreate(PersonSpec spec)
@@ -848,10 +847,7 @@ namespace DreamMachine.UnityBridge
                 string path = AgentPath(_babies[i].Spec.Id);
                 if (File.Exists(path)) File.Delete(path);
                 Actor baby = _babies[i];
-                baby.State = AgentPersistentState.CreateNew(baby.Spec);
-                baby.Mind = new AgentMind(baby.Spec.BirthSeed, MindCondition.Full);
-                baby.Mind.Library = baby.State.Library;
-                baby.Wetware = new HebbianWetware(4, 3, baby.Spec.BirthSeed);
+                BindChild(baby, _sim.ResetChild(baby.Spec.Id));
             }
             _day = 0;
             _encounters = 0;

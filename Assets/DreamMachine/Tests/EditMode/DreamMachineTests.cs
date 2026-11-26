@@ -19,6 +19,80 @@ using NUnit.Framework;
 
 namespace DreamMachine.Tests
 {
+    public class HumanoidAnatomyTests
+    {
+        [Test]
+        public void BirthSeedAndAgeDetermineDistinctSegmentProportions()
+        {
+            var profile = new HumanoidAnatomy(12);
+            var newborn = profile.AtAge(0);
+            var adult = profile.AtAge(HumanoidAnatomy.AdultAgeDays);
+            Assert.AreEqual(adult, new HumanoidAnatomy(12).AtAge(6));
+            Assert.AreNotEqual(adult, new HumanoidAnatomy(125).AtAge(6));
+            Assert.AreEqual(adult, profile.AtAge(200));
+            Assert.That(newborn.Head / newborn.Height, Is.InRange(0.23f, 0.26f));
+            Assert.That(adult.Head / adult.Height, Is.InRange(0.12f, 0.14f));
+            Assert.AreEqual(adult.Height, adult.PelvisHeight + adult.Torso + adult.Neck + adult.Head, 0.0001f);
+            Assert.Greater(adult.Forearm / newborn.Forearm, adult.Head / newborn.Head);
+
+            for (int seed = 0; seed < 64; seed++)
+            {
+                var anatomy = new HumanoidAnatomy(seed);
+                var last = anatomy.AtAge(0);
+                for (int step = 1; step <= 96; step++)
+                {
+                    var next = anatomy.AtAge(step / 16f);
+                    Assert.Greater(next.Height, last.Height);
+                    Assert.Greater(next.GripReach, last.GripReach);
+                    Assert.Greater(next.Torso, 0f);
+                    last = next;
+                }
+            }
+        }
+
+        [Test]
+        public void SleepStagesGrowReachAndChangeTheSameMotorCommandOutcome()
+        {
+            Assert.AreEqual(0f, WorldSimulation.AnatomyAge(0.60f));
+            Assert.That(WorldSimulation.AnatomyAge(0.85f), Is.InRange(0.4f, 0.6f));
+            Assert.AreEqual(1f, WorldSimulation.AnatomyAge(1.60f));
+            var profile = new HumanoidAnatomy(75);
+            var newborn = profile.AtAge(0);
+            var adult = profile.AtAge(6);
+            Assert.IsFalse(newborn.WithinGripReach(0.35f));
+            Assert.IsTrue(adult.WithinGripReach(0.35f));
+            newborn.GripPosition(-(float)Math.PI / 2f, 0f, out float childDown, out float childForward);
+            adult.GripPosition(-(float)Math.PI / 2f, 0f, out float adultDown, out float adultForward);
+            Assert.AreEqual(0f, childDown, 0.00001f);
+            Assert.AreEqual(0f, adultDown, 0.00001f);
+            Assert.AreEqual(newborn.GripReach, childForward, 0.00001f);
+            Assert.AreEqual(adult.GripReach, adultForward, 0.00001f);
+        }
+
+        [Test]
+        public void CheckpointRestoresSeededMatureBodyIntoTheKernelAndReadsLegacySaves()
+        {
+            var population = PopulationConfig.CreateDefault();
+            PersonSpec son = population.Find("son");
+            var state = AgentPersistentState.CreateNew(son);
+            state.Physiology.AgeDays = 3.82f;
+            state.Physiology.RecomputeGrowth();
+            var restored = AgentPersistentState.FromJson(state.ToJson(), false);
+            var legacy = state.ToData();
+            legacy.Remove("anatomyVersion");
+            var previousFormat = AgentPersistentState.FromJson(MiniJson.Stringify(legacy), false);
+            var world = WorldSimulation.Create(population, QualityPreset.Phone, 7, spec => spec.Id == son.Id ? restored : null);
+            SimChild child = world.Find(son.Id);
+            float age = WorldSimulation.AnatomyAge(state.Physiology.AgeDays);
+            Assert.AreSame(restored, child.State);
+            Assert.AreEqual(state.Physiology.AgeDays, child.Body.AgeDays);
+            Assert.AreEqual(state.Anatomy.AtAge(age), child.State.Anatomy.AtAge(age));
+            Assert.AreEqual(previousFormat.Anatomy.AtAge(age), child.State.Anatomy.AtAge(age));
+            Assert.AreEqual(state.Anatomy.NewbornHeight, world.ResetChild(son.Id).State.Anatomy.AtAge(0).Height);
+            Assert.AreEqual(0f, child.Body.AgeDays);
+        }
+    }
+
     public class PilotLibraryArchiveTests
     {
         string _root;
