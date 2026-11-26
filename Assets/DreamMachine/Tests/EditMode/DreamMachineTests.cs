@@ -21,6 +21,66 @@ namespace DreamMachine.Tests
 {
     public class WorldCheckpointTests
     {
+        [Test]
+        public void TruncatedEnvelopeAndMissingPayloadAreRejectedWithoutChangingBackup()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            string path = Path.Combine(directory, "world");
+            try
+            {
+                var world = WorldSimulation.Create(PopulationConfig.CreateDefault(), QualityPreset.Phone, 7);
+                world.SaveCheckpoint(path);
+                byte[] valid = File.ReadAllBytes(path);
+                world.Tick();
+                world.SaveCheckpoint(path);
+                foreach (int length in new[] { 0, 1, 58, valid.Length - 1 })
+                {
+                    byte[] truncated = new byte[length];
+                    Array.Copy(valid, truncated, length);
+                    File.WriteAllBytes(path, truncated);
+                    Assert.Throws<InvalidDataException>(() => WorldSimulation.LoadPrimaryCheckpoint(path));
+                    Assert.Throws<InvalidDataException>(() => world.SaveCheckpoint(path));
+                    CollectionAssert.AreEqual(truncated, File.ReadAllBytes(path));
+                    CollectionAssert.AreEqual(valid, File.ReadAllBytes(path + ".previous"));
+                }
+                byte[] badManifest = (byte[])valid.Clone();
+                badManifest[1] = (byte)'X';
+                Assert.Throws<InvalidDataException>(() => WorldSimulation.RestoreCheckpoint(badManifest));
+            }
+            finally
+            {
+                if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            }
+        }
+
+        [Test]
+        public void WindowsShareLockPreventsReplacementAndPreservesBothGenerations()
+        {
+            if (Environment.OSVersion.Platform != PlatformID.Win32NT) Assert.Ignore("Windows share-mode test.");
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            string path = Path.Combine(directory, "world");
+            try
+            {
+                var world = WorldSimulation.Create(PopulationConfig.CreateDefault(), QualityPreset.Phone, 7);
+                world.SaveCheckpoint(path);
+                byte[] prior = File.ReadAllBytes(path);
+                world.Tick();
+                world.SaveCheckpoint(path);
+                byte[] current = File.ReadAllBytes(path);
+                world.Tick();
+                using (var locked = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+                    Assert.Catch<IOException>(() => world.SaveCheckpoint(path));
+                CollectionAssert.AreEqual(current, File.ReadAllBytes(path));
+                CollectionAssert.AreEqual(prior, File.ReadAllBytes(path + ".previous"));
+                Assert.That(Directory.GetFiles(directory, "*.pending"), Is.Empty);
+                Assert.AreEqual(1, WorldSimulation.LoadPrimaryCheckpoint(path).TickCount);
+            }
+            finally
+            {
+                if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            }
+        }
+
         [TestCase(7)]
         [TestCase(18)]
         [TestCase(101)]

@@ -87,7 +87,9 @@ namespace DreamMachine.UnityBridge
         bool _ready;
         int _replayRows;
         WorldSimulation _sim;
-        GameObject _simulationTray;
+        const string SimulationTrayId = "simulation";
+        TrayWorkspace _workspace;
+        float _nextTrayRefresh;
         TimeGovernor _governor = new TimeGovernor();
         QualityPreset _preset = QualityPreset.Phone;
         float _achieved = 1f;
@@ -163,6 +165,11 @@ namespace DreamMachine.UnityBridge
             BuildHome();
             _ready = true;
             SelectBaby(0);
+            _workspace = new TrayWorkspace("DreamMachine.Workspace.v1.");
+            _workspace.Register(SimulationTrayId, "Simulation controls", new Vector2(480, 105),
+                new TrayWorkspace.Layout { AnchorMin = new Vector2(0.02f, 0.86f), AnchorMax = new Vector2(0.98f, 0.99f) },
+                BuildSimulationControls, () => _timeLabel = null, RefreshSimulationControls);
+            _workspace.RestoreVisibility();
         }
 
         void OnGUI()
@@ -178,6 +185,11 @@ namespace DreamMachine.UnityBridge
             float real = Time.unscaledDeltaTime;
             if (real > 0.1f) real = 0.1f;
             HandleTimeKeys();
+            if (_workspace != null && Time.unscaledTime >= _nextTrayRefresh)
+            {
+                _nextTrayRefresh = Time.unscaledTime + 0.2f;
+                _workspace.RefreshVisible();
+            }
             if (_remote != null && _remote.Active && _remote.Latest != null && _remote.Latest.Length > 0)
             {
                 if (!_governor.Paused)
@@ -739,8 +751,7 @@ namespace DreamMachine.UnityBridge
             _performance = !_performance;
             int w = _performance ? 96 : 176;
             int h = _performance ? 64 : 120;
-            if (_eyeRt != null) _eyeRt.Release();
-            if (_segRt != null) _segRt.Release();
+            ReleasePreviewTextures();
             _eyeRt = new RenderTexture(w, h, 16);
             _segRt = new RenderTexture(w, h, 16);
             _eye.targetTexture = _eyeRt;
@@ -1179,46 +1190,46 @@ namespace DreamMachine.UnityBridge
             roof.GetComponent<Renderer>().sharedMaterial = CharacterFactory.MakeMaterial(_unlit, new Color(0.45f, 0.22f, 0.18f), 0);
         }
 
-        void ToggleSimulationTray()
+        void OnDestroy()
         {
-            if (_simulationTray != null)
+            _workspace?.Dispose();
+            ReleasePreviewTextures();
+        }
+
+        void ReleasePreviewTextures()
+        {
+            if (_eye != null) _eye.targetTexture = null;
+            if (_seg != null) _seg.targetTexture = null;
+            if (_eyeRt != null)
             {
-                _simulationTray.SetActive(false);
-                Destroy(_simulationTray);
-                _simulationTray = null;
-                _timeLabel = null;
-                return;
+                _eyeRt.Release();
+                Destroy(_eyeRt);
+                _eyeRt = null;
             }
-            var canvasGo = new GameObject("Simulation controls");
-            _simulationTray = canvasGo;
-            var canvas = canvasGo.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 20;
-            var scaler = canvasGo.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1080f, 1920f);
-            scaler.matchWidthOrHeight = 0.35f;
-            canvasGo.AddComponent<GraphicRaycaster>();
-            var bar = new GameObject("Bar");
-            bar.transform.SetParent(canvasGo.transform, false);
-            var rect = bar.AddComponent<RectTransform>();
-            rect.anchorMin = new Vector2(0.02f, 0.9f);
-            rect.anchorMax = new Vector2(0.98f, 0.99f);
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
-            bar.AddComponent<Image>().color = new Color(0.08f, 0.09f, 0.11f, 0.92f);
-            _timeLabel = NewLabel(bar.transform, "Clock", 22);
+            if (_segRt != null)
+            {
+                _segRt.Release();
+                Destroy(_segRt);
+                _segRt = null;
+            }
+        }
+
+        void ToggleSimulationTray() => _workspace?.Toggle(SimulationTrayId);
+
+        void BuildSimulationControls(RectTransform bar)
+        {
+            _timeLabel = NewLabel(bar, "Clock", 20);
             var clock = _timeLabel.rectTransform;
-            clock.anchorMin = new Vector2(0.02f, 0.45f);
+            clock.anchorMin = new Vector2(0.02f, 0.49f);
             clock.anchorMax = new Vector2(0.98f, 0.98f);
-            AddTimeButton(bar.transform, "Pause", 0f, 0.14f, () => _governor.Paused = true);
-            AddTimeButton(bar.transform, "Resume", 0.14f, 0.28f, () => _governor.Paused = false);
-            AddTimeButton(bar.transform, "Step", 0.28f, 0.40f, RequestLocalStep);
-            AddTimeButton(bar.transform, "Slower", 0.40f, 0.55f, () => SetScale(Mathf.Max(0.1f, _governor.TargetScale / 10f)));
-            AddTimeButton(bar.transform, "Faster", 0.55f, 0.70f, () => SetScale(Mathf.Min(1000f, _governor.TargetScale * 10f)));
-            AddTimeButton(bar.transform, "Save", 0.70f, 0.77f, SaveAll);
-            AddTimeButton(bar.transform, "Restore", 0.77f, 0.88f, RestoreWorld);
-            AddTimeButton(bar.transform, "Close", 0.88f, 1f, ToggleSimulationTray);
+            AddTimeButton(bar, "Pause", 0f, 0.14f, () => _governor.Paused = true);
+            AddTimeButton(bar, "Resume", 0.14f, 0.28f, () => _governor.Paused = false);
+            AddTimeButton(bar, "Step", 0.28f, 0.40f, RequestLocalStep);
+            AddTimeButton(bar, "Slower", 0.40f, 0.55f, () => SetScale(Mathf.Max(0.1f, _governor.TargetScale / 10f)));
+            AddTimeButton(bar, "Faster", 0.55f, 0.70f, () => SetScale(Mathf.Min(1000f, _governor.TargetScale * 10f)));
+            AddTimeButton(bar, "Save", 0.70f, 0.77f, SaveAll);
+            AddTimeButton(bar, "Restore", 0.77f, 0.88f, RestoreWorld);
+            AddTimeButton(bar, "Close", 0.88f, 1f, ToggleSimulationTray);
         }
 
         Text _timeLabel;
@@ -1238,6 +1249,9 @@ namespace DreamMachine.UnityBridge
             var label = NewLabel(go.transform, "T", 18);
             label.text = name;
             label.alignment = TextAnchor.MiddleCenter;
+            label.resizeTextForBestFit = true;
+            label.resizeTextMinSize = 10;
+            label.resizeTextMaxSize = 18;
             var lr = label.rectTransform;
             lr.anchorMin = Vector2.zero;
             lr.anchorMax = Vector2.one;
@@ -1334,12 +1348,13 @@ namespace DreamMachine.UnityBridge
                 shown++;
             }
             for (int i = shown; i < _elementMarks.Count; i++) _elementMarks[i].SetActive(false);
-            if (_timeLabel != null)
-            {
-                _timeLabel.text = "Day " + (_sim.DayIndex + 1)
-                    + "   tick " + _sim.TickCount + "   " + _sim.SimSeconds.ToString("0.00") + " sim s   "
-                    + SpeedLabel();
-            }
+        }
+
+        void RefreshSimulationControls()
+        {
+            _timeLabel.text = "Day " + (_sim.DayIndex + 1)
+                + "   tick " + _sim.TickCount + "   " + _sim.SimSeconds.ToString("0.00") + " sim s   "
+                + SpeedLabel();
         }
 
         void ColorizeGrid()

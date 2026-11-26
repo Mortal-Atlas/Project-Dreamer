@@ -1,0 +1,27 @@
+# Next experiment · isolated arm and hand
+
+The existing seeded anatomy changes segment lengths through development, and `SegmentedBody` places stable grip and gaze pivots on the visual rig. `CharacterFactory` builds kinematic primitive geometry with disabled collider envelopes. The compact walking genome runs in the shared kernel. The Body Observatory reports live or seeded dimensions and a geometric reach bound. These mechanisms supply a repeatable starting body for a contact experiment. [Anatomy and rig evidence](HUMANOID_RIG.md)
+
+## Minimal fixture
+
+Use one supported learner arm, one elbow and wrist controller, and one instrumented movable object. Begin with one rigid object moved against known resistance while reaching or pressing. Add grip and lift after the simple contact dynamics and measurements are stable. Run the fixture in an isolated scene with a fixed physics step coordinated by the authoritative clock. Treat the physics driver as a producer of measurements and the kernel as owner of the experimental command and learning schedule.
+
+1. Identify the shoulder, elbow, wrist and palm by stable semantic IDs. Use palm, finger pad and neighboring skin patches with adjacency and local coordinates tied to the functional anatomy. Recompute receptor positions when anatomy grows while retaining IDs and calibration references.
+2. Issue a bounded motor intention with target in body-relative coordinates. Keep the evaluator's target and exact world transforms outside the learner's inputs. Log commanded effort, measured joint angles and angular velocities, contact timing and resistance.
+3. Use measured contact impulse over the applicable fixed time interval for a force estimate. Mark pressure inferred from this force and estimated contact area as approximate. Compare traction and slip across surfaces with different friction coefficients. Validate idle, first contact, sliding and saturation before learning.
+4. Persist body-conditioned joint calibration and a small forward model that predicts elbow response and contact onset. Evaluate error against actual feedback and update the model with bounded learning. Keep the procedural baseline, the learner and assistance separately labeled.
+5. Compare matched frozen and adaptive controllers across seeds and held-out resistance or growth changes. Measure contact-onset error, tracking error, peak force and work, with replay after restart. A predefined trajectory can establish an engineered baseline. Learning requires measurable improvement and retention under held-out changes.
+
+The first observability pass should display commanded and measured joint states, receptor activity and force/error time series for the same authoritative tick. Display an assisted trajectory with its provenance. Verify that closing the tray and changing the displayed mesh preserve model parameters, joint state and outcome. [Relevant specification](MASTER_IMPLEMENTATION_SPECIFICATION.md#16-topological-skin-architecture)
+
+## Future checkpoint boundary
+
+After stepping physics and applying feedback, freeze the owner state under one checkpoint tick. Store stable object IDs, material revision, transform, linear/angular velocity, sleep state when relevant, modifications, and authoritative relationships to learners and surfaces. Separate per-tick contact buffers from contact history used by learning. Record current articulated joint positions and velocities, motor command and controller state, receptor calibration, held-object/grip attachment endpoints, local attachment frames, constraint parameters and pending requests needed after restart. Load all referenced bodies before reconstructing constraints. Validate both references and restore order before allowing either physics or learning to advance.
+
+Start with a known movable test fixture. An attached chalk-equivalent object must restore in the same relationship to the hand and resume with bounded settling error. Record which contacts and solver internals can be saved. Compare same-platform continuation with measured tolerances. Unity's solver caches, contact regeneration and platform float behavior require evidence before promising deterministic replay. Version this new state separately from the current kernel-only world payload. [Existing ownership inventory](WORLD_CHECKPOINT.md)
+
+## Character binding
+
+Merlin and Marie are established teachers. Arthur and Alice are developing squires. Maintain their existing stable simulation identities and use role-independent semantic joint and skin IDs for rendering. The first authorized retarget test should load a substitute or licensed VRM source into the isolated project, validate bind pose, units and joint orientation, then map the approved mesh to the existing grip and joint landmarks. Check rest and moving poses before selecting developmental variants.
+
+For the supplied files, the owner needs the original editable VRoid project or an authorized new export and confirmation of the rights covering each model, texture and garment. When the owner has those rights, set the export conditions to permit the intended third-party use, modification if adapting age variants, and redistribution only if the model will ship in a shared build. Preserve attribution. For someone else's source, obtain the needed rights from the creator or substitute a suitable licensed model. The four supplied binaries remain outside the shared project. [Avatar mapping and metadata](ASSET_AND_LICENSE_REGISTRY.md)
