@@ -2,6 +2,12 @@
 
 Updated November 26, 2026.
 
+## Active persistence slice
+
+- Branch `feature/authoritative-simulation-clock`, kernel and Unity implementation commit `dbd49e8f5e89c9ce0774adc86e1f00855bb3bf8d`, [draft PR #7](https://github.com/Mortal-Atlas/Project-Dreamer/pull/7). Base is protected main. PR #6 is an ancestor. [Local exclusions and owner inventory](WORLD_CHECKPOINT.md)
+- Executed `dotnet test dotnet/DreamMachine.Core.Tests -c Release --nologo` (48 passed) and isolated Unity Edit Mode `-batchmode -nographics -runTests -testPlatform EditMode -assemblyNames DreamMachine.Tests` (49 passed). Ran isolated `-batchmode -force-d3d12 -executeMethod ClockSmoke.Control` and `ClockSmoke.Observed`, both through day one with matched checkpoints and in-place restore. Scratch logs begin `checkpoint-` in the isolated Unity project. Ran a temporary .NET Release profiler at tick 1140 for four and twelve individuals.
+- Next, create the stable tray registration and open/close/layout persistence boundary around the current Simulation panel. Expand the matched restored-world observer experiment to multiple seeds and all implemented observer actions. Keep local VRMs and unrelated owner changes out of this branch. Do not start live physics persistence until its ownership and state synchronization rules are explicit.
+
 ## Active clock slice
 
 - Branch `feature/authoritative-simulation-clock`. Implementation checkpoint `43bc016`, based on `49f148d`. [Draft PR #7](https://github.com/Mortal-Atlas/Project-Dreamer/pull/7) targets protected `main`. The owner’s synchronization rules are in the [Part XXXIII addendum](GITHUB_SYNCHRONIZATION.md).

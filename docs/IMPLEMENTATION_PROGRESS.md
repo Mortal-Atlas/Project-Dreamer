@@ -1,5 +1,15 @@
 # Implementation progress
 
+## Atomic world-and-learner checkpoint · November 26, 2026
+
+[Draft PR #7](https://github.com/Mortal-Atlas/Project-Dreamer/pull/7) now contains the embedded kernel checkpoint, load-on-start and in-place Unity restore, atomic stage export, and a persisted intervention ledger for explicit learner resets. The previous valid primary stays recoverable after publication. An invalid primary blocks startup and remains on disk. A failed in-place restore preserves the active world. Legacy individual files remain available for first-run migration when no world checkpoint exists. [State inventory, repository audit and recovery](WORLD_CHECKPOINT.md)
+
+48 .NET Release tests and 49 isolated Unity 6000.3.19f1 Edit Mode tests passed. Three cases save at tick 690 and compare a continuous run to a file-restored instance through tick 1140, crossing the night and day transitions. They compare ordered recorded history, named learner and grid fields, and full checkpoint bytes. File tests cover interrupted pending writes, missing primary with backup, corrupt payloads and incompatible format versions. The explicit reset test verifies that passive capture creates no intervention record.
+
+Two isolated DX12 Play Mode launches restored the same seed-18 checkpoint at tick 690. The control stepped without opening the panel. The observed run opened and closed the panel repeatedly, switched between the learners, rendered camera previews and used the Step button. They reached tick 1140 with the same checkpoint SHA-256 (`13ffff7d9d089b331554ad08adae22171ababf3cb56bf45c3f8dd7565dee562d`) and world hash `d5b13b29`. Both called the application's save and restore handlers, took an intervening tick, then recovered the exact saved bytes. This validates the tested UI paths for one observer seed. There was no visual screenshot inspection, memory-panel test, presentation-mode test or external physics restore.
+
+See the [measured performance](PERFORMANCE_BENCHMARKS.md). The embedded household checkpoint covers the current grid and compact learner model. Persistent movable Unity props, separate asynchronous/remote subsystems and workspace layout remain open. The next infrastructure pass should add a stable panel registry with workspace persistence, extend observer controls and seed coverage, and validate the checkpoint on the target filesystem before functional embodiment adds contact and motor state.
+
 ## Milestone One clock and observer checkpoint · November 26, 2026
 
 [Draft PR #7](https://github.com/Mortal-Atlas/Project-Dreamer/pull/7) builds on open [PR #6](https://github.com/Mortal-Atlas/Project-Dreamer/pull/6). Reviewed PR #6 before branching. GitHub returned no submitted reviews, inline comments, or discussion findings. Code inspection found two local simulation writes in Unity presentation. The vision preview added mask observations to private learner state, and the night display blended the walker policy and recorded an additional dream hypothesis. The preview now renders only. Night presentation uses a separate derived seed for displayed dream props, while the shared kernel retains its own tick-driven cognition.

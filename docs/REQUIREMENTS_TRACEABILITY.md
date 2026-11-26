@@ -264,6 +264,8 @@ The source is the [consolidated specification](MASTER_IMPLEMENTATION_SPECIFICATI
 
 ## Evidence register
 
+The embedded v1 checkpoint adds evidence for §§5, 6, 10, 52, 57, 116, 133, 150, 157, 162 and 169. Three kernel continuations match after disk restore across a day boundary, and one paired Unity observer run matches all serialized state. The reset intervention ledger is persisted. Wider observer coverage, workspace controls, movable physics state, mobile filesystem behavior and cross-process recovery remain partial. [Checkpoint owner inventory](WORLD_CHECKPOINT.md) · [Verification results](IMPLEMENTATION_PROGRESS.md) · [Performance](PERFORMANCE_BENCHMARKS.md)
+
 The clock checkpoint extends K evidence for §§5–7, 116, 124, 133 and 169. Pause and single-step have executed regression tests. The control panel is dismissible, and live preview and night display no longer write to authoritative learner state. Complete checkpoint and observer invariance criteria remain open. [Clock results](IMPLEMENTATION_PROGRESS.md)
 
 | Owner addendum | Owner | Dependencies | Status | Evidence |

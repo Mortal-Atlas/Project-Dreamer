@@ -48,3 +48,19 @@ Approximate sizing uses 27 directed weighted neuron pairs per neuron for reduced
 | 139,255 | ~3.7 million | ~59 MB | ~74 million |
 
 At 1,000×, a full 20 Hz edge scan would demand roughly 74 billion visits per wall second per learner. Spiking reference models can require finer integration and incur higher cost. A contact-level array at the same 16-byte shared-plus-private budget would take about 872 MB before overhead. The v783 raw synapse Feather download is about 9.49 GB; the proofread connections file is about 852 MB. Parse the reference offline and consider event-driven updates and calibrated condensed graphs. Compare synthetic and biological variants with matched edge/activation budgets. On Android measure thermal and allocation behavior independently. Keep every world tick and validate any neural scheduling choices on event order, learning and replay before use. [Published neural model](https://doi.org/10.1038/s41586-024-07763-9) · [Dataset sizes](https://zenodo.org/records/10676866)
+# Atomic checkpoint measurements · November 26, 2026
+
+Release .NET, Laptop preset, 16×16 grid, seed 7, after 1,140 ticks. Nine repetitions after one warm operation for each row. Windows workstation with i7-14700HX and 15.71 GiB RAM. The owner's Unity editor remained open. These timings measure allocation and checkpoint cost on this workstation and do not qualify as a clean headless throughput comparison.
+
+| People | Payload | Operation | Median ms | Min–max ms | Thread allocations per operation |
+| ---: | ---: | --- | ---: | ---: | ---: |
+| 4 | 54,475 bytes | Capture | 1.25 | 1.18–4.79 | 660,824 bytes |
+| 4 | 54,475 bytes | Validate and reconstruct | 2.83 | 1.37–17.95 | 992,081 bytes |
+| 4 | 54,475 bytes | Publish with prior backup | 13.08 | 12.24–48.04 | 2,762,861 bytes |
+| 4 | 54,475 bytes | Read and restore | 0.99 | 0.92–3.79 | 1,047,008 bytes |
+| 12 | 142,838 bytes | Capture | 2.99 | 1.94–13.74 | 2,060,180 bytes |
+| 12 | 142,838 bytes | Validate and reconstruct | 2.42 | 2.25–6.15 | 2,847,267 bytes |
+| 12 | 142,838 bytes | Publish with prior backup | 34.96 | 23.74–55.83 | 8,049,186 bytes |
+| 12 | 142,838 bytes | Read and restore | 5.14 | 4.24–6.10 | 2,990,600 bytes |
+
+An isolated Play Mode panel creation took 4.565 ms and coincided with a 216 KiB managed-memory increase. Allocated bytes include temporaries and are not retained-memory measurements. The single panel sample includes concurrent allocations. There is no fresh process-isolated throughput or retained-memory comparison. The existing CLI has four- and twelve-person cases. A one-individual comparison requires a supported single-individual scenario.
