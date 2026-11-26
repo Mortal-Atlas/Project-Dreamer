@@ -565,6 +565,27 @@ namespace DreamMachine.Tests
     public class TimeFidelityTests
     {
         [Test]
+        public void RunBudget_MeasuresTheWholeBatchAndPreservesTickState()
+        {
+            PopulationConfig population = PopulationConfig.CreateDefault();
+            WorldSimulation budgeted = WorldSimulation.Create(population, QualityPreset.Laptop, 5);
+            WorldSimulation replay = WorldSimulation.Create(population, QualityPreset.Laptop, 5);
+            const double budgetMs = 20;
+            const int hardCap = 100000;
+            budgeted.RunTicks(256);
+            replay.RunTicks(256);
+
+            SimProfile profile = budgeted.RunBudget(hardCap, budgetMs, 0.016f, 1000f, false, 0f);
+
+            Assert.Greater(profile.Ticks, 0);
+            Assert.Less(profile.Ticks, hardCap);
+            Assert.GreaterOrEqual(profile.Ticks / (double)profile.TicksPerSecond * 1000, budgetMs - 0.01);
+            replay.RunTicks(profile.Ticks);
+            Assert.AreEqual(replay.TickCount, budgeted.TickCount);
+            Assert.AreEqual(replay.StateHash(), budgeted.StateHash());
+        }
+
+        [Test]
         public void FastForward_MatchesOneByOne_AndJumpIsJustMoreTicks()
         {
             PopulationConfig pop = PopulationConfig.CreateDefault();
@@ -608,6 +629,29 @@ namespace DreamMachine.Tests
             Assert.Greater(planned, 1);
         }
     }
+
+#if UNITY_EDITOR
+    public class DreamMachineSceneTests
+    {
+        [Test]
+        public void MainCamera_HasNormalizedRotationInEditMode()
+        {
+            var scene = UnityEditor.SceneManagement.EditorSceneManager.OpenPreviewScene("Assets/Scenes/DreamMachine.unity");
+            try
+            {
+                var camera = Array.Find(scene.GetRootGameObjects(), root => root.CompareTag("MainCamera"));
+                Assert.IsNotNull(camera);
+                Assert.IsNotNull(camera.GetComponent<UnityEngine.Camera>());
+                var rotation = camera.transform.localRotation;
+                Assert.AreEqual(1f, UnityEngine.Quaternion.Dot(rotation, rotation), 0.000001f);
+            }
+            finally
+            {
+                UnityEditor.SceneManagement.EditorSceneManager.ClosePreviewScene(scene);
+            }
+        }
+    }
+#endif
 
     public class MiniJsonTests
     {
