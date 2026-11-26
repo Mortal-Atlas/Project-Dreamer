@@ -19,6 +19,312 @@ using NUnit.Framework;
 
 namespace DreamMachine.Tests
 {
+    public class HumanoidAnatomyTests
+    {
+        [Test]
+        public void BirthSeedAndAgeDetermineDistinctSegmentProportions()
+        {
+            var profile = new HumanoidAnatomy(12);
+            var newborn = profile.AtAge(0);
+            var adult = profile.AtAge(HumanoidAnatomy.AdultAgeDays);
+            Assert.AreEqual(adult, new HumanoidAnatomy(12).AtAge(6));
+            Assert.AreNotEqual(adult, new HumanoidAnatomy(125).AtAge(6));
+            Assert.AreEqual(adult, profile.AtAge(200));
+            Assert.That(newborn.Head / newborn.Height, Is.InRange(0.23f, 0.26f));
+            Assert.That(adult.Head / adult.Height, Is.InRange(0.12f, 0.14f));
+            Assert.AreEqual(adult.Height, adult.PelvisHeight + adult.Torso + adult.Neck + adult.Head, 0.0001f);
+            Assert.Greater(adult.Forearm / newborn.Forearm, adult.Head / newborn.Head);
+
+            for (int seed = 0; seed < 64; seed++)
+            {
+                var anatomy = new HumanoidAnatomy(seed);
+                var last = anatomy.AtAge(0);
+                for (int step = 1; step <= 96; step++)
+                {
+                    var next = anatomy.AtAge(step / 16f);
+                    Assert.Greater(next.Height, last.Height);
+                    Assert.Greater(next.GripReach, last.GripReach);
+                    Assert.Greater(next.Torso, 0f);
+                    last = next;
+                }
+            }
+        }
+
+        [Test]
+        public void SleepStagesGrowReachAndChangeTheSameMotorCommandOutcome()
+        {
+            Assert.AreEqual(0f, WorldSimulation.AnatomyAge(0.60f));
+            Assert.That(WorldSimulation.AnatomyAge(0.85f), Is.InRange(0.4f, 0.6f));
+            Assert.AreEqual(1f, WorldSimulation.AnatomyAge(1.60f));
+            var profile = new HumanoidAnatomy(75);
+            var newborn = profile.AtAge(0);
+            var adult = profile.AtAge(6);
+            Assert.IsFalse(newborn.WithinGripReach(0.35f));
+            Assert.IsTrue(adult.WithinGripReach(0.35f));
+            newborn.GripPosition(-(float)Math.PI / 2f, 0f, out float childDown, out float childForward);
+            adult.GripPosition(-(float)Math.PI / 2f, 0f, out float adultDown, out float adultForward);
+            Assert.AreEqual(0f, childDown, 0.00001f);
+            Assert.AreEqual(0f, adultDown, 0.00001f);
+            Assert.AreEqual(newborn.GripReach, childForward, 0.00001f);
+            Assert.AreEqual(adult.GripReach, adultForward, 0.00001f);
+        }
+
+        [Test]
+        public void CheckpointRestoresSeededMatureBodyIntoTheKernelAndReadsLegacySaves()
+        {
+            var population = PopulationConfig.CreateDefault();
+            PersonSpec son = population.Find("son");
+            var state = AgentPersistentState.CreateNew(son);
+            state.Physiology.AgeDays = 3.82f;
+            state.Physiology.RecomputeGrowth();
+            var restored = AgentPersistentState.FromJson(state.ToJson(), false);
+            var legacy = state.ToData();
+            legacy.Remove("anatomyVersion");
+            var previousFormat = AgentPersistentState.FromJson(MiniJson.Stringify(legacy), false);
+            var world = WorldSimulation.Create(population, QualityPreset.Phone, 7, spec => spec.Id == son.Id ? restored : null);
+            SimChild child = world.Find(son.Id);
+            float age = WorldSimulation.AnatomyAge(state.Physiology.AgeDays);
+            Assert.AreSame(restored, child.State);
+            Assert.AreEqual(state.Physiology.AgeDays, child.Body.AgeDays);
+            Assert.AreEqual(state.Anatomy.AtAge(age), child.State.Anatomy.AtAge(age));
+            Assert.AreEqual(previousFormat.Anatomy.AtAge(age), child.State.Anatomy.AtAge(age));
+            Assert.AreEqual(state.Anatomy.NewbornHeight, world.ResetChild(son.Id).State.Anatomy.AtAge(0).Height);
+            Assert.AreEqual(0f, child.Body.AgeDays);
+        }
+    }
+
+    public class PilotLibraryArchiveTests
+    {
+        string _root;
+
+        [SetUp]
+        public void SetUp() => _root = Path.Combine(Path.GetTempPath(), "dreamer-archive-" + Guid.NewGuid().ToString("N"));
+
+        [TearDown]
+        public void TearDown()
+        {
+            if (Directory.Exists(_root)) Directory.Delete(_root, true);
+        }
+
+        [Test]
+        public void LibrariesExposeRealHistoryAndNavigateAcrossShelves()
+        {
+            var archive = new PilotLibraryArchive(_root, reserve: 0);
+            PilotVolume volume = archive.Capture(12, true, true);
+            var acquired = archive.Search(volume.Id, LibraryShelf.Knowledge);
+            var hypotheses = archive.Search(volume.Id, LibraryShelf.Possibility, "hypothesis");
+            var teacher = archive.Search(volume.Id, LibraryShelf.LivedMemory, "teacher");
+            Assert.IsNotEmpty(acquired);
+            Assert.AreEqual(1, hypotheses.Count);
+            Assert.AreEqual(1, teacher.Count);
+            StringAssert.Contains("probabilityOfEffect", archive.Read(volume.Id, acquired[0].Id));
+
+            LibraryBook hypothesis = hypotheses[0];
+            LibraryBook replay = archive.GetBook(volume.Id, hypothesis.Links[0]);
+            StringAssert.StartsWith("Replay", replay.Title);
+            Assert.AreEqual(LibraryShelf.LivedMemory, replay.Shelf);
+            StringAssert.StartsWith("Probe", archive.ReferencedBy(volume.Id, hypothesis.Id)[0].Title);
+            Assert.AreEqual(LatchRoomSimulation.TeacherTick, teacher[0].Tick);
+
+            PilotVolume empty = archive.Capture(13, true, true, 0);
+            Assert.Throws<KeyNotFoundException>(() => archive.Read(empty.Id, teacher[0].Id));
+            Assert.AreEqual(PilotLibraryArchive.PageSize, archive.Search(volume.Id, LibraryShelf.LivedMemory).Count);
+            Assert.IsNotEmpty(archive.Search(volume.Id, LibraryShelf.LivedMemory, after: 40));
+        }
+
+        [Test]
+        public void RestorationReplaysTheSameStateAndContinuesAfterBrowsing()
+        {
+            var archive = new PilotLibraryArchive(_root, reserve: 0);
+            PilotVolume volume = archive.Capture(12, true, true, LatchRoomSimulation.WakeTick);
+            var restored = archive.Restore(volume.Id);
+            Assert.AreEqual(LatchRoomSimulation.WakeTick, restored.TickCount);
+            foreach (LibraryBook book in archive.Search(volume.Id, LibraryShelf.Knowledge)) archive.Read(volume.Id, book.Id);
+            restored.RunTicks(LatchRoomSimulation.EndTick);
+            var original = new LatchRoomSimulation(12, true, true);
+            original.RunTicks(LatchRoomSimulation.EndTick);
+            CollectionAssert.AreEqual(original.Trace, restored.Trace);
+            CollectionAssert.AreEqual(original.LivedMemory, restored.LivedMemory);
+        }
+
+        [Test]
+        public void DuplicateBodiesUseOneBlobAndRejectedCapturePreservesPriorRecords()
+        {
+            var archive = new PilotLibraryArchive(_root, reserve: 0);
+            PilotVolume first = archive.Capture(50, false, false, 1);
+            LibraryStorage before = archive.Storage();
+            Assert.AreEqual(first.Id, archive.Capture(50, false, false, 1).Id);
+            archive.Capture(51, false, false, 1);
+            LibraryStorage shared = archive.Storage();
+            Assert.AreEqual(before.Blobs, shared.Blobs);
+            Assert.AreEqual(before.Books * 2, shared.Books);
+
+            var full = new PilotLibraryArchive(_root, shared.PhysicalBytes, 0);
+            Assert.Throws<IOException>(() => full.Capture(52, true, true));
+            Assert.AreEqual(shared.PhysicalBytes, full.Storage().PhysicalBytes);
+            Assert.IsNotEmpty(full.Read(first.Id, 1));
+        }
+
+        [Test]
+        public void InterruptedCatalogIsInvisibleAndCorruptedBodiesReportFailure()
+        {
+            var archive = new PilotLibraryArchive(_root, reserve: 0);
+            PilotVolume volume = archive.Capture(1, false, false, 1);
+            File.WriteAllText(Path.Combine(_root, "volumes", "interrupted.pending"), "incomplete");
+            Assert.AreEqual(1, archive.Volumes().Count);
+            foreach (string blob in Directory.GetFiles(Path.Combine(_root, "blobs")))
+                File.WriteAllText(blob, "bad gzip");
+            Assert.Throws<InvalidDataException>(() => archive.Read(volume.Id, 1));
+        }
+    }
+
+    public class DiscoveryRoomTests
+    {
+        [Test]
+        public void FixedTicksPreserveQuestionsAcrossNightAndKeepProbesOutOfTraining()
+        {
+            var room = new DiscoveryRoom(14, 9, true, true);
+            room.RunTicks(LatchRoomSimulation.NightTick);
+            var question = room.Questions[0];
+            int evidenceBeforeSleep = question.Evidence.Count;
+            room.RunTicks(LatchRoomSimulation.WakeTick - LatchRoomSimulation.NightTick);
+            Assert.AreSame(question, room.Questions[0]);
+            Assert.AreEqual(evidenceBeforeSleep, question.Evidence.Count);
+
+            while (room.TickCount < DiscoveryRoom.EndTick - 1) room.RunTicks(1);
+            Assert.AreEqual(18, room.Attempts.Count);
+            Assert.IsNull(room.Transferred);
+            bool followedRehearsal = false;
+            foreach (DiscoveryAttempt attempt in room.Attempts)
+            {
+                Assert.AreNotEqual(DiscoveryRoom.HeldOutCue, attempt.Cue);
+                if (!attempt.ReplaySource.HasValue) continue;
+                var remembered = room.Attempts[attempt.ReplaySource.Value - 1];
+                Assert.Less(remembered.Tick, LatchRoomSimulation.NightTick);
+                Assert.Greater(attempt.Tick, LatchRoomSimulation.WakeTick);
+                Assert.AreEqual(remembered.Control, attempt.Control);
+                Assert.AreEqual(remembered.Cue, attempt.Cue);
+                Assert.AreNotEqual(remembered.Movement, attempt.Movement);
+                followedRehearsal = true;
+            }
+            Assert.IsTrue(followedRehearsal);
+            room.RunTicks(1);
+            Assert.IsNotNull(room.Retained);
+            Assert.IsNotNull(room.Transferred);
+            Assert.AreEqual(18, room.Attempts.Count);
+        }
+
+        [Test]
+        public void BatchedRunsMatchAndAblationsKeepTheSameOpportunities()
+        {
+            var full = new DiscoveryRoom(51, 8, true, true);
+            var batched = new DiscoveryRoom(51, 8, true, true);
+            var baseline = new DiscoveryRoom(51, 8, false, false);
+            full.RunTicks(DiscoveryRoom.EndTick);
+            baseline.RunTicks(DiscoveryRoom.EndTick);
+            while (batched.TickCount < DiscoveryRoom.EndTick) batched.RunTicks(37);
+
+            CollectionAssert.AreEqual(full.Attempts, batched.Attempts);
+            Assert.AreEqual(full.Transferred, batched.Transferred);
+            Assert.AreEqual(full.Attempts.Count, baseline.Attempts.Count);
+            for (int i = 0; i < full.Attempts.Count; i++)
+            {
+                var a = full.Attempts[i];
+                var b = baseline.Attempts[i];
+                Assert.AreEqual(a.Tick, b.Tick);
+                Assert.AreEqual(a.Cue, b.Cue);
+                if (a.Control == b.Control && a.Movement == b.Movement) Assert.AreEqual(a.Effect, b.Effect);
+            }
+        }
+
+        [Test]
+        public void MaximumTrainingBudgetKeepsProbabilitiesFinite()
+        {
+            var room = new DiscoveryRoom(75, DiscoveryRoom.MaximumAttemptsPerDay, false, false);
+            room.RunTicks(DiscoveryRoom.EndTick);
+            Assert.AreEqual(2 * DiscoveryRoom.MaximumAttemptsPerDay, room.Attempts.Count);
+            foreach (DiscoveryQuestion question in room.Questions)
+            {
+                double total = question.NoiseProbability;
+                for (int model = 0; model < DiscoveryQuestion.MechanismCount; model++)
+                    total += question.MechanismProbability(model);
+                Assert.AreEqual(1d, total, 1e-12);
+            }
+        }
+    }
+
+    public class LatchRoomTests
+    {
+        [Test]
+        public void SameSeedAndSettingsProduceIdenticalTraceInDifferentBatches()
+        {
+            var whole = new LatchRoomSimulation(12, true, true);
+            var batched = new LatchRoomSimulation(12, true, true);
+            whole.RunTicks(LatchRoomSimulation.EndTick);
+            while (batched.TickCount < LatchRoomSimulation.EndTick) batched.RunTicks(17);
+            batched.RunTicks(17);
+
+            Assert.AreEqual(whole.TickCount, batched.TickCount);
+            Assert.AreEqual(whole.Trace, batched.Trace);
+            Assert.AreEqual(whole.LivedMemory, batched.LivedMemory);
+        }
+
+        [Test]
+        public void DreamComesFromOwnFeedbackAndNextDayProbeTestsIt()
+        {
+            var room = new LatchRoomSimulation(12, true, true);
+            room.RunTicks(LatchRoomSimulation.NightTick);
+            int wakingMemories = room.LivedMemory.Count;
+            room.RunTicks(LatchRoomSimulation.WakeTick - LatchRoomSimulation.NightTick);
+
+            Assert.AreEqual(wakingMemories, room.LivedMemory.Count);
+            RoomEvent idea = Find(room.Trace, RoomEventKind.Hypothesis);
+            RoomEvent replay = room.Trace[idea.ParentId.Value - 1];
+            RoomEvent memory = room.Trace[replay.ParentId.Value - 1];
+            RoomEvent feedback = room.Trace[memory.ParentId.Value - 1];
+            Assert.AreEqual(RoomEventKind.Feedback, feedback.Kind);
+            Assert.AreEqual(RoomEventKind.Memory, memory.Kind);
+            Assert.Less(memory.Tick, LatchRoomSimulation.NightTick);
+            Assert.AreNotEqual(memory.Action, idea.Action);
+
+            room.RunTicks(LatchRoomSimulation.EndTick - LatchRoomSimulation.WakeTick);
+            RoomEvent probe = Find(room.Trace, RoomEventKind.Probe);
+            Assert.AreEqual(idea.Id, probe.ParentId);
+            Assert.AreEqual(idea.Action, probe.Action);
+            Assert.AreEqual(LatchRoomSimulation.WakeTick, probe.Tick);
+            Assert.IsTrue(room.LivedMemory[room.LivedMemory.Count - 1].Transfer);
+        }
+
+        [Test]
+        public void ExperimentalSwitchesChangePolicyWithoutChangingOpportunitiesOrDemonstration()
+        {
+            var baseline = new LatchRoomSimulation(12, false, false);
+            var integrated = new LatchRoomSimulation(12, true, true);
+            baseline.RunTicks(LatchRoomSimulation.EndTick);
+            integrated.RunTicks(LatchRoomSimulation.EndTick);
+
+            Assert.AreEqual(baseline.LivedMemory.Count, integrated.LivedMemory.Count);
+            foreach (RoomEvent entry in baseline.Trace)
+            {
+                Assert.AreNotEqual(RoomEventKind.Question, entry.Kind);
+                Assert.AreNotEqual(RoomEventKind.Hypothesis, entry.Kind);
+            }
+            Assert.AreEqual(1, Find(integrated.Trace, RoomEventKind.Question).Tick);
+            RoomEvent baselineTeacher = Find(baseline.Trace, RoomEventKind.TeacherDemonstration);
+            RoomEvent integratedTeacher = Find(integrated.Trace, RoomEventKind.TeacherDemonstration);
+            Assert.AreEqual(baselineTeacher.Tick, integratedTeacher.Tick);
+            Assert.AreEqual(baselineTeacher.Action, integratedTeacher.Action);
+            Assert.AreEqual(baselineTeacher.Effect, integratedTeacher.Effect);
+        }
+
+        static RoomEvent Find(IReadOnlyList<RoomEvent> trace, RoomEventKind kind)
+        {
+            foreach (RoomEvent entry in trace)
+                if (entry.Kind == kind) return entry;
+            throw new AssertionException("Missing room event " + kind);
+        }
+    }
+
     public class SeedAndAtlasTests
     {
         [Test]
@@ -565,6 +871,27 @@ namespace DreamMachine.Tests
     public class TimeFidelityTests
     {
         [Test]
+        public void RunBudget_MeasuresTheWholeBatchAndPreservesTickState()
+        {
+            PopulationConfig population = PopulationConfig.CreateDefault();
+            WorldSimulation budgeted = WorldSimulation.Create(population, QualityPreset.Laptop, 5);
+            WorldSimulation replay = WorldSimulation.Create(population, QualityPreset.Laptop, 5);
+            const double budgetMs = 20;
+            const int hardCap = 100000;
+            budgeted.RunTicks(256);
+            replay.RunTicks(256);
+
+            SimProfile profile = budgeted.RunBudget(hardCap, budgetMs, 0.016f, 1000f, false, 0f);
+
+            Assert.Greater(profile.Ticks, 0);
+            Assert.Less(profile.Ticks, hardCap);
+            Assert.GreaterOrEqual(profile.Ticks / (double)profile.TicksPerSecond * 1000, budgetMs - 0.01);
+            replay.RunTicks(profile.Ticks);
+            Assert.AreEqual(replay.TickCount, budgeted.TickCount);
+            Assert.AreEqual(replay.StateHash(), budgeted.StateHash());
+        }
+
+        [Test]
         public void FastForward_MatchesOneByOne_AndJumpIsJustMoreTicks()
         {
             PopulationConfig pop = PopulationConfig.CreateDefault();
@@ -608,6 +935,29 @@ namespace DreamMachine.Tests
             Assert.Greater(planned, 1);
         }
     }
+
+#if UNITY_EDITOR
+    public class DreamMachineSceneTests
+    {
+        [Test]
+        public void MainCamera_HasNormalizedRotationInEditMode()
+        {
+            var scene = UnityEditor.SceneManagement.EditorSceneManager.OpenPreviewScene("Assets/Scenes/DreamMachine.unity");
+            try
+            {
+                var camera = Array.Find(scene.GetRootGameObjects(), root => root.CompareTag("MainCamera"));
+                Assert.IsNotNull(camera);
+                Assert.IsNotNull(camera.GetComponent<UnityEngine.Camera>());
+                var rotation = camera.transform.localRotation;
+                Assert.AreEqual(1f, UnityEngine.Quaternion.Dot(rotation, rotation), 0.000001f);
+            }
+            finally
+            {
+                UnityEditor.SceneManagement.EditorSceneManager.ClosePreviewScene(scene);
+            }
+        }
+    }
+#endif
 
     public class MiniJsonTests
     {

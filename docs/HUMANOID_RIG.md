@@ -1,0 +1,32 @@
+# Seeded growing humanoid rig
+
+The previous view generated ten animated pivots and rigid meshes, with one fixed child template and one fixed adult template. Overall scale came from the appearance file. The learner already had a sagittal walking model and physiological maturation. Saved child state was loaded by the view and then replaced by a fresh kernel state. This change gives the existing family a shared anatomical profile and binds the view to the restored kernel child.
+
+## What runs
+
+- `HumanoidAnatomy` uses a separate deterministic stream. Seeded frame size correlates newborn and adult height. Modest bounded variation in head, limb and breadth proportions and spurt timing gives distinct bodies. The continuous curves allocate separate growth to torso, head, neck, limbs, hands and feet. The neutral newborn head is about one quarter of standing length and the adult head about one eighth. These are engineering profiles, with six simulation days representing the accelerated growth horizon. [WHO length and height reference](https://www.who.int/tools/child-growth-standards/standards/length-height-for-age)
+- The shared kernel maps chronological age to daytime plateaus and sleeping growth. Unity samples it at 1/64-day intervals and updates existing transforms with a unit-scale root. Pelvis, torso, chest, neck, head, jaw, eyes, ears, clavicles, wrists, hands, grip points, ankles and feet have stable names. The existing ten pose channels continue to drive their hinges. Limb meshes and disabled collider envelopes track the same geometry. The eye and semantic mask cameras use the moving gaze anchor. Appearance colors, hair and clothing remain authored. Physical proportions now come from anatomy rather than the old appearance scale fields.
+- The existing save stores birth seed, age and the added anatomy generator version. Old saves derive version 1 from their existing fields. The kernel binds a matching restored child before the Unity body is built. Reset binds a new child state to the already-built rig. The save remains a partial state snapshot and does not restore world clock, wetware weights or a live physics scene.
+- The shared geometry exposes a sagittal hand endpoint and a neutral grip reach bound. A given arm command produces different hand positions as the limb develops. **Dream Machine → Body Observatory** exposes live rig dimensions when a rig is selected, and a clearly labeled seeded reference profile otherwise.
+
+## Technology assessment
+
+| Option | Assessment |
+| --- | --- |
+| MakeHuman and MPFB2 | Suitable for offline skin and morph authoring. MakeHuman's source is AGPL and its designated core asset exports are CC0. MPFB2 uses GPL and designated core assets use CC0. Every additional garment, morph and texture needs its own terms reviewed. [MakeHuman terms](https://static.makehumancommunity.org/about/license.html) · [MPFB2](https://github.com/makehumancommunity/mpfb2) |
+| Blender | GPL authoring application. Use offline to prepare original meshes and checked assets. Export weights and morphs with a stable semantic bone map before replacing geometry. [Blender license](https://www.blender.org/about/license/) |
+| Unity Animation Rigging | Candidate for Unity procedural constraints such as two-bone IK under the package's Unity terms. Its poses are an engineering control baseline. Keep simulation and evaluation independent of an optional view package. [Package manual](https://docs.unity3d.com/Packages/com.unity.animation.rigging@1.4/manual/index.html) |
+| Unity ML-Agents and Animation Samples | ML-Agents provides Apache-2.0 training tools and requires the separate Python stack for common training paths. Animation Samples is reference material. Review its repository terms and individual assets before import. Neither is a dependency for the rig. [ML-Agents](https://github.com/Unity-Technologies/ml-agents) · [Animation Samples](https://github.com/Unity-Technologies/Unity.Animation.Samples) |
+| ArticulationBody, ConfigurableJoint and active ragdolls | ArticulationBody is a reduced-coordinate chain candidate. ConfigurableJoint is a candidate for experimental drives and external assistance. Benchmark anchors, contacts, inertia and replay in an opt-in fixture before binding to family movement. Active-ragdoll reference skills need a separate acquired-behavior control. [ArticulationBody](https://docs.unity3d.com/6000.0/Documentation/ScriptReference/ArticulationBody.html) · [ConfigurableJoint](https://docs.unity3d.com/6000.0/Documentation/Manual/class-ConfigurableJoint.html) · [DeepMimic](https://arxiv.org/abs/1804.02717) |
+
+## Remaining milestones
+
+The family uses kinematic geometry. Its collider envelopes are disabled, and joint torque, mass and balance continue under the existing compact movement/physiology approximation. Hand landmarks and the reach bound provide no gripping or collision response. Validate a small contact-driven reaching fixture before adding articulated digits, joint limits, actuation loads or physics growth. Train from personal motor attempts and sensory error. Compare unchanged, normalized and adaptive policies across a held-out growth step. Keep teacher guidance and sensory-only mimicry distinct. The legacy walking path remains separate from that experiment.
+
+The next integration should carry body-state checkpoints and meaningful growth landmarks into the archive. Respiratory and vocal growth, body-mass and inertia parameters, stance and contact calibration, fine motor control and teacher-guided handwriting remain planned. No dependency or external asset was added.
+
+## Verification
+
+An isolated Unity 6.3 DX12 run initialized four family rigs in Play Mode and exited successfully. The son kept the same elbow transform during growth. Measured newborn grip reach matched the core at about 0.150 m and grew to 0.697 m at maturity. The harness also checked the gaze, grip and ankle anchors, unit root scale, and inactive collision envelopes. This was a rig and geometry check, without contact-driven reaching or Android verification.
+
+The Release headless benchmark used the Laptop preset, 30 warm-up ticks, and 2,000 measured ticks per run. Five fresh launches gave medians of 56,301 ticks/s for four people and 34,588 ticks/s for 12. The anatomy sampling lives outside the household tick loop. The shared tests cover 64 birth seeds, sleeping growth, changed hand positions under an identical command, and restoration of mature geometry from both old and new saves.

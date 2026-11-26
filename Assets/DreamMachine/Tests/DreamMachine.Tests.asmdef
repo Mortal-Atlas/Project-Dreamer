@@ -19,8 +19,5 @@
     "defineConstraints": [
         "UNITY_INCLUDE_TESTS"
     ],
-    "versionDefines": [],
-    "optionalUnityReferences": [
-        "TestAssemblies"
-    ]
+    "versionDefines": []
 }
