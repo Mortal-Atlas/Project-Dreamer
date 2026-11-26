@@ -66,7 +66,6 @@ namespace DreamMachine.Sim
         readonly float[] _parentA = new float[10];
         readonly float[] _parentB = new float[10];
         readonly float[] _wetIn = new float[4];
-        readonly Stopwatch _clock = new Stopwatch();
         int _lastLoggedDay = -1;
 
         public bool IsNight
@@ -142,9 +141,7 @@ namespace DreamMachine.Sim
 
         public void Tick()
         {
-            long t0 = _clock.ElapsedTicks;
             Elements.Step(Dt);
-            long t1 = _clock.ElapsedTicks;
             bool night = IsNight;
             FamilyRoutine routine = PopulationConfig.RoutineAt(SimSeconds, DayLength, AwakeLength);
             string parentClip = ClipFor(routine, night);
@@ -158,7 +155,6 @@ namespace DreamMachine.Sim
             {
                 StepChild(Children[i], night, routine);
             }
-            long t2 = _clock.ElapsedTicks;
             SimSeconds += Dt;
             TickCount++;
             int day = DayIndex;
@@ -170,36 +166,33 @@ namespace DreamMachine.Sim
                     PhysiologyLog.Add(PhysiologySample.From(Children[i], day, night ? "night" : "awake"));
                 }
             }
-            _clock.Stop();
         }
 
         public int RunTicks(int count)
         {
-            _clock.Restart();
             int n = 0;
             while (n < count)
             {
                 Tick();
                 n++;
             }
-            _clock.Stop();
             return n;
         }
 
         public SimProfile RunBudget(int hardCap, double budgetMs, float realDt, float requestedScale, bool catchUp, float catchAge)
         {
             var profile = new SimProfile();
-            _clock.Restart();
+            var clock = Stopwatch.StartNew();
             int n = 0;
-            while (n < hardCap && _clock.Elapsed.TotalMilliseconds < budgetMs)
+            while (n < hardCap && clock.Elapsed.TotalMilliseconds < budgetMs)
             {
                 if (catchUp && MinAgeDays() >= catchAge) break;
                 Tick();
                 n++;
             }
-            _clock.Stop();
+            clock.Stop();
             profile.Ticks = n;
-            double seconds = _clock.Elapsed.TotalSeconds;
+            double seconds = clock.Elapsed.TotalSeconds;
             profile.TicksPerSecond = seconds > 0 ? (float)(n / seconds) : 0f;
             profile.AchievedScale = realDt > 0.000001f ? (float)((n * Dt) / realDt) : 0f;
             if (!catchUp && requestedScale > 0f && profile.AchievedScale > requestedScale)
