@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.IO;
+using System.Text;
 using DreamMachine.Affect;
 using DreamMachine.Physiology;
 using DreamMachine.Body;
@@ -66,6 +68,7 @@ namespace DreamMachine.Development
         public string AgentId;
         public string DisplayName;
         public int BirthSeed;
+        public HumanoidAnatomy Anatomy => new HumanoidAnatomy(BirthSeed);
         public int Generation;
         public int Day;
         public LibraryThree Library = new LibraryThree();
@@ -142,6 +145,7 @@ namespace DreamMachine.Development
                 { "agentId", AgentId ?? "" },
                 { "displayName", DisplayName ?? "" },
                 { "birthSeed", BirthSeed },
+                { "anatomyVersion", HumanoidAnatomy.GeneratorVersion },
                 { "generation", Generation },
                 { "day", Day },
                 { "sex", Sex ?? "" },
@@ -162,6 +166,9 @@ namespace DreamMachine.Development
         public static AgentPersistentState FromJson(string json, bool beginNewSession)
         {
             var data = MiniJson.AsObject(MiniJson.Parse(json));
+            if (data.TryGetValue("anatomyVersion", out object anatomyVersion) &&
+                MiniJson.AsInt(anatomyVersion) != HumanoidAnatomy.GeneratorVersion)
+                throw new System.FormatException("Unsupported humanoid anatomy generator version.");
             var state = new AgentPersistentState
             {
                 AgentId = MiniJson.AsString(data["agentId"]),
@@ -176,7 +183,13 @@ namespace DreamMachine.Development
             state.Emotions = new EmotionState(state.BirthSeed);
             state.Physiology = new PhysiologyState(state.BirthSeed);
             if (data.ContainsKey("emotions")) state.Emotions.LoadData(MiniJson.AsObject(data["emotions"]));
-            if (data.ContainsKey("ageDays")) state.Physiology.AgeDays = MiniJson.AsFloat(data["ageDays"]);
+            if (data.ContainsKey("ageDays"))
+            {
+                float age = MiniJson.AsFloat(data["ageDays"]);
+                if (float.IsNaN(age) || float.IsInfinity(age) || age < 0f)
+                    throw new System.FormatException("Saved developmental age is out of range.");
+                state.Physiology.AgeDays = age;
+            }
             if (data.ContainsKey("heartRate")) state.Physiology.HeartRate = MiniJson.AsFloat(data["heartRate"]);
             if (data.ContainsKey("energy")) state.Physiology.Energy = MiniJson.AsFloat(data["energy"]);
             state.Physiology.SetGeneration(state.Generation);
@@ -221,6 +234,46 @@ namespace DreamMachine.Development
                 state.Physiology.SetGeneration(state.Generation);
             }
             return state;
+        }
+    }
+
+    public static class AgentSaveFile
+    {
+        public static AgentPersistentState Load(string path)
+        {
+            try
+            {
+                return AgentPersistentState.FromJson(File.ReadAllText(path), true);
+            }
+            catch (FileNotFoundException) { return null; }
+            catch (DirectoryNotFoundException) { return null; }
+            catch (System.Exception error) when (error is System.FormatException ||
+                error is System.InvalidCastException || error is System.NullReferenceException ||
+                error is System.OverflowException || error is KeyNotFoundException)
+            {
+                throw new InvalidDataException("Cannot read saved individual at " + path, error);
+            }
+        }
+
+        public static void Save(string path, AgentPersistentState state)
+        {
+            byte[] data = Encoding.UTF8.GetBytes(state.ToJson());
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path)));
+            string pending = path + "." + System.Guid.NewGuid().ToString("N") + ".pending";
+            try
+            {
+                using (var stream = new FileStream(pending, FileMode.CreateNew, FileAccess.Write))
+                {
+                    stream.Write(data, 0, data.Length);
+                    stream.Flush(true);
+                }
+                if (File.Exists(path)) File.Replace(pending, path, null);
+                else File.Move(pending, path);
+            }
+            finally
+            {
+                File.Delete(pending);
+            }
         }
     }
 

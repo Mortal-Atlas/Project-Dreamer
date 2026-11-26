@@ -71,6 +71,7 @@ namespace DreamMachine.UnityBridge
         Font _font;
         Transform _dreamAnchor;
         TextMesh _banner;
+        string _startupFailure;
 
         int _focus;
         int _day;
@@ -111,6 +112,22 @@ namespace DreamMachine.UnityBridge
 
         void Start()
         {
+            TextAsset familyFile = Resources.Load<TextAsset>("family");
+            _pop = familyFile != null ? PopulationConfig.FromJson(familyFile.text) : PopulationConfig.CreateDefault();
+            try
+            {
+                _sim = WorldSimulation.Create(_pop, _preset, 7, spec => AgentSaveFile.Load(AgentPath(spec.Id)));
+            }
+            catch (System.Exception error) when (error is IOException || error is InvalidDataException ||
+                error is System.UnauthorizedAccessException)
+            {
+                _startupFailure = "Simulation paused. A saved individual could not be restored.\n" + error.Message
+                    + "\nInspect the save or restore a known-good copy, then restart.\n"
+                    + Path.Combine(Application.persistentDataPath, "agents");
+                Debug.LogError(_startupFailure, this);
+                return;
+            }
+
             _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             if (_font == null) _font = Resources.GetBuiltinResource<Font>("Arial.ttf");
             EnsureEventSystem();
@@ -120,8 +137,6 @@ namespace DreamMachine.UnityBridge
             if (visible == null) visible = Shader.Find("Unlit/Color");
             _unlit = new Material(visible);
             _idShader = Shader.Find("DreamMachine/IdColor");
-            TextAsset familyFile = Resources.Load<TextAsset>("family");
-            _pop = familyFile != null ? PopulationConfig.FromJson(familyFile.text) : PopulationConfig.CreateDefault();
             _groups = new GroupMind();
             _groups.Step(0, 0, 7);
             _world = new HiddenRuleWorld { ShiftAt = 18 };
@@ -140,19 +155,17 @@ namespace DreamMachine.UnityBridge
                 wet.LoadText(replay.text);
                 _replayRows = wet.Rows.Count;
             }
-            _sim = WorldSimulation.Create(_pop, _preset, 7);
-            for (int i = 0; i < _babies.Count; i++)
-            {
-                SimChild child = _sim.Find(_babies[i].Spec.Id);
-                if (child == null) continue;
-                _babies[i].State = child.State;
-                _babies[i].Mind = child.Mind;
-                _babies[i].Wetware = child.Wetware;
-            }
             BuildHome();
             BuildTimeBar();
             _ready = true;
             SelectBaby(0);
+        }
+
+        void OnGUI()
+        {
+            if (string.IsNullOrEmpty(_startupFailure)) return;
+            var style = new GUIStyle(GUI.skin.label) { wordWrap = true };
+            GUI.Label(new Rect(16, 16, Mathf.Max(16, Screen.width - 32), 180), _startupFailure, style);
         }
 
         void Update()
@@ -312,6 +325,7 @@ namespace DreamMachine.UnityBridge
 
         void StepBaby(Actor actor, float dt)
         {
+            actor.Body.ApplyDevelopmentAge(WorldSimulation.AnatomyAge(actor.State.Physiology.AgeDays));
             if (_sim != null)
             {
                 SimChild child = _sim.Find(actor.Spec.Id);
@@ -537,9 +551,8 @@ namespace DreamMachine.UnityBridge
         {
             if (_eye == null || _seg == null || _babies.Count == 0) return;
             Actor baby = _babies[_focus];
-            Transform head = baby.Body.HeadPivot();
-            _eye.transform.position = head.position + head.forward * 0.12f + Vector3.up * 0.05f;
-            _eye.transform.rotation = Quaternion.LookRotation(baby.Body.transform.forward + Vector3.down * 0.05f, Vector3.up);
+            Transform gaze = baby.Body.RigPivot("gaze");
+            _eye.transform.SetPositionAndRotation(gaze.position, gaze.rotation);
             _seg.transform.position = _eye.transform.position;
             _seg.transform.rotation = _eye.transform.rotation;
             _eye.Render();
@@ -643,7 +656,10 @@ namespace DreamMachine.UnityBridge
                 PersonSpec spec = _pop.People[i];
                 AppearanceProfile look;
                 if (!looks.TryGetValue(spec.Id, out look)) look = AppearanceCatalog.For(spec);
-                SegmentedBody body = CharacterFactory.Build(parent, look, _unlit);
+                SimChild child = _sim.Find(spec.Id);
+                HumanoidAnatomy anatomy = child == null ? new HumanoidAnatomy(spec.BirthSeed) : child.State.Anatomy;
+                float developmentAge = child == null ? HumanoidAnatomy.AdultAgeDays : WorldSimulation.AnatomyAge(child.Body.AgeDays);
+                SegmentedBody body = CharacterFactory.Build(parent, look, _unlit, anatomy, developmentAge);
                 var actor = new Actor
                 {
                     Spec = spec,
@@ -654,12 +670,9 @@ namespace DreamMachine.UnityBridge
                 };
                 int groupIndex = spec.Group == GroupId.Boys ? 0 : 1;
                 actor.Pos = _anchors[groupIndex] + Slot(spec);
-                if (spec.Role == MemberRole.Baby)
+                if (child != null)
                 {
-                    actor.State = LoadOrCreate(spec);
-                    actor.Mind = new AgentMind(spec.BirthSeed, MindCondition.Full);
-                    actor.Mind.Library = actor.State.Library;
-                    actor.Wetware = new HebbianWetware(4, 3, spec.BirthSeed);
+                    BindChild(actor, child);
                     actor.NextPractice = 0.4f * _babies.Count;
                     actor.NextEncounter = 1.5f + _babies.Count;
                     _babies.Add(actor);
@@ -669,21 +682,11 @@ namespace DreamMachine.UnityBridge
             }
         }
 
-        AgentPersistentState LoadOrCreate(PersonSpec spec)
+        static void BindChild(Actor actor, SimChild child)
         {
-            string path = AgentPath(spec.Id);
-            if (File.Exists(path))
-            {
-                try
-                {
-                    return AgentPersistentState.FromJson(File.ReadAllText(path), true);
-                }
-                catch (System.Exception)
-                {
-                    // A damaged save should not block the nursery. Start this baby again.
-                }
-            }
-            return AgentPersistentState.CreateNew(spec);
+            actor.State = child.State;
+            actor.Mind = child.Mind;
+            actor.Wetware = child.Wetware;
         }
 
         void BuildProps()
@@ -831,14 +834,21 @@ namespace DreamMachine.UnityBridge
 
         void SaveAll()
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(AgentPath("x")) ?? Application.persistentDataPath);
-            for (int i = 0; i < _babies.Count; i++)
+            try
             {
-                Actor baby = _babies[i];
-                baby.State.Day = _day;
-                File.WriteAllText(AgentPath(baby.Spec.Id), baby.State.ToJson());
+                for (int i = 0; i < _babies.Count; i++)
+                {
+                    Actor baby = _babies[i];
+                    baby.State.Day = _day;
+                    AgentSaveFile.Save(AgentPath(baby.Spec.Id), baby.State);
+                }
+                WriteGrowth();
             }
-            WriteGrowth();
+            catch (System.Exception error) when (error is IOException || error is System.UnauthorizedAccessException)
+            {
+                _banner.text = "Save interrupted. See the console for the affected file.";
+                Debug.LogError(error, this);
+            }
         }
 
         void ResetBabies()
@@ -848,10 +858,7 @@ namespace DreamMachine.UnityBridge
                 string path = AgentPath(_babies[i].Spec.Id);
                 if (File.Exists(path)) File.Delete(path);
                 Actor baby = _babies[i];
-                baby.State = AgentPersistentState.CreateNew(baby.Spec);
-                baby.Mind = new AgentMind(baby.Spec.BirthSeed, MindCondition.Full);
-                baby.Mind.Library = baby.State.Library;
-                baby.Wetware = new HebbianWetware(4, 3, baby.Spec.BirthSeed);
+                BindChild(baby, _sim.ResetChild(baby.Spec.Id));
             }
             _day = 0;
             _encounters = 0;
