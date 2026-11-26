@@ -22,6 +22,41 @@ namespace DreamMachine.Tests
     public class ElbowLabTests
     {
         [Test]
+        public void PredictiveCorrectionAndLearningAreBoundedAndPersisted()
+        {
+            var predictor = new ContactPredictor();
+            var adaptive = new PredictiveMotor(MotorCondition.Adaptive, predictor);
+            var frozen = new PredictiveMotor(MotorCondition.Frozen, predictor);
+            var engineered = new PredictiveMotor(MotorCondition.Engineered, predictor);
+            var sensed = new ElbowLab.StepSample(1, 1, 0, 0.2, 0, 0,
+                new ElbowLab.Proprioception(0.1, 2, 1, -0.5));
+            var first = adaptive.Before(sensed, 1);
+            Assert.AreEqual(0, engineered.Before(sensed, 1).Correction);
+            Assert.That(first.Correction, Is.Negative);
+            for (int i = 0; i < 20; i++)
+            {
+                var prediction = adaptive.Before(sensed, 1);
+                Assert.That(Math.Abs(prediction.Correction), Is.LessThanOrEqualTo(PredictiveMotor.MaximumCorrection));
+                Assert.AreEqual(0.5, adaptive.After(prediction.Probability, sensed));
+                frozen.After(prediction.Probability, sensed);
+            }
+            Assert.AreEqual(1, adaptive.Gain);
+            Assert.AreEqual(0.75, frozen.Gain);
+            Assert.AreEqual(20, adaptive.Updates);
+            using var stream = new MemoryStream();
+            using var writer = new BinaryWriter(stream);
+            adaptive.WriteState(writer);
+            stream.Position = 0;
+            using var reader = new BinaryReader(stream);
+            var restored = PredictiveMotor.ReadState(reader, predictor);
+            Assert.AreEqual(adaptive.Before(sensed, 1), restored.Before(sensed, 1));
+            var forceful = new ElbowLab.StepSample(2, 1, 0.1, 2, 0, 0, sensed.Feedback);
+            restored.After(0.5, forceful);
+            Assert.IsTrue(restored.Stopped);
+            Assert.Throws<InvalidOperationException>(() => restored.Before(sensed, 1));
+        }
+
+        [Test]
         public void TrainedContactProbabilitySurvivesReloadWithoutPrivilegedObjectData()
         {
             ElbowLab lab = Create(0.28, 0.20);

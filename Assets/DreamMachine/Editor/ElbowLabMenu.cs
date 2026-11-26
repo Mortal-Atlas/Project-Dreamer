@@ -13,12 +13,17 @@ namespace DreamMachine.EditorTools
         [MenuItem("Dream Machine/Start Native Elbow Laboratory")]
         static void OpenNative() => Open(true);
 
-        static void Open(bool native)
+        [MenuItem("Dream Machine/Start Predictive Elbow Laboratory")]
+        static void OpenPredictive() => Open(true, true);
+
+        static void Open(bool native, bool predictive = false)
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode ||
                 !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            new GameObject("Elbow Laboratory").AddComponent<ElbowLabView>().UseNativePhysics = native;
+            var view = new GameObject("Elbow Laboratory").AddComponent<ElbowLabView>();
+            view.UseNativePhysics = native;
+            view.UsePredictiveMotor = predictive;
             EditorApplication.EnterPlaymode();
         }
     }

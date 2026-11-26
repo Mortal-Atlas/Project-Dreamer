@@ -95,6 +95,8 @@ namespace DreamMachine.UnityBridge
         static bool Valid(Quaternion q) => Finite(q.w) &&
             Valid(new Vector3(q.x, q.y, q.z)) && Mathf.Abs(Quaternion.Dot(q, q) - 1) < 0.0001f;
 
+        public static string ValidateCheckpoint(byte[] bytes) => Decode(bytes).Individual;
+
         static Snapshot Decode(byte[] bytes)
         {
             try

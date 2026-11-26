@@ -129,9 +129,20 @@ namespace DreamMachine.UnityBridge
         }
 
         public ElbowLab.StepSample Step()
+            => Step(0);
+
+        public double LastBaselineTorque { get; private set; }
+        public double LastAppliedCorrection { get; private set; }
+        public double LastSignedWork { get; private set; }
+        public double LastAbsoluteWork { get; private set; }
+
+        public ElbowLab.StepSample Step(double correction)
         {
             if (_disposed || Finished) throw new InvalidOperationException("Native fixture cannot advance.");
-            double previous = Angle, x = X, y = Y, effort = 0;
+            if (!PredictiveMotor.Finite(correction) || Math.Abs(correction) > PredictiveMotor.MaximumCorrection)
+                throw new ArgumentOutOfRangeException(nameof(correction));
+            double previous = Angle, x = X, y = Y, effort = 0, baseline = 0;
+            LastSignedWork = LastAbsoluteWork = 0;
             _impulse = _torqueImpulse = 0;
             Array.Clear(_normal, 0, _normal.Length);
             Array.Clear(_tangent, 0, _tangent.Length);
@@ -141,14 +152,21 @@ namespace DreamMachine.UnityBridge
             {
                 long start = ProfileEnabled ? Stopwatch.GetTimestamp() : 0;
                 double velocity = _arm.angularVelocity.z;
-                double command = Math.Max(-2, Math.Min(2, 9 * (RequestedTarget - Angle) - 0.7 * velocity));
+                double beforeAngle = Angle;
+                double engineered = Math.Max(-2, Math.Min(2, 9 * (RequestedTarget - beforeAngle) - 0.7 * velocity));
+                double command = Math.Max(-2, Math.Min(2, engineered + correction));
                 _arm.AddTorque(Vector3.forward * (float)(command - 0.1 * velocity), ForceMode.Force);
                 effort += command;
+                baseline += engineered;
                 _receiver.ContactMask = 0;
                 if (ProfileEnabled) MotorTimestampTicks += Stopwatch.GetTimestamp() - start;
                 start = ProfileEnabled ? Stopwatch.GetTimestamp() : 0;
                 _physics.Simulate(Substep);
                 if (ProfileEnabled) PhysicsTimestampTicks += Stopwatch.GetTimestamp() - start;
+                double work = command * Mathf.DeltaAngle((float)beforeAngle * Mathf.Rad2Deg,
+                    (float)Angle * Mathf.Rad2Deg) * Mathf.Deg2Rad;
+                LastSignedWork += work;
+                LastAbsoluteWork += Math.Abs(work);
                 for (int r = 0; r < _duration.Length; r++)
                     _duration[r] = (_receiver.ContactMask & (1 << r)) != 0 ? _duration[r] + Substep : 0;
             }
@@ -159,6 +177,8 @@ namespace DreamMachine.UnityBridge
             Latest = new ElbowLab.StepSample(++Tick, RequestedTarget, previous, _impulse, X - x, Y - y,
                 new ElbowLab.Proprioception(Angle, _arm.angularVelocity.z, effort / ElbowLab.Substeps,
                     _torqueImpulse / WorldSimulation.Dt));
+            LastBaselineTorque = baseline / ElbowLab.Substeps;
+            LastAppliedCorrection = (effort - baseline) / ElbowLab.Substeps;
             if (ProfileEnabled) SensorTimestampTicks += Stopwatch.GetTimestamp() - sensorStart;
             return Latest;
         }

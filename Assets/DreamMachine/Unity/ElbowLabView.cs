@@ -19,6 +19,8 @@ namespace DreamMachine.UnityBridge
         readonly StringBuilder _readout = new StringBuilder(512);
         IElbowFixture _lab;
         public bool UseNativePhysics;
+        public bool UsePredictiveMotor;
+        PredictiveNativeTrial _predictive;
         TrayWorkspace _workspace;
         Transform _arm, _puck;
         Text _telemetry, _statusLabel;
@@ -27,14 +29,13 @@ namespace DreamMachine.UnityBridge
         float _nextRefresh;
         const string Tray = "embodiment.elbow";
         string Checkpoint => Path.Combine(Application.persistentDataPath,
+            UsePredictiveMotor ? "elbow-predictive.checkpoint" :
             UseNativePhysics ? "elbow-native.checkpoint" : "elbow-lab.checkpoint");
 
         void Start()
         {
             _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            TryFile(() => _lab = UseNativePhysics
-                ? (IElbowFixture)(NativeElbowLab.LoadCheckpoint(Checkpoint) ?? new NativeElbowLab(ElbowLab.Settings.Standard, "son"))
-                : ElbowLab.LoadCheckpoint(Checkpoint) ?? new ElbowLab(ElbowLab.Settings.Standard, "son"));
+            TryFile(InitializeLab);
             var camera = new GameObject("Laboratory Camera", typeof(Camera)).GetComponent<Camera>();
             camera.transform.SetParent(transform);
             camera.transform.position = new Vector3(0.07f, 0.1f, -2f);
@@ -64,7 +65,7 @@ namespace DreamMachine.UnityBridge
                 _skin[i] = _patches[i].GetComponent<Renderer>().sharedMaterial;
             }
             _workspace = new TrayWorkspace("DreamMachine.Workspace.v1.");
-            _workspace.Register(Tray, "Elbow laboratory", new Vector2(480, 300), new TrayWorkspace.Layout
+            _workspace.Register(Tray, "Elbow laboratory", new Vector2(480, 340), new TrayWorkspace.Layout
             {
                 AnchorMin = new Vector2(0.03f, 0.61f), AnchorMax = new Vector2(0.97f, 0.98f), Visible = true
             }, BuildTray, () => { _telemetry = null; _statusLabel = null; }, RefreshTray);
@@ -72,14 +73,42 @@ namespace DreamMachine.UnityBridge
             DrawBody();
         }
 
+        void InitializeLab()
+        {
+            if (UsePredictiveMotor)
+            {
+                _predictive = PredictiveNativeTrial.LoadCheckpoint(Checkpoint);
+                if (_predictive == null)
+                {
+                    string path = Path.Combine(Application.persistentDataPath, "native-scratch.predictor");
+                    if (!File.Exists(path))
+                        throw new InvalidDataException("Train or supply an identity-compatible native-scratch.predictor in " +
+                            Application.persistentDataPath);
+                    string model = File.ReadAllText(path);
+                    ContactPredictor.Restore(model, "son");
+                    _predictive = new PredictiveNativeTrial(new NativeElbowLab(ElbowLab.Settings.Standard, "son"),
+                        model, MotorCondition.Adaptive);
+                }
+                _lab = _predictive.Lab;
+                return;
+            }
+            _lab = UseNativePhysics
+                ? (IElbowFixture)(NativeElbowLab.LoadCheckpoint(Checkpoint) ?? new NativeElbowLab(ElbowLab.Settings.Standard, "son"))
+                : ElbowLab.LoadCheckpoint(Checkpoint) ?? new ElbowLab(ElbowLab.Settings.Standard, "son");
+        }
+
         void Update()
         {
             if (_workspace == null) return;
             if (DreamInput.WasPressed(KeyCode.Tab)) _workspace.Toggle(Tray);
-            if (_lab != null && !_lab.Finished)
+            if (_lab != null && !(_predictive?.Finished ?? _lab.Finished))
             {
                 int count = _clock.TakeSingleStep() ? 1 : _clock.Plan(Time.unscaledDeltaTime, WorldSimulation.Dt, 8);
-                for (int i = 0; i < count && !_lab.Finished; i++) _lab.Step();
+                for (int i = 0; i < count && !(_predictive?.Finished ?? _lab.Finished); i++)
+                {
+                    if (_predictive == null) _lab.Step();
+                    else _predictive.Step();
+                }
                 if (count > 0) DrawBody();
             }
             if (Time.unscaledTime >= _nextRefresh)
@@ -127,11 +156,23 @@ namespace DreamMachine.UnityBridge
             });
             AddButton(parent, 3, "Save", () => TryFile(() =>
             {
-                if (_lab is NativeElbowLab native) native.SaveCheckpoint(Checkpoint);
+                if (_predictive != null) _predictive.SaveCheckpoint(Checkpoint);
+                else if (_lab is NativeElbowLab native) native.SaveCheckpoint(Checkpoint);
                 else if (_lab is ElbowLab reference) reference.SaveCheckpoint(Checkpoint);
             }));
             AddButton(parent, 4, "Restore", () => TryFile(() =>
             {
+                if (UsePredictiveMotor)
+                {
+                    var restoredTrial = PredictiveNativeTrial.LoadCheckpoint(Checkpoint) ??
+                        throw new InvalidDataException("No predictive checkpoint.");
+                    _predictive?.Dispose();
+                    _predictive = restoredTrial;
+                    _lab = restoredTrial.Lab;
+                    _clock.Paused = true;
+                    DrawBody();
+                    return;
+                }
                 IElbowFixture restored = UseNativePhysics
                     ? (IElbowFixture)NativeElbowLab.LoadCheckpoint(Checkpoint)
                     : ElbowLab.LoadCheckpoint(Checkpoint);
@@ -167,6 +208,18 @@ namespace DreamMachine.UnityBridge
             _readout.AppendLine($"Target {_lab.RequestedTarget:F2} rad · joint {sensed.Angle:F2} rad / {sensed.Velocity:F2} rad/s");
             _readout.AppendLine($"Motor {sensed.Effort:F2} N m · resistance {sensed.Resistance:F2} N m");
             _readout.AppendLine($"Puck ({_lab.X:F3}, {_lab.Y:F3}) m · contact {_lab.Latest.NormalImpulse:F3} N s");
+            if (_predictive != null)
+            {
+                var native = _predictive.Lab;
+                var motor = _predictive.Motor;
+                _readout.AppendLine($"{motor.Condition} · gain {motor.Gain:F3} · updates {motor.Updates}" +
+                    (motor.Stopped ? " · protective stop" : ""));
+                if (_predictive.HasFeedback)
+                {
+                    _readout.AppendLine($"Baseline {native.LastBaselineTorque:F2} · correction {native.LastAppliedCorrection:F2} · final {sensed.Effort:F2} N m");
+                    _readout.AppendLine($"Predicted {_predictive.LastProbability:P1} · observed {(_lab.Latest.NormalImpulse > 0 ? 1 : 0)} · error {_predictive.LastError:+0.000;-0.000;0.000}");
+                }
+            }
             for (int i = 0; i < ElbowLab.ReceptorCount; i++)
             {
                 ElbowLab.Receptor region = _lab.ReadRegion(i);

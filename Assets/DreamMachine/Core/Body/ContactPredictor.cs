@@ -65,15 +65,7 @@ namespace DreamMachine.Body
 
         public void Save(string path, string individual, string provenance, string evaluation)
         {
-            if (string.IsNullOrWhiteSpace(individual) || string.IsNullOrWhiteSpace(provenance))
-                throw new ArgumentException("A predictor requires an identity and training provenance.");
-            var data = new Dictionary<string, object>
-            {
-                { "version", 1 }, { "topology", "palm-chain-v1" }, { "length_m", ElbowLab.ArmLength },
-                { "features", Features }, { "individual", individual }, { "provenance", provenance },
-                { "evaluation", evaluation ?? "" }, { "weights", _weights }
-            };
-            byte[] bytes = System.Text.Encoding.UTF8.GetBytes(MiniJson.Stringify(data));
+            byte[] bytes = System.Text.Encoding.UTF8.GetBytes(Capture(individual, provenance, evaluation));
             WorldSimulation.PublishCheckpoint(path, bytes, file =>
             {
                 if (!File.Exists(file) && !File.Exists(file + ".previous")) return false;
@@ -82,11 +74,27 @@ namespace DreamMachine.Body
             });
         }
 
+        public string Capture(string individual, string provenance, string evaluation)
+        {
+            if (string.IsNullOrWhiteSpace(individual) || string.IsNullOrWhiteSpace(provenance))
+                throw new ArgumentException("A predictor requires an identity and training provenance.");
+            var data = new Dictionary<string, object>
+            {
+                { "version", 1 }, { "topology", "palm-chain-v1" }, { "length_m", ElbowLab.ArmLength },
+                { "features", Features }, { "individual", individual }, { "provenance", provenance },
+                { "evaluation", evaluation ?? "" }, { "weights", _weights }
+            };
+            return MiniJson.Stringify(data);
+        }
+
         public static ContactPredictor Load(string path, string individual)
+            => Restore(File.ReadAllText(path), individual);
+
+        public static ContactPredictor Restore(string json, string individual)
         {
             try
             {
-                var d = MiniJson.AsObject(MiniJson.Parse(File.ReadAllText(path)));
+                var d = MiniJson.AsObject(MiniJson.Parse(json));
                 if (d == null || MiniJson.AsInt(d["version"]) != 1 || MiniJson.AsString(d["topology"]) != "palm-chain-v1" ||
                     MiniJson.AsDouble(d["length_m"]) != ElbowLab.ArmLength || MiniJson.AsString(d["features"]) != Features ||
                     MiniJson.AsString(d["individual"]) != individual || string.IsNullOrWhiteSpace(MiniJson.AsString(d["provenance"])))
