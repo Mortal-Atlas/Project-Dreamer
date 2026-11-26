@@ -1,0 +1,3 @@
+﻿day,agent_id,phase,age_days,maturity,heart_rate,breathing_rate,energy,hunger,cortisol,oxytocin,melatonin,pain,mean_activation,mean_force,mean_fatigue,walk_force_scale,nerve_delay_ms
+0,son,awake,0.000962,0.000053,128.8146,34,0.866616,0.132044,0.121972,0.224881,0.1,0,0,0,0,0.594366,139.9949
+0,daughter,awake,0.000962,0.000053,132.3359,34,0.847425,0.151219,0.12224,0.224881,0.1,0,0,0,0,0.5699,139.9949

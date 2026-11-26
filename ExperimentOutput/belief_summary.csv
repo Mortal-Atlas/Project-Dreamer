@@ -1,0 +1,13 @@
+﻿condition,window,start_trial,end_trial,mean_accuracy
+A_library_I,opening,0,20,0.6875
+A_library_I,pre_shift,20,40,0.70625
+A_library_I,post_shift,40,60,0.525
+A_library_I,late,60,80,0.39375
+B_library_I_II,opening,0,20,0.6875
+B_library_I_II,pre_shift,20,40,0.70625
+B_library_I_II,post_shift,40,60,0.525
+B_library_I_II,late,60,80,0.39375
+C_library_I_II_III,opening,0,20,0.68125
+C_library_I_II_III,pre_shift,20,40,0.775
+C_library_I_II_III,post_shift,40,60,0.6125
+C_library_I_II_III,late,60,80,0.7375
