@@ -116,14 +116,19 @@ namespace DreamMachine.UnityBridge
             _pop = familyFile != null ? PopulationConfig.FromJson(familyFile.text) : PopulationConfig.CreateDefault();
             try
             {
-                _sim = WorldSimulation.Create(_pop, _preset, 7, spec => AgentSaveFile.Load(AgentPath(spec.Id)));
+                _sim = WorldSimulation.LoadPrimaryCheckpoint(WorldPath())
+                    ?? WorldSimulation.Create(_pop, _preset, 7, spec => AgentSaveFile.Load(AgentPath(spec.Id)));
+                _pop = _sim.Population;
+                _preset = _sim.Preset;
+                _night = _sim.IsNight;
+                _day = _sim.DayIndex;
             }
             catch (System.Exception error) when (error is IOException || error is InvalidDataException ||
                 error is System.UnauthorizedAccessException)
             {
                 _startupFailure = "Simulation paused. A saved individual could not be restored.\n" + error.Message
                     + "\nInspect the save or restore a known-good copy, then restart.\n"
-                    + Path.Combine(Application.persistentDataPath, "agents");
+                    + Application.persistentDataPath;
                 Debug.LogError(_startupFailure, this);
                 return;
             }
@@ -772,34 +777,72 @@ namespace DreamMachine.UnityBridge
         {
             try
             {
-                for (int i = 0; i < _babies.Count; i++)
-                {
-                    Actor baby = _babies[i];
-                    baby.State.Day = _day;
-                    AgentSaveFile.Save(AgentPath(baby.Spec.Id), baby.State);
-                }
+                if (_remote != null && _remote.Active) return;
+                _sim.SaveCheckpoint(WorldPath());
                 WriteGrowth();
             }
-            catch (System.Exception error) when (error is IOException || error is System.UnauthorizedAccessException)
+            catch (System.Exception error) when (error is IOException || error is InvalidDataException ||
+                error is System.UnauthorizedAccessException)
             {
                 _banner.text = "Save interrupted. See the console for the affected file.";
                 Debug.LogError(error, this);
             }
         }
 
+        static string WorldPath() => Path.Combine(Application.persistentDataPath, "world.checkpoint");
+
+        void RestoreWorld()
+        {
+            if (_remote != null && _remote.Active) return;
+            try
+            {
+                WorldSimulation restored = WorldSimulation.LoadCheckpoint(WorldPath());
+                if (restored == null) throw new InvalidDataException("No world checkpoint exists.");
+                if (restored.Population.People.Count != _actors.Count)
+                    throw new InvalidDataException("The checkpoint roster differs from this scene.");
+                foreach (PersonSpec person in restored.Population.People)
+                {
+                    if (!_actors.TryGetValue(person.Id, out Actor actor) ||
+                        person.BirthSeed != actor.Spec.BirthSeed || person.Role != actor.Spec.Role)
+                        throw new InvalidDataException("The checkpoint roster differs from this scene.");
+                }
+                _sim = restored;
+                _pop = restored.Population;
+                _preset = restored.Preset;
+                _day = restored.DayIndex;
+                _night = restored.IsNight;
+                _governor = new TimeGovernor { Paused = true };
+                foreach (Actor actor in _actors.Values)
+                {
+                    actor.Spec = _pop.Find(actor.Spec.Id);
+                    SimChild child = _sim.Find(actor.Spec.Id);
+                    if (child != null) BindChild(actor, child);
+                }
+                foreach (GameObject dream in _dreams) Destroy(dream);
+                _dreams.Clear();
+                StepActors(WorldSimulation.Dt);
+                _banner.text = "World restored. Simulation paused.";
+            }
+            catch (System.Exception error) when (error is IOException || error is InvalidDataException ||
+                error is System.UnauthorizedAccessException)
+            {
+                _banner.text = "Restore failed. The current world is still active.";
+                Debug.LogError(error, this);
+            }
+        }
+
         void ResetBabies()
         {
+            if (_remote != null && _remote.Active) return;
             for (int i = 0; i < _babies.Count; i++)
             {
-                string path = AgentPath(_babies[i].Spec.Id);
-                if (File.Exists(path)) File.Delete(path);
                 Actor baby = _babies[i];
-                BindChild(baby, _sim.ResetChild(baby.Spec.Id));
+                BindChild(baby, _sim.ResetLearnerForResearch(baby.Spec.Id, "Reset requested in the Unity HUD."));
             }
-            _day = 0;
             _encounters = 0;
             _ruleAnnounced = false;
             _banner.text = "Newborns. Same seeds, empty memory. Generation 0.";
+            SaveAll();
         }
 
         void RefreshHud()
@@ -1109,14 +1152,17 @@ namespace DreamMachine.UnityBridge
             else if (age >= WorldSimulation.AgeOf(LifeStage.Toddler)) stage = "toddler";
             else stage = "newborn";
             string dir = Path.Combine(Application.persistentDataPath, "stages", stage);
-            Directory.CreateDirectory(dir);
-            File.WriteAllText(Path.Combine(dir, "clock.txt"), _sim.TickCount + "\n" + _sim.SimSeconds.ToString("R"));
-            for (int i = 0; i < _sim.Children.Count; i++)
+            try
             {
-                SimChild child = _sim.Children[i];
-                File.WriteAllText(Path.Combine(dir, child.Spec.Id + ".json"), child.State.ToJson());
+                _sim.SaveCheckpoint(Path.Combine(dir, "world.checkpoint"));
+                if (_hud != null) _hud.SetResult("Saved stage " + stage + " (" + _sim.TickCount + " ticks) to " + dir);
             }
-            if (_hud != null) _hud.SetResult("Saved stage " + stage + " (" + _sim.TickCount + " ticks) to " + dir);
+            catch (System.Exception error) when (error is IOException || error is InvalidDataException ||
+                error is System.UnauthorizedAccessException)
+            {
+                if (_hud != null) _hud.SetResult("Stage save failed. See the console.");
+                Debug.LogError(error, this);
+            }
         }
 
         void BuildHome()
@@ -1170,8 +1216,9 @@ namespace DreamMachine.UnityBridge
             AddTimeButton(bar.transform, "Step", 0.28f, 0.40f, RequestLocalStep);
             AddTimeButton(bar.transform, "Slower", 0.40f, 0.55f, () => SetScale(Mathf.Max(0.1f, _governor.TargetScale / 10f)));
             AddTimeButton(bar.transform, "Faster", 0.55f, 0.70f, () => SetScale(Mathf.Min(1000f, _governor.TargetScale * 10f)));
-            AddTimeButton(bar.transform, "Save", 0.70f, 0.85f, SaveAll);
-            AddTimeButton(bar.transform, "Close", 0.85f, 1f, ToggleSimulationTray);
+            AddTimeButton(bar.transform, "Save", 0.70f, 0.77f, SaveAll);
+            AddTimeButton(bar.transform, "Restore", 0.77f, 0.88f, RestoreWorld);
+            AddTimeButton(bar.transform, "Close", 0.88f, 1f, ToggleSimulationTray);
         }
 
         Text _timeLabel;

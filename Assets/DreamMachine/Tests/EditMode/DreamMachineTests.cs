@@ -19,6 +19,114 @@ using NUnit.Framework;
 
 namespace DreamMachine.Tests
 {
+    public class WorldCheckpointTests
+    {
+        [TestCase(7)]
+        [TestCase(18)]
+        [TestCase(101)]
+        public void FileRoundTripContinuesAcrossNightAndDay(int seed)
+        {
+            string path = Path.GetTempFileName();
+            File.Delete(path);
+            try
+            {
+                var continuous = WorldSimulation.Create(PopulationConfig.CreateDefault(), QualityPreset.Phone, seed);
+                continuous.RunTicks(690);
+                continuous.Elements.Pour(13, 0.6f);
+                continuous.SaveCheckpoint(path);
+                WorldSimulation restarted = WorldSimulation.LoadCheckpoint(path);
+                AssertEquivalent(continuous, restarted);
+                for (int i = 0; i < 450; i++)
+                {
+                    continuous.Tick();
+                    restarted.Tick();
+                    if (i % 37 == 0 || i == 449) AssertEquivalent(continuous, restarted);
+                }
+                Assert.AreEqual(1, restarted.DayIndex);
+                Assert.IsFalse(restarted.IsNight);
+            }
+            finally { File.Delete(path); }
+        }
+
+        static void AssertEquivalent(WorldSimulation expected, WorldSimulation actual)
+        {
+            Assert.AreEqual(expected.TickCount, actual.TickCount, "clock tick");
+            Assert.AreEqual(expected.SimSeconds, actual.SimSeconds, "clock seconds");
+            CollectionAssert.AreEqual(expected.Elements.Water, actual.Elements.Water, "environment water");
+            CollectionAssert.AreEqual(expected.Elements.Temperature, actual.Elements.Temperature, "environment temperature");
+            foreach (SimChild learner in expected.Children)
+            {
+                SimChild restored = actual.Find(learner.Spec.Id);
+                Assert.AreEqual(learner.State.Generation, restored.State.Generation, learner.Spec.Id + " generation");
+                Assert.AreEqual(learner.Body.AgeDays, restored.Body.AgeDays, learner.Spec.Id + " age");
+                Assert.AreEqual(learner.X, restored.X, learner.Spec.Id + " X");
+                Assert.AreEqual(learner.Z, restored.Z, learner.Spec.Id + " Z");
+                CollectionAssert.AreEqual(learner.State.Walker.Genome, restored.State.Walker.Genome, learner.Spec.Id + " motor genome");
+                CollectionAssert.AreEqual(learner.Wetware.Snapshot().Weights, restored.Wetware.Snapshot().Weights,
+                    learner.Spec.Id + " wetware weights");
+                Assert.AreEqual(learner.State.ToJson(), restored.State.ToJson(), learner.Spec.Id + " persisted observations and memory");
+            }
+            CollectionAssert.AreEqual(expected.CaptureCheckpoint(), actual.CaptureCheckpoint(), "full checkpoint fields");
+        }
+
+        [Test]
+        public void InterruptedOrInvalidPublicationPreservesRecoverableFiles()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            string path = Path.Combine(directory, "world");
+            try
+            {
+                Assert.IsNull(WorldSimulation.LoadCheckpoint(path));
+                WorldSimulation world = WorldSimulation.Create(PopulationConfig.CreateDefault(), QualityPreset.Phone, 7);
+                world.SaveCheckpoint(path);
+                byte[] first = File.ReadAllBytes(path);
+                File.WriteAllBytes(path + ".interrupted.pending", new byte[] { 1 });
+                AssertEquivalent(world, WorldSimulation.LoadCheckpoint(path));
+                world.RunTicks(7);
+                world.SaveCheckpoint(path);
+                CollectionAssert.AreEqual(first, File.ReadAllBytes(path + ".previous"));
+                AssertEquivalent(world, WorldSimulation.LoadCheckpoint(path));
+
+                byte[] corrupt = File.ReadAllBytes(path);
+                corrupt[corrupt.Length - 1] ^= 1;
+                File.WriteAllBytes(path, corrupt);
+                Assert.Throws<InvalidDataException>(() => WorldSimulation.LoadCheckpoint(path));
+                Assert.Throws<InvalidDataException>(() => world.SaveCheckpoint(path));
+                CollectionAssert.AreEqual(corrupt, File.ReadAllBytes(path));
+                CollectionAssert.AreEqual(first, File.ReadAllBytes(path + ".previous"));
+
+                byte[] incompatible = (byte[])first.Clone();
+                incompatible[1 + "DreamMachine.World".Length] = 99;
+                Assert.Throws<InvalidDataException>(() => WorldSimulation.RestoreCheckpoint(incompatible));
+                File.Delete(path);
+                Assert.Throws<InvalidDataException>(() => WorldSimulation.LoadPrimaryCheckpoint(path));
+                Assert.Throws<InvalidDataException>(() => world.SaveCheckpoint(path));
+            }
+            finally
+            {
+                if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            }
+        }
+
+        [Test]
+        public void ExplicitResetPersistsLedgerAndPassiveCaptureDoesNotAppend()
+        {
+            var world = WorldSimulation.Create(PopulationConfig.CreateDefault(), QualityPreset.Phone, 7);
+            world.RunTicks(20);
+            world.CaptureCheckpoint();
+            Assert.That(world.ReadInterventions(), Is.Empty);
+            world.ResetLearnerForResearch("son", "Reset trial baseline");
+            var copied = WorldSimulation.RestoreCheckpoint(world.CaptureCheckpoint());
+            ResearchIntervention entry = copied.ReadInterventions()[0];
+            Assert.AreEqual("son", entry.EntityId);
+            Assert.AreEqual(20, entry.Tick);
+            Assert.AreEqual("reset-learner", entry.Kind);
+            Assert.AreEqual("Reset trial baseline", entry.Reason);
+            Assert.AreNotEqual(entry.Previous, entry.Result);
+            AssertEquivalent(world, copied);
+        }
+    }
+
     public class SimulationClockTests
     {
         [Test]

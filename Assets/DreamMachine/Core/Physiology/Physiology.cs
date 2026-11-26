@@ -214,6 +214,76 @@ namespace DreamMachine.Physiology
             return (MotorDrive[1] + MotorDrive[3] + MotorDrive[5] + MotorDrive[7]) * 0.25f;
         }
 
+        internal void WriteCheckpoint(System.IO.BinaryWriter writer)
+        {
+            writer.Write(AgeDays);
+            writer.Write(Maturity);
+            writer.Write(HeartRate);
+            writer.Write(BreathingRate);
+            writer.Write(BreathingEfficiency);
+            writer.Write(Energy);
+            writer.Write(Hunger);
+            writer.Write(Cortisol);
+            writer.Write(Oxytocin);
+            writer.Write(Melatonin);
+            writer.Write(NerveDelaySeconds);
+            writer.Write(MuscleStrength);
+            writer.Write(RestingHeartRate);
+            writer.Write(RestingBreathRate);
+            writer.Write(WalkForceScale);
+            writer.Write(MeanActivation);
+            writer.Write(MeanForce);
+            writer.Write(MeanFatigue);
+            writer.Write(Pain);
+            writer.Write(Warmth);
+            writer.Write(_seedHr);
+            writer.Write(_seedMuscle);
+            writer.Write(BirthSeed);
+            writer.Write(Generation);
+            writer.Write(_taps);
+            for (int i = 0; i < Stretch.Length; i++) writer.Write(Stretch[i]);
+            for (int i = 0; i < MotorDrive.Length; i++) writer.Write(MotorDrive[i]);
+            for (int i = 0; i < Activation.Length; i++) writer.Write(Activation[i]);
+            for (int i = 0; i < Force.Length; i++) writer.Write(Force[i]);
+            for (int i = 0; i < Fatigue.Length; i++) writer.Write(Fatigue[i]);
+            for (int i = 0; i < _delay.Length; i++) writer.Write(_delay[i]);
+        }
+
+        internal void ReadCheckpoint(System.IO.BinaryReader reader)
+        {
+            AgeDays = reader.ReadSingle();
+            Maturity = reader.ReadSingle();
+            HeartRate = reader.ReadSingle();
+            BreathingRate = reader.ReadSingle();
+            BreathingEfficiency = reader.ReadSingle();
+            Energy = reader.ReadSingle();
+            Hunger = reader.ReadSingle();
+            Cortisol = reader.ReadSingle();
+            Oxytocin = reader.ReadSingle();
+            Melatonin = reader.ReadSingle();
+            NerveDelaySeconds = reader.ReadSingle();
+            MuscleStrength = reader.ReadSingle();
+            RestingHeartRate = reader.ReadSingle();
+            RestingBreathRate = reader.ReadSingle();
+            WalkForceScale = reader.ReadSingle();
+            MeanActivation = reader.ReadSingle();
+            MeanForce = reader.ReadSingle();
+            MeanFatigue = reader.ReadSingle();
+            Pain = reader.ReadSingle();
+            Warmth = reader.ReadSingle();
+            _seedHr = reader.ReadSingle();
+            _seedMuscle = reader.ReadSingle();
+            BirthSeed = reader.ReadInt32();
+            Generation = reader.ReadInt32();
+            _taps = reader.ReadInt32();
+            for (int i = 0; i < Stretch.Length; i++) Stretch[i] = reader.ReadSingle();
+            for (int i = 0; i < MotorDrive.Length; i++) MotorDrive[i] = reader.ReadSingle();
+            for (int i = 0; i < Activation.Length; i++) Activation[i] = reader.ReadSingle();
+            for (int i = 0; i < Force.Length; i++) Force[i] = reader.ReadSingle();
+            for (int i = 0; i < Fatigue.Length; i++) Fatigue[i] = reader.ReadSingle();
+            for (int i = 0; i < _delay.Length; i++) _delay[i] = reader.ReadSingle();
+        }
+
         float Push(int pathway, int joint, float value)
         {
             int basis = (pathway * Joints + joint) * MaxTaps;

@@ -46,7 +46,7 @@ namespace DreamMachine.Sim
     /// One fixed-step tick of the whole household.
     /// Fast-forward calls this same method. It never coarsens the step.
     /// </summary>
-    public sealed class WorldSimulation
+    public sealed partial class WorldSimulation
     {
         public const float Dt = 0.05f;
         public const float DayLength = 52f;
@@ -501,6 +501,44 @@ namespace DreamMachine.Sim
         public float MeanFatigue;
         public float WalkForceScale;
         public float NerveDelaySeconds;
+
+        internal void WriteCheckpoint(System.IO.BinaryWriter writer)
+        {
+            writer.Write(AgeDays);
+            writer.Write(Maturity);
+            writer.Write(HeartRate);
+            writer.Write(BreathingRate);
+            writer.Write(Energy);
+            writer.Write(Hunger);
+            writer.Write(Cortisol);
+            writer.Write(Oxytocin);
+            writer.Write(Melatonin);
+            writer.Write(Pain);
+            writer.Write(MeanActivation);
+            writer.Write(MeanForce);
+            writer.Write(MeanFatigue);
+            writer.Write(WalkForceScale);
+            writer.Write(NerveDelaySeconds);
+        }
+
+        internal void ReadCheckpoint(System.IO.BinaryReader reader)
+        {
+            AgeDays = reader.ReadSingle();
+            Maturity = reader.ReadSingle();
+            HeartRate = reader.ReadSingle();
+            BreathingRate = reader.ReadSingle();
+            Energy = reader.ReadSingle();
+            Hunger = reader.ReadSingle();
+            Cortisol = reader.ReadSingle();
+            Oxytocin = reader.ReadSingle();
+            Melatonin = reader.ReadSingle();
+            Pain = reader.ReadSingle();
+            MeanActivation = reader.ReadSingle();
+            MeanForce = reader.ReadSingle();
+            MeanFatigue = reader.ReadSingle();
+            WalkForceScale = reader.ReadSingle();
+            NerveDelaySeconds = reader.ReadSingle();
+        }
 
         public static PhysiologySample From(SimChild child, int day, string phase)
         {

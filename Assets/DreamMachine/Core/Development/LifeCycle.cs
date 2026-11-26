@@ -114,10 +114,10 @@ namespace DreamMachine.Development
             return MiniJson.Stringify(ToData());
         }
 
-        public Dictionary<string, object> ToData()
+        public Dictionary<string, object> ToData(bool includeAllObservations = false)
         {
             var observations = new List<object>();
-            int start = Observations.Count > 48 ? Observations.Count - 48 : 0;
+            int start = !includeAllObservations && Observations.Count > 48 ? Observations.Count - 48 : 0;
             for (int i = start; i < Observations.Count; i++)
             {
                 VisualObservation o = Observations[i];
