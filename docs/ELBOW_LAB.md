@@ -1,5 +1,7 @@
 # Elbow laboratory · Milestone Two Phase A
 
+Phase A.2 adds a separate native backend and contact-prediction experiment. This page retains the numerical reference, original trace and checkpoint protocol. [Native comparison and prediction results](NATIVE_ELBOW_LAB.md)
+
 The fixture advances one bounded elbow degree of freedom about a fixed mount and a planar circular puck with position, orientation, linear velocity and spin. A bounded engineered PD controller applies torque to the forearm. At each 0.05 s simulation tick it executes ten fixed substeps. Each substep evaluates the motor, computes spring-damper contact and capped tangential friction, integrates equal-and-opposite contact effects on the puck and elbow, and updates the receptor accumulators. The tick then publishes proprioception and tactile samples. No part of the fixture runs in the household tick loop.
 
 The numerical contact solver is the authority for this fixture. Unity draws the resulting state without smoothing. The primitives are display geometry; Unity's native solver does not produce these results. Cross-platform and in-contact native solver continuation remain unverified. [Core fixture](../Assets/DreamMachine/Core/Body/ElbowLab.cs) · [Unity view](../Assets/DreamMachine/Unity/ElbowLabView.cs)

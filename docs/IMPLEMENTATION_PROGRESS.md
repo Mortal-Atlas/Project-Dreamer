@@ -1,5 +1,13 @@
 # Implementation progress
 
+## Milestone Two Phase A.2 · native contact and learned prediction
+
+[Draft PR #8](https://github.com/Mortal-Atlas/Project-Dreamer/pull/8) remains on the existing stack over #7 and #6, targeting protected main. All three PR heads were reviewed for ancestry and GitHub feedback before coding. No submitted reviews or inline findings were present. The local exclusion audit remains applicable and the new fixture requires no local package overrides. [Excluded local files](WORLD_CHECKPOINT.md)
+
+The independent local Unity physics fixture and shared sensory contract now produce matched traces beside the preserved numerical model. In the standard trial the onset matched at tick 4, while native cumulative normal impulse was 0.29405 N s versus 0.41990 N s. Native restart checks over eight ticks from five save boundaries and the native tray's pause, single-step, checkpoint and dismissal paths passed in isolated DX12 Play Mode. The active contact round trip had two sub-tolerance JSON double changes. The fixture does not restore internal PhysX solver caches.
+
+Learned next-tick contact prediction was tested on eight held-out native trials. Native scratch scored Brier 0.06355 and F1 0.857. Planar-to-native transfer scored 0.10567 and 0.400. Eight native calibration trials improved transfer to 0.07498 and 0.769. No learned policy controlled the motor. A fresh Unity process recovered 288 identical probe predictions from three saved models. Final .NET Release and Unity Edit Mode suites passed 55 and 56 tests. The clean worktree verified the pre-predictor native foundation and retained the numerical trace digest. Visual screenshots and matched tray memory/CPU costs are open. [Native and learning experiment](NATIVE_ELBOW_LAB.md)
+
 ## Milestone Two Phase A · elbow and tactile contact
 
 Draft PR #8 introduces the isolated fixed-step numerical elbow and puck, sensor records, fixture checkpoint, and shared Unity laboratory tray. It stacks on PR #7 at `e9ceeaf`, which depends on PR #6. GitHub showed no submitted or inline reviews on either prerequisite at the audit. Compare the milestone with `git diff origin/feature/authoritative-simulation-clock...origin/feature/embodiment-contact-lab`. PRs remain unmerged. The [local exclusion inventory](WORLD_CHECKPOINT.md) still applies and the isolated build required none of those local files.

@@ -72,3 +72,9 @@ In isolated Unity Play Mode, first open took 5.815 ms (seed 18) and 4.832 ms (se
 ## Isolated elbow laboratory
 
 `--elbow-lab` on the clean Windows worktree measured 1.3 µs per tick for ten substeps plus tactile/proprioceptive feedback (15,000 ticks), with 6 B/tick amortized trial resets. The 464-byte checkpoint took 3.4 µs to capture and 3.4 µs to reconstruct, with 2,104 and 2,000 temporary bytes/op respectively (500 measurements each). Atomic publication averaged 9.30 ms and about 21.6 kB allocated (15 publications), including flush and validation. These are means from one warm run, with the owner's Unity editor open. Core timings exclude the CSV writer and do not isolate each sensor stage. Observer rendering and retained memory costs are not measured for this fixture.
+
+## Native elbow and learned prediction
+
+Unity 6000.3.19f1, Windows DX12 isolated Play Mode, four 80-tick cases and ten 5 ms substeps per tick. The owner's editor remained open. Per tick means were 7.36–10.01 µs for motor application, 355.92–438.77 µs for native `Simulate` including callbacks, and 0.97–1.16 µs for final sensor formatting. Standard contact processing accounted for 9.27 µs inside the 438.77 µs simulation interval. The callbacks and timings are nested. Recorder allocations and one-time scene creation were outside the timed steps. The thread allocation counter recorded 0 B/tick around native Step in these runs.
+
+Four model fits (including calibration) took 18.35 ms combined. Inference averaged 0.050–0.065 µs over 10,000 calls per model. Saved model files were 457–502 bytes. Native checkpoint publication and restoration were exercised but not separately timed. Tray-open/closed costs, retained GPU memory and process-isolated native throughput remain open. The measured numerical baseline above is historical and is not an equivalent replacement for the native solver.

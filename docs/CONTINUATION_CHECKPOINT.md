@@ -2,6 +2,12 @@
 
 Updated November 26, 2026.
 
+## Active Phase A.2 native fixture and prediction
+
+- Branch `feature/embodiment-contact-lab`, [draft PR #8](https://github.com/Mortal-Atlas/Project-Dreamer/pull/8) against protected main. Native fixture checkpoint commit `084f8e1a0d512fdd1c18faffeeb93da97b896e62`. Existing stack remains #6 → #7 → #8. No authorized merge. Existing user changes, recovery assets and VRMs remain excluded.
+- Ran Release .NET tests (55 passed), isolated Unity 6000.3.19f1 Edit Mode (56 passed), DX12 `-executeMethod NativeElbowSmoke.Run` and a separate `-executeMethod NativeContactStudy.Reload` (288 identical probe predictions). The clean native-foundation checkout passed its 54 tests and reproduced the numerical CSV digest. Recreate the optional harness using [tools/unity](../tools/unity/README.md).
+- Next, export per-tick signed contact-probability error alongside measured impulse and region for the native feedback loop. Match frozen and bounded adaptive motor controls on held-out masses and positions, and compare force/work, tracking, retention, and restart against the engineered controller. Add additional target labels only with explicit held-out evaluation. Verify rendered trays and profile matched open/closed cost before broadening to multijoint coordination. [Results and limits](NATIVE_ELBOW_LAB.md)
+
 ## Active Phase A embodiment branch
 
 - Branch `feature/embodiment-contact-lab` at the implementation checkpoint `d18bd74d1f2207d49851d2315ace2942296c3af6`. [Draft PR #8](https://github.com/Mortal-Atlas/Project-Dreamer/pull/8) targets protected main and stacks on PR #7 at `e9ceeaf`. The pre-existing owner changes and local-only assets remain excluded as documented in [WORLD_CHECKPOINT.md](WORLD_CHECKPOINT.md).

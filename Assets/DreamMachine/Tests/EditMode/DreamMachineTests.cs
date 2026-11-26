@@ -21,6 +21,34 @@ namespace DreamMachine.Tests
 {
     public class ElbowLabTests
     {
+        [Test]
+        public void TrainedContactProbabilitySurvivesReloadWithoutPrivilegedObjectData()
+        {
+            ElbowLab lab = Create(0.28, 0.20);
+            var rows = new List<ContactPredictor.Example>();
+            for (int i = 0; i < 15; i++)
+            {
+                var previous = lab.Latest;
+                rows.Add(new ContactPredictor.Example(previous, 0.9, lab.Step(0.9).NormalImpulse > 0));
+            }
+            var predictor = new ContactPredictor();
+            predictor.Train(rows, 200);
+            var probe = rows[3];
+            double expected = predictor.Predict(probe.Previous, probe.Requested);
+            Assert.AreNotEqual(0.5, expected);
+            var changed = new ElbowLab.StepSample(probe.Previous.Tick, 0, probe.Previous.PreviousAngle,
+                probe.Previous.NormalImpulse, 999, -999, probe.Previous.Feedback);
+            Assert.AreEqual(expected, predictor.Predict(changed, probe.Requested));
+            string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".predictor");
+            try
+            {
+                predictor.Save(path, "son", "numerical trial fixture", "unit test");
+                Assert.AreEqual(expected, ContactPredictor.Load(path, "son").Predict(changed, probe.Requested), 1e-12);
+                Assert.Throws<InvalidDataException>(() => ContactPredictor.Load(path, "daughter"));
+            }
+            finally { File.Delete(path); }
+        }
+
         static ElbowLab Create(double x, double y, double mass = 0.25, double friction = 0.4) =>
             new ElbowLab(new ElbowLab.Settings(-1.1, 1.3, 0, mass, friction, x, y, 80), "son");
 

@@ -111,6 +111,7 @@ internal static class NativeElbowSmoke
             }
 
             ScreenCapture.CaptureScreenshot(Path.Combine(directory, "native-elbow.png"));
+            NativeContactStudy.Run(directory);
             Debug.Log("NATIVE_SMOKE native free/contact/localization, pause, step, observer and disk restore checked");
             EditorApplication.update -= Verify;
             EditorApplication.ExitPlaymode();
