@@ -2,6 +2,8 @@
 
 This Unity **6.3 LTS** project (`6000.3.19f1`, URP 17.3.0) contains the Dream Machine family simulation.
 
+The November 2026 audit documents the [current architecture](docs/ARCHITECTURE.md), [research and licenses](docs/RESEARCH_INTEGRATION.md), [benchmarks](docs/PERFORMANCE_BENCHMARKS.md), [roadmap](docs/DEVELOPMENT_ROADMAP.md), and [first room experiment](docs/EXPERIMENTAL_PROTOCOLS.md).
+
 ## Open and press Play
 
 1. Install **Unity 6000.3.19f1** with the **Universal Render Pipeline** (the editor version in `ProjectSettings/ProjectVersion.txt`).
