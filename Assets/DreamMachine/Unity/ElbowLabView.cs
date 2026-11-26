@@ -38,9 +38,9 @@ namespace DreamMachine.UnityBridge
             TryFile(InitializeLab);
             var camera = new GameObject("Laboratory Camera", typeof(Camera)).GetComponent<Camera>();
             camera.transform.SetParent(transform);
-            camera.transform.position = new Vector3(0.07f, 0.1f, -2f);
+            camera.transform.position = new Vector3(0.07f, 0.40f, -2f);
             camera.orthographic = true;
-            camera.orthographicSize = 0.58f;
+            camera.orthographicSize = 0.68f;
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0.055f, 0.08f, 0.11f);
             if (EventSystem.current == null)

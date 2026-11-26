@@ -169,3 +169,6 @@ Packages/packages-lock.json linguist-generated
 
 # Exceptions for .asset files such as lightning pre-baking
 LightingData.asset     binary
+
+# Keep this small reproducibility capture directly available with the experiment.
+docs/evidence/phase-b-predictive-tray.png -filter -diff -merge -text

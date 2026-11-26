@@ -264,6 +264,8 @@ The source is the [consolidated specification](MASTER_IMPLEMENTATION_SPECIFICATI
 
 ## Evidence register
 
+Phase B adds evidence for §§14, 16–21, 57, 124, 128–129, 148, 157 and 170. Actual signed contact prediction error changes a bounded corrective torque. Native comparisons cover engineered, frozen, adaptive, and numerically pretrained/calibrated controllers on complete held-out configurations. A separate Unity process continued learning from a joint physics/model checkpoint. Motor outcomes include lower work and cumulative impulse alongside higher mean tracking error and peak impulse. Receptor-valued prediction, multi-joint transfer and developmental growth calibration remain open. [Phase B experimental evidence](PREDICTIVE_MOTOR_PHASE_B.md)
+
 Phase A.2 extends §§14–21, 57, 116, 124, 128–129, 148, 157 and 170. Native movement, topology, fixed-step scheduling and the tested restart envelope have executable evidence. Cross-backend measurement preserves contact differences. A sensory-only contact-probability predictor has observed held-out scores, negative transfer findings and restart persistence. Richer sensory targets, closed-loop motor adaptation, sustained native solver constraints and visual/resource evaluation remain partial. [Native fixture and learning evidence](NATIVE_ELBOW_LAB.md)
 
 Phase A adds partial evidence for §§14–21, 57, 116, 124, 128–129, 148, 157 and 170. Same-runtime numerical contact, tactile localization and proprioception are verified in the bounded fixture, as are physical checkpoint continuation and read-only observation. The Unity view renders the shared numerical model. A native solver comparison and learned sensorimotor checkpoints remain open. [Phase A matrix and reproducible traces](ELBOW_LAB.md)

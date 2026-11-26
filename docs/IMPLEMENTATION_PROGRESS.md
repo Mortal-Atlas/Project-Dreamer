@@ -1,5 +1,13 @@
 # Implementation progress
 
+## Milestone Two Phase B · predictive motor adaptation
+
+The owner reconciled packages, project settings and looks in `adbc5af` and `5b7ebe6`. Phase B started at the synchronized `5b7ebe6`, with a clean worktree. Locally excluded Roslyn plug-ins and recovery files were untouched. [Draft PR #8](https://github.com/Mortal-Atlas/Project-Dreamer/pull/8) remains on the existing #6 → #7 → #8 stack. The audit found zero PR #8 reviews and inline comments. No temporary Git worktree was created.
+
+The native controller now predicts before the physical step, collects the signed contact error afterward, and learns a bounded gain that changes later torque. The native Phase A.2 controller remains the zero-residual baseline. Fifty-six .NET tests and 57 Unity Edit Mode tests passed. The isolated DX12 study ran 48 paired physical trials and the restart check verified 18 subsequent steps in a separate process with no observed deviation.
+
+Native adaptation reduced mean absolute command work from 1.244 to 1.122 J and cumulative impulse from 0.4070 to 0.3737 N s. Tracking error increased from 0.12781 to 0.13062 rad and mean peak impulse rose from 0.23488 to 0.24634 N s. Online adaptation and the frozen predictor performed similarly. These results support a causal learned change with tradeoffs and do not demonstrate a net motor advantage. [Phase B protocol, matched outcomes and state persistence](PREDICTIVE_MOTOR_PHASE_B.md)
+
 ## Milestone Two Phase A.2 · native contact and learned prediction
 
 [Draft PR #8](https://github.com/Mortal-Atlas/Project-Dreamer/pull/8) remains on the existing stack over #7 and #6, targeting protected main. All three PR heads were reviewed for ancestry and GitHub feedback before coding. No submitted reviews or inline findings were present. The local exclusion audit remains applicable and the new fixture requires no local package overrides. [Excluded local files](WORLD_CHECKPOINT.md)

@@ -2,6 +2,12 @@
 
 Updated November 26, 2026.
 
+## Active Phase B predictive motor study
+
+- Branch `feature/embodiment-contact-lab`, [draft PR #8](https://github.com/Mortal-Atlas/Project-Dreamer/pull/8) to protected main. The Phase B implementation checkpoint is `a24ad02526effc2fc910926075a139d6f4509fa5`. Owner reconciliation at `5b7ebe6` is an ancestor. Main checkout began clean. Do not alter excluded Roslyn and recovery assets. No experimental Git worktree was created.
+- Executed `dotnet test dotnet/DreamMachine.Core.Tests -c Release --nologo` (56 passed) and isolated Unity Edit Mode (57 passed). Ran separate Unity DX12 processes using `PredictiveMotorStudy.Run`, `PredictiveMotorStudy.Reload` and `PredictiveTraySmoke.Run`. See [study and restart protocol](PREDICTIVE_MOTOR_PHASE_B.md) and [reproduction commands](../tools/unity/README.md). Full results, trace, checkpoint and probe outputs were copied to `phase-b` under the owner-supplied backup.
+- Next, run a matched study with an explicit multiobjective acceptance gate. Preserve peak impulse and tracking limits while trying a force-aware residual with a separately validated impulse predictor. Reuse the existing four conditions, add rate-matched baselines and hold out complete initial configurations. Introduce wrist coordination only after this single-joint check. No merge authorized.
+
 ## Active Phase A.2 native fixture and prediction
 
 - Branch `feature/embodiment-contact-lab`, [draft PR #8](https://github.com/Mortal-Atlas/Project-Dreamer/pull/8) against protected main. Native fixture checkpoint commit `084f8e1a0d512fdd1c18faffeeb93da97b896e62`. Existing stack remains #6 → #7 → #8. No authorized merge. Existing user changes, recovery assets and VRMs remain excluded.

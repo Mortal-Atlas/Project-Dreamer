@@ -1,5 +1,7 @@
 # Native elbow laboratory · Phase A.2
 
+The Phase B experiment reuses this fixture and prediction model family to test actual bounded motor corrections. [Phase B experiment and results](PREDICTIVE_MOTOR_PHASE_B.md)
+
 **Dream Machine → Start Native Elbow Laboratory** runs the native fixture. The existing **Start Elbow Laboratory** opens the unchanged numerical reference. Both use the same tray and observe the same `IElbowFixture` contract. The native lab owns a local 3D physics scene, a world-anchored Unity HingeJoint, and physical sphere colliders for the palm and puck. Rigidbody torque and collision impulses drive the observed movement. Display geometry has no authoritative collider or actuator. [Unity scene simulation API](https://docs.unity3d.com/6000.0/Documentation/ScriptReference/PhysicsScene.Simulate.html) · [Unity hinge API](https://docs.unity3d.com/6000.0/Documentation/ScriptReference/HingeJoint.html)
 
 ## Physical and sensory protocol
