@@ -157,7 +157,16 @@ namespace DreamMachine.Sim
         {
             SimChild child = Find(id);
             if (child == null) return null;
+            if (PhysicalPractice?.Active == true && PhysicalPractice.Individual == id)
+                throw new InvalidOperationException("Return the learner to Living before resetting.");
+            var practiceMemory = PhysicalPractice?.Individual == id ? child.State.Library : null;
             BindChildState(child, AgentPersistentState.CreateNew(child.Spec));
+            if (practiceMemory != null)
+                foreach (var attempt in PhysicalPractice.Records)
+                {
+                    var record = practiceMemory.GetOrNull(attempt.MemoryId);
+                    child.State.Library.RecordExperience(record.Id, record.Statement, record.Appendices[0].Evidence, attempt.End);
+                }
             child.SawParentPour = false;
             Home?.ReplaceLearner(child);
             return child;

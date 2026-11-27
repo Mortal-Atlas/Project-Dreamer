@@ -103,6 +103,7 @@ namespace DreamMachine.UnityBridge
             _last[1].NormalForce >= GripCalibration.ContactForce;
         public bool FreeObject => !_object.isKinematic && _object.useGravity && _object.constraints == RigidbodyConstraints.None &&
             _object.transform.parent == null && _object.GetComponents<Joint>().Length == 0;
+        public bool Settled => Terminal && _releaseTicks >= 5;
         public bool Terminal => Phase == GripPhase.Complete || Phase == GripPhase.Failed;
         public float TravelTarget { get; private set; }
 

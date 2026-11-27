@@ -27,6 +27,8 @@ The goal is for an individual to express an intention, formulate and execute bou
 
 C.1.4 adds a distinct active prelift brake and verifies return after measured perturbation under the C.1.3 gates. H1 uses a supported hinged wrist and opposed guided contacts at 5 ms. The model supplies actual impulse, force, slip and effort with stable role IDs and a versioned limited acquisition record. The household operating-mode boundary remains the next integration dependency. In the separate ground-movement track, first build an actuated torso and limb support fixture for prone/supine rolling and protective bracing. Score actual force, contact and unsupported transitions independently of adult gait. Start a seeded torso on an instrumented mat with a supported supine posture, bounded shoulder and hip drives, and distinct head, torso and limb contact regions. Compare free settling, an engineered roll and a protective-brace condition. Require actual weight transfer and contact continuity on the side before attempting a prone transition. Record contact order, joint limits, head impact, work and failed transitions. [Prelift results](LOWER_BODY_C14.md) [Physical hand](PHYSICAL_HAND_H1.md) [Collision and pose audit](BODY_INTEGRITY_AUDIT.md)
 
+H2 exercises the operational boundary on a supported household task. The shared kernel owns Arthur's clock, reservation, cap and lived attempt references. The native station integrates wrist, digits and free object contact. The same observer reads either live frames or stored frames. [H2 implementation](PHYSICAL_DEVELOPMENT_H2.md)
+
 ## Layers and authority
 
 ```mermaid

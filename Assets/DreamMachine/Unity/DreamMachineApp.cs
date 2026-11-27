@@ -180,7 +180,7 @@ namespace DreamMachine.UnityBridge
             if (_sim.Home != null) clockLayout.Visible = false;
             _workspace.Register(SimulationTrayId, "Simulation controls", new Vector2(480, 105), clockLayout,
                 BuildSimulationControls, () => _timeLabel = null, RefreshSimulationControls);
-            if (_sim.Home != null) RegisterLivingTray();
+            if (_sim.Home != null) { RegisterLivingTray(); RegisterPracticeTray(); }
             _workspace.RestoreVisibility();
             if (_sim.Home != null) DrawLiving(0.1f);
         }
@@ -198,6 +198,7 @@ namespace DreamMachine.UnityBridge
             float real = Time.unscaledDeltaTime;
             if (real > 0.1f) real = 0.1f;
             HandleTimeKeys();
+            UpdatePracticeReplay();
             if (_workspace != null && Time.unscaledTime >= _nextTrayRefresh)
             {
                 _nextTrayRefresh = Time.unscaledTime + 0.2f;
@@ -223,15 +224,15 @@ namespace DreamMachine.UnityBridge
             var watch = System.Diagnostics.Stopwatch.StartNew();
             if (_governor.TakeSingleStep())
             {
-                _sim.Tick();
+                AdvanceHouseholdTick();
                 ran = 1;
             }
             else if (_governor.CatchingUp && !_governor.Paused)
             {
                 float goal = WorldSimulation.AgeOf(_governor.CatchStage);
-                while (ran < budget && watch.Elapsed.TotalMilliseconds < budgetMs && _sim.MinAgeDays() < goal)
+                while (!_governor.Paused && ran < budget && watch.Elapsed.TotalMilliseconds < budgetMs && _sim.MinAgeDays() < goal)
                 {
-                    _sim.Tick();
+                    AdvanceHouseholdTick();
                     ran++;
                 }
                 if (_sim.MinAgeDays() >= goal)
@@ -243,9 +244,9 @@ namespace DreamMachine.UnityBridge
             else
             {
                 int want = _governor.Plan(real, WorldSimulation.Dt, budget);
-                while (ran < want && watch.Elapsed.TotalMilliseconds < budgetMs)
+                while (!_governor.Paused && ran < want && watch.Elapsed.TotalMilliseconds < budgetMs)
                 {
-                    _sim.Tick();
+                    AdvanceHouseholdTick();
                     ran++;
                 }
                 _governor.Accumulator += (want - ran) * WorldSimulation.Dt;
@@ -743,7 +744,7 @@ namespace DreamMachine.UnityBridge
             _hud.AddSimulationEntryPoints(ToggleSimulationTray, ResetSimulationLayout);
             if (_sim.Home != null)
             {
-                _hud.AddLivingEntryPoints(() => _workspace.Toggle(LifeTray), ToggleResearchPresentation);
+                _hud.AddLivingEntryPoints(() => _workspace.Toggle(LifeTray), ToggleResearchPresentation, OpenPracticeTray);
                 _hud.ShowResearch(false);
             }
             _hud.AddActionButton(_performance ? "Detail" : "Fast", TogglePerformance);
@@ -805,6 +806,13 @@ namespace DreamMachine.UnityBridge
             try
             {
                 if (_remote != null && _remote.Active) return;
+                if (_sim.PhysicalPractice?.AttemptRunning == true ||
+                    _sim.PhysicalPractice?.Active == true && _practiceHand != null && !_practiceHand.Settled)
+                {
+                    _practiceStatus = "Save when the object has settled on the table.";
+                    RefreshPractice();
+                    return;
+                }
                 if (_archiveHouseholdBaseline)
                 {
                     string source = WorldPath(), archive = source + ".pre-household";
@@ -813,6 +821,7 @@ namespace DreamMachine.UnityBridge
                 }
                 _sim.SaveCheckpoint(WorldPath());
                 WriteGrowth();
+                _practiceStatus = "Saved at a settled boundary.";
             }
             catch (System.Exception error) when (error is IOException || error is InvalidDataException ||
                 error is System.UnauthorizedAccessException)
@@ -827,6 +836,12 @@ namespace DreamMachine.UnityBridge
         void RestoreWorld()
         {
             if (_remote != null && _remote.Active) return;
+            if (_sim.PhysicalPractice?.AttemptRunning == true)
+            {
+                _practiceStatus = "Finish the grip before restoring.";
+                RefreshPractice();
+                return;
+            }
             try
             {
                 WorldSimulation restored = WorldSimulation.LoadCheckpoint(WorldPath());
@@ -839,6 +854,7 @@ namespace DreamMachine.UnityBridge
                         person.BirthSeed != actor.Spec.BirthSeed || person.Role != actor.Spec.Role)
                         throw new InvalidDataException("The checkpoint roster differs from this scene.");
                 }
+                ClearPracticeNative();
                 _sim = restored;
                 EnableLivingPresentation();
                 _pop = restored.Population;
@@ -874,6 +890,12 @@ namespace DreamMachine.UnityBridge
         void ResetBabies()
         {
             if (_remote != null && _remote.Active) return;
+            if (_sim.PhysicalPractice?.Active == true)
+            {
+                _practiceStatus = "Return to Living before resetting.";
+                RefreshPractice();
+                return;
+            }
             for (int i = 0; i < _babies.Count; i++)
             {
                 Actor baby = _babies[i];
@@ -1041,11 +1063,14 @@ namespace DreamMachine.UnityBridge
             float scroll = DreamInput.ScrollY;
             if (Mathf.Abs(scroll) > 0.01f) _zoom -= scroll * 0.02f;
             _orbitPitch = Mathf.Clamp(_orbitPitch, 12f, 70f);
+            bool practiceView = _practiceRoot != null && _practiceRoot.gameObject.activeSelf;
             _zoom = Mathf.Clamp(_zoom, 3.5f, 16f);
             Transform target = _babies[_focus].Body.transform;
             Vector3 look = target.position + Vector3.up * 0.9f;
             if (_sim.Home != null && !_researchPresentation) look = new Vector3(0f, .63f, 1.27f);
-            Vector3 offset = Quaternion.Euler(_orbitPitch, _orbitYaw, 0f) * new Vector3(0f, 0f, -_zoom);
+            Quaternion orbit = Quaternion.Euler(_orbitPitch, _orbitYaw, 0f);
+            if (practiceView) look = _practiceRoot.position + Vector3.up * .08f + orbit * Vector3.right * .22f;
+            Vector3 offset = orbit * new Vector3(0f, 0f, practiceView ? -1.30f : -_zoom);
             Camera.main.transform.position = look + offset;
             Camera.main.transform.LookAt(look);
         }
@@ -1225,7 +1250,9 @@ namespace DreamMachine.UnityBridge
 
         void OnDestroy()
         {
+            _ready = false;
             _workspace?.Dispose();
+            ClearPracticeNative();
             ReleasePreviewTextures();
         }
 

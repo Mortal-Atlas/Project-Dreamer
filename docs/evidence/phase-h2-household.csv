@@ -1,0 +1,5 @@
+attempt,start_tick,end_tick,cap_before_n,cap_after_n,slip_ticks,held_ticks,peak_clearance_m,outcome,tick_cpu_ms,trajectory_bytes
+1,0,78,0.18,0.46,6,0,0.0000,hold-gate-failed,1.213,26710
+2,78,164,0.46,0.74,7,0,0.0000,hold-gate-failed,0.894,29414
+3,164,235,0.74,0.74,0,12,0.0584,physical-lift-hold-release,0.991,24344
+4,235,306,0.74,0.74,0,12,0.0584,physical-lift-hold-release,1.152,24344

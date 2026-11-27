@@ -36,7 +36,7 @@ namespace DreamMachine.Sim
     {
         // Version 1 stores the embedded kernel at a completed tick boundary.
         const int CheckpointVersion = 1;
-        const int HouseholdCheckpointVersion = 5;
+        const int HouseholdCheckpointVersion = 6;
         const int MaxCheckpointBytes = 64 * 1024 * 1024;
         readonly System.Collections.Generic.List<ResearchIntervention> _interventions =
             new System.Collections.Generic.List<ResearchIntervention>();
@@ -58,6 +58,8 @@ namespace DreamMachine.Sim
 
         public byte[] CaptureCheckpoint()
         {
+            if (PhysicalPractice?.AttemptRunning == true)
+                throw new InvalidDataException("Wait for the supported grip attempt to finish before saving.");
             using var payload = new MemoryStream();
             using var writer = new BinaryWriter(payload);
             writer.Write((int)Preset);
@@ -116,6 +118,11 @@ namespace DreamMachine.Sim
                 writer.Write(entry.Reason);
             }
             Home?.Write(writer);
+            if (Home != null)
+            {
+                writer.Write(PhysicalPractice != null);
+                PhysicalPractice?.Write(writer);
+            }
             byte[] bytes = payload.ToArray();
             using var envelope = new MemoryStream();
             using var manifest = new BinaryWriter(envelope);
@@ -152,6 +159,8 @@ namespace DreamMachine.Sim
                 {
                     if (!world.EnableHouseholdLife()) throw new InvalidDataException("Household activity roster does not match.");
                     world.Home.Read(payload, version);
+                    if (version >= 6 && payload.ReadBoolean())
+                        world.PhysicalPractice = HouseholdGripSession.Read(payload, world.Find(HouseholdGripSession.Arthur), world.TickCount);
                 }
                 if (payload.BaseStream.Position != payload.BaseStream.Length)
                     throw new InvalidDataException("Unexpected trailing checkpoint data.");

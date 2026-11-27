@@ -207,7 +207,8 @@ namespace DreamMachine.UnityBridge
                 if (_livingActors[i] == null) _livingActors[i] = _actors[life.PersonId(i)];
                 Actor actor = _livingActors[i];
                 var state = life.ReadPerson(i);
-                bool sleeping = state.Activity == HomeActivity.Sleep && state.Phase == HomePhase.Act;
+                bool practicing = i == HouseholdLife.SearchActor && _sim.PhysicalPractice?.Active == true;
+                bool sleeping = !practicing && state.Activity == HomeActivity.Sleep && state.Phase == HomePhase.Act;
                 Vector3 previous = actor.Pos;
                 actor.Pos = new Vector3(state.X, 0f, state.Z);
                 // Every pillow is on the negative-Z side of its bed.
@@ -236,7 +237,7 @@ namespace DreamMachine.UnityBridge
                 }
                 bool acting = state.Phase == HomePhase.Act && state.Activity != HomeActivity.Sleep && state.Activity != HomeActivity.Rest &&
                     state.Activity != HomeActivity.Inspect;
-                bool seated = state.Activity == HomeActivity.Rest && state.Item >= 0 && moved < .002f;
+                bool seated = practicing || state.Activity == HomeActivity.Rest && state.Item >= 0 && moved < .002f;
                 actor.Body.ApplyHouseholdPose(attention, acting, seated, sleeping, dt, _sim.SimSeconds);
                 Vector3? contact = acting ? ContactPoint(state.Activity, state.Item, actor.Pos) : null;
                 int scan = life.ActiveSocketDecision(i);
@@ -245,6 +246,7 @@ namespace DreamMachine.UnityBridge
                 UpdateLocalAvatar(actor, attention, contact,
                     seated, sleeping, acting && (state.Activity == HomeActivity.Eat || state.Activity == HomeActivity.Drink), dt);
             }
+            DrawPractice();
         }
 
         Vector3? ContactPoint(HomeActivity activity, int item, Vector3 origin)

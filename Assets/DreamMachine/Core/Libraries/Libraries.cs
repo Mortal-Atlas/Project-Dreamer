@@ -346,6 +346,19 @@ namespace DreamMachine.Libraries
             return record;
         }
 
+        internal void RecordExperience(string id, string statement, string evidence, int timestamp)
+        {
+            var record = new BeliefRecord
+            {
+                Id = id, Kind = "Experience", Statement = statement, Source = "firsthand-supported-grip"
+            };
+            record.Appendices.Add(new AppendixEntry
+            {
+                Timestamp = timestamp, Evidence = evidence, NewStatement = statement, Reason = "firsthand-supported-grip"
+            });
+            _beliefs.Add(id, record);
+        }
+
         public float Rate(string id)
         {
             BeliefRecord record = GetOrNull(id);

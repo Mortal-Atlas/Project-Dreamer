@@ -111,16 +111,18 @@ namespace DreamMachine.UnityBridge
             }
         }
 
-        public void AddLivingEntryPoints(UnityEngine.Events.UnityAction experience, UnityEngine.Events.UnityAction research)
+        public void AddLivingEntryPoints(UnityEngine.Events.UnityAction experience, UnityEngine.Events.UnityAction research,
+            UnityEngine.Events.UnityAction practice)
         {
-            _persistentActions.sizeDelta = new Vector2(740f, 55f);
+            _persistentActions.sizeDelta = new Vector2(925f, 55f);
             MakeButton(_persistentActions, "Life & experience", experience);
             MakeButton(_persistentActions, "Living / research", research);
+            MakeButton(_persistentActions, "Physical development", practice);
             for (int i = 0; i < _persistentActions.childCount; i++)
             {
                 var rect = (RectTransform)_persistentActions.GetChild(i);
-                rect.anchorMin = new Vector2(i * .25f, 0f);
-                rect.anchorMax = new Vector2((i + 1) * .25f, 1f);
+                rect.anchorMin = new Vector2(i / (float)_persistentActions.childCount, 0f);
+                rect.anchorMax = new Vector2((i + 1) / (float)_persistentActions.childCount, 1f);
                 rect.offsetMin = new Vector2(2f, 0f);
                 rect.offsetMax = new Vector2(-2f, 0f);
             }

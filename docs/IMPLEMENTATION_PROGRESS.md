@@ -1,6 +1,6 @@
 # Implementation progress
 
-C.1.4 and H1 verify active prelift recovery, an anatomical pair registry, pose diagnostics, a native supported grasp, and small scalar acquisition with parameter retention. The Motor attempts tray replays actual laboratory successes and failures. The next milestone is learner-bound practice inside Physical Development Mode. [H1 report](PHYSICAL_HAND_H1.md) [Body audit](BODY_INTEGRITY_AUDIT.md)
+C.1.4 and H1 verify active prelift recovery, an anatomical pair registry, pose diagnostics, a native supported grasp, and small scalar acquisition with parameter retention. The Motor attempts tray replays actual laboratory successes and failures. H2 demonstrates Arthur's learner-bound household practice and settled restart. H3 will compare context-sensitive manipulation on held-out objects. [H2 results](PHYSICAL_DEVELOPMENT_H2.md) [H1 report](PHYSICAL_HAND_H1.md) [Body audit](BODY_INTEGRITY_AUDIT.md)
 
 ## Physical development planning · November 27, 2026
 

@@ -428,6 +428,14 @@ The clock checkpoint extends K evidence for §§5–7, 116, 124, 133 and 169. Pa
 | C.1.4 sections 17-20. Adaptation, retention and transfer | Measured slip update, stable individual and versioned skill | Verified for bounded scalar practice, partial transfer | Separate Unity process restored eight practice records and scored 2/2 familiar and 2/4 held-out. [Acquisition evidence](PHYSICAL_HAND_H1.md#acquisition-retention-and-transfer) |
 | C.1.4 sections 21-24. Browser, movement composition, libraries and live integration | Bounded laboratory replay, typed practice records, shared clock and household-mode prerequisites | Partial | Actual laboratory playback passes observer checks. Babel composition, durable library links and learner-bound household practice remain open. [Browser](PHYSICAL_HAND_H1.md#browser-and-provenance) |
 
+## Phase H2 persistent household practice
+
+| Requirement | Implementation and dependency | Status | Evidence |
+| --- | --- | --- | --- |
+| H2 sections 4-8 and 19. Named individual, shared clock, physical practice, return | Household state with actual H1 native substeps and supported station | Verified for Arthur on the familiar sphere | Two slip failures, successful hold/release, fresh retained success, return to Living on his existing identity. [H2 validation](PHYSICAL_DEVELOPMENT_H2.md) |
+| Sections 12-18 and 21. Evidence, browser, playback and restart | Version 6 world envelope, content-addressed tapes, firsthand Library III records | Verified for settled boundary and minimal tray | Save and restore, immutable playback and observed contact values. Arbitrary mid-contact restore, pressure and full browser comparisons remain open. [H2 persistence](PHYSICAL_DEVELOPMENT_H2.md#durable-evidence-and-playback) |
+| Sections 9-11, 20, 22-30. Context, broader libraries and other embodiments | H1 baseline and newly verified H2 world boundary | Partial | H3 comparison, Library I and II indexing, Alice, garment corrections and composition still require independent work. [Continuation](CONTINUATION_CHECKPOINT.md) |
+
 ## Physical development and motor vocabulary addendum
 
 The [nervous-system audit](PHYSICAL_NERVOUS_SYSTEM_SPECIFICATION.md#existing-system-audit) identifies existing fixture evidence and integration gaps. The [acceptance plan](PHYSICAL_NERVOUS_SYSTEM_SPECIFICATION.md#experimental-acceptance) records matched tests and scope for the related master requirements §§5–6, 12–21, 46–49, 56–57, 62–64, 92, 128–132, 137, 156–158, 170, 172 and 175.

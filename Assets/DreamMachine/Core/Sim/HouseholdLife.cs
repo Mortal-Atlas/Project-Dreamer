@@ -140,6 +140,7 @@ namespace DreamMachine.Sim
                 Person p = _people[index];
                 p.Thirst = Math.Min(1f, p.Thirst + .0005f);
                 p.Eating = false;
+                if (index == SearchActor && _world.PhysicalPractice?.Active == true) continue;
                 if (night && p.Activity != HomeActivity.Sleep)
                 {
                     if (p.Activity == HomeActivity.FindToy) InterruptSearch(index, tick);
