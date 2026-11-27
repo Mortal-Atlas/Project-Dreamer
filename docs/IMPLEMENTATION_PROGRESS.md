@@ -1,5 +1,13 @@
 # Implementation progress
 
+## Phase C.1.1 · lateral balance and first swing experiment · November 27, 2026
+
+Added native roll actuation, idealized pelvis sensors, sole pressure measurements and a gated physical swing. On three fresh seeds, both sides of frontal pose passed the 85% requirement, with 86.33–88.36% mean loading. The feedback variant passed through 80%. All six physical attempts lost stance contact and aborted. Five subsequently made non-foot contact. The verified transfer controller remains selectable apart from the swing. [Experiment, negative results and live observatory](LOWER_BODY_C11.md)
+
+The regressions passed 70 .NET and 71 Unity Edit Mode tests. Native DX12 case runs, a 200-tick observed 4× comparison, an actual 281-tick tray export, and the household restore and pose checks passed. [Measured performance](PERFORMANCE_BENCHMARKS.md#phase-c11-lateral-balance)
+
+The external registry records eight candidate sources and one decoded force-plate trial. Read-only VRM inspection confirmed the lower-leg mapping and measured rest proportions. Authorized import and physical-to-visual skinning remain pending. [Research sources](EXTERNAL_RESEARCH_RESOURCES.md) · [Avatar compatibility](ASSET_AND_LICENSE_REGISTRY.md#phase-c11-lower-body-retargeting-compatibility)
+
 ## Phase C.1 · native standing and transfer · November 27, 2026
 
 Built an opt-in PhysX rig with a free pelvis, six sagittal hinges and an actuated internal ballast. Five seeded anatomies passed six seconds of standing, left/re-centered/right transfer and momentum checks. The highest stance share was 67.2%, below the 85% stepping prerequisite. The perturbation trials produced measured falls under selected and full drive disabling. The lower-body tray exports both foot trajectories and stays separate from household saves and motor policies. [Protocol, traces and actual Unity capture](LOWER_BODY_C1.md)

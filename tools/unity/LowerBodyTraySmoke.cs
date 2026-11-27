@@ -56,6 +56,8 @@ internal static class LowerBodyTraySmoke
             if (_phase == 0)
             {
                 if (lab.Tick != 0 || lab.PelvisPosition != _initial) throw new Exception("Native physics advanced while paused.");
+                Click("Request swing");
+                if (lab.Action != SwingOutcome.GateBlocked) throw new Exception("The tray bypassed the swing interlock.");
                 Click("Step");
                 _phase++;
                 return;
@@ -65,10 +67,12 @@ internal static class LowerBodyTraySmoke
             var workspace = (TrayWorkspace)typeof(LowerBodyLabView).GetField("_workspace", Flags).GetValue(view);
             var clock = (TimeGovernor)typeof(LowerBodyLabView).GetField("_clock", Flags).GetValue(view);
             if (!clock.Paused) throw new Exception("Single-step left the lab running.");
-            Click("Load left");
-            if (lab.RequestedLoad != -1) throw new Exception("Left load command did not reach the fixture.");
             var step = typeof(LowerBodyLabView).GetMethod("StepFixture", Flags).CreateDelegate(typeof(Action), view) as Action;
+            for (int i = 0; i < 180; i++) step();
+            Click("Load left");
+            if (Mathf.Abs(lab.RequestedLoad + .875f) > .0001f) throw new Exception("Left load command did not reach the fixture.");
             for (int i = 0; i < 100; i++) step();
+            if (!lab.SwingReady || !lab.ReadSole(0).PressureValid) throw new Exception("The standing tray fixture failed its transfer or contact check.");
             Vector3 position = lab.PelvisPosition, velocity = lab.PelvisVelocity;
             Vector3 leftImpulse = lab.LeftImpulse, rightImpulse = lab.RightImpulse;
             typeof(LowerBodyLabView).GetMethod("Draw", Flags).Invoke(view, null);
@@ -77,7 +81,9 @@ internal static class LowerBodyTraySmoke
             Click("Export");
             var exported = Directory.EnumerateFiles(Application.persistentDataPath, "lower-body-101-*.csv")
                 .OrderByDescending(File.GetLastWriteTimeUtc).First();
-            if (File.ReadLines(exported).Count() != 102) throw new Exception("The exported trajectory should contain each recorded tick.");
+            var rows = File.ReadAllLines(exported);
+            if (rows.Length != 282 || !rows[0].StartsWith("schema,provenance,") || !rows[1].StartsWith("2,isolated-physical-measurement,"))
+                throw new Exception("The exported trajectory must contain the schema and every recorded tick.");
             var watch = Stopwatch.StartNew();
             for (int i = 0; i < 100; i++) workspace.RefreshVisible();
             watch.Stop();
@@ -86,7 +92,7 @@ internal static class LowerBodyTraySmoke
             watch.Restart();
             for (int i = 0; i < 100; i++) workspace.RefreshVisible();
             watch.Stop();
-            if (lab.Tick != 101 || lab.PelvisPosition != position || lab.PelvisVelocity != velocity ||
+            if (lab.Tick != 281 || lab.PelvisPosition != position || lab.PelvisVelocity != velocity ||
                 lab.LeftImpulse != leftImpulse || lab.RightImpulse != rightImpulse)
                 throw new Exception("View refresh altered the paused native state.");
             int measuredTick = lab.Tick;
@@ -102,7 +108,7 @@ internal static class LowerBodyTraySmoke
             Click("Reset lab");
             var reset = (NativeLowerBodyLab)typeof(LowerBodyLabView).GetField("_lab", Flags).GetValue(view);
             if (reset == next || reset.Tick != 0 || reset.Seed != next.Seed) throw new Exception("Reset did not rebuild the selected fixture.");
-            Debug.Log(FormattableString.Invariant($"LOWER_BODY_TRAY paused=8frames stepped=1 observer_tick={measuredTick} export=101_rows resume_pause=True select_reset=True refresh_open_us={open:F3} refresh_closed_us={closed:F3}"));
+            Debug.Log(FormattableString.Invariant($"LOWER_BODY_TRAY paused=8frames stepped=1 observer_tick={measuredTick} export=281_rows resume_pause=True select_reset=True refresh_open_us={open:F3} refresh_closed_us={closed:F3}"));
             EditorApplication.update -= Verify;
             EditorApplication.ExitPlaymode();
         }
@@ -134,7 +140,7 @@ internal static class LowerBodyTraySmoke
             RenderTexture.active = target;
             image.ReadPixels(new Rect(0, 0, target.width, target.height), 0, 0);
             image.Apply();
-            File.WriteAllBytes(Path.Combine(Application.persistentDataPath, "phase-c1-observatory.png"), image.EncodeToPNG());
+            File.WriteAllBytes(Path.Combine(Application.persistentDataPath, "phase-c11-observatory.png"), image.EncodeToPNG());
         }
         finally
         {

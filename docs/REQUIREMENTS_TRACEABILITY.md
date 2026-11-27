@@ -22,8 +22,8 @@ The source is the [consolidated specification](MASTER_IMPLEMENTATION_SPECIFICATI
 | [14 Functional skeleton and movement](MASTER_IMPLEMENTATION_SPECIFICATION.md#14-functional-skeleton-and-movement) | Anatomy and motion | §§5–7, 10 | Partial | [R](#r-evidence) |
 | [15 Physical affordances and interaction](MASTER_IMPLEMENTATION_SPECIFICATION.md#15-physical-affordances-and-interaction) | Anatomy and motion | §§5–7, 10 | Partial | [R](#r-evidence) · [C.1](LOWER_BODY_C1.md) |
 | [16 Topological skin architecture](MASTER_IMPLEMENTATION_SPECIFICATION.md#16-topological-skin-architecture) | Contact and motor learning | §§7, 12–15 | Not started | — |
-| [17 Material interaction and tactile signals](MASTER_IMPLEMENTATION_SPECIFICATION.md#17-material-interaction-and-tactile-signals) | Contact and motor learning | §§7, 12–15 | Not started | — |
-| [18 Proprioception and body schema](MASTER_IMPLEMENTATION_SPECIFICATION.md#18-proprioception-and-body-schema) | Contact and motor learning | §§7, 12–15 | Not started | — |
+| [17 Material interaction and tactile signals](MASTER_IMPLEMENTATION_SPECIFICATION.md#17-material-interaction-and-tactile-signals) | Contact and motor learning | §§7, 12–15 | Partial | [C.1.1 sole and pressure measurements](LOWER_BODY_C11.md#implementation) |
+| [18 Proprioception and body schema](MASTER_IMPLEMENTATION_SPECIFICATION.md#18-proprioception-and-body-schema) | Contact and motor learning | §§7, 12–15 | Partial | [C.1.1 calibrated sensor model](LOWER_BODY_C11.md#implementation) |
 | [19 Sensorimotor prediction and error correction](MASTER_IMPLEMENTATION_SPECIFICATION.md#19-sensorimotor-prediction-and-error-correction) | Contact and motor learning | §§7, 12–15 | Not started | — |
 | [20 Topological muscle memory](MASTER_IMPLEMENTATION_SPECIFICATION.md#20-topological-muscle-memory) | Contact and motor learning | §§7, 12–15 | Not started | — |
 | [21 Sensorimotor inheritance experiment](MASTER_IMPLEMENTATION_SPECIFICATION.md#21-sensorimotor-inheritance-experiment) | Contact and motor learning | §§7, 12–15 | Not started | — |
@@ -175,7 +175,7 @@ The source is the [consolidated specification](MASTER_IMPLEMENTATION_SPECIFICATI
 | [167 Version control and continuation](MASTER_IMPLEMENTATION_SPECIFICATION.md#167-version-control-and-continuation) | Reliability and release | §§3–8, 57, 181–186 | Partial | [Z](#z-evidence) |
 | [168 Milestone Zero — Repository recovery and audit](MASTER_IMPLEMENTATION_SPECIFICATION.md#168-milestone-zero--repository-recovery-and-audit) | Milestone Zero | §§2–3, 181–186 | Partial | [Z](#z-evidence) |
 | [169 Milestone One — Core infrastructure](MASTER_IMPLEMENTATION_SPECIFICATION.md#169-milestone-one--core-infrastructure) | Milestone delivery | §168 | Not started | — |
-| [170 Milestone Two — Functional embodiment](MASTER_IMPLEMENTATION_SPECIFICATION.md#170-milestone-two--functional-embodiment) | Milestone delivery | §169 | Partial | [C.1](LOWER_BODY_C1.md) |
+| [170 Milestone Two — Functional embodiment](MASTER_IMPLEMENTATION_SPECIFICATION.md#170-milestone-two--functional-embodiment) | Milestone delivery | §169 | Partial | [C.1](LOWER_BODY_C1.md) · [C.1.1](LOWER_BODY_C11.md) |
 | [171 Milestone Three — Founding preschool](MASTER_IMPLEMENTATION_SPECIFICATION.md#171-milestone-three--founding-preschool) | Milestone delivery | §170 | Not started | — |
 | [172 Milestone Four — Integrated memory and cognition](MASTER_IMPLEMENTATION_SPECIFICATION.md#172-milestone-four--integrated-memory-and-cognition) | Milestone delivery | §171 | Not started | — |
 | [173 Milestone Five — Persistent living world](MASTER_IMPLEMENTATION_SPECIFICATION.md#173-milestone-five--persistent-living-world) | Milestone delivery | §172 | Not started | — |
@@ -263,6 +263,8 @@ The source is the [consolidated specification](MASTER_IMPLEMENTATION_SPECIFICATI
 | [A.69 Immediate Assignment](MASTER_IMPLEMENTATION_SPECIFICATION.md#69-immediate-assignment) | Delivery and verification | §§168–179, 181–186 | Partial | [Z](#z-evidence) |
 
 ## Evidence register
+
+Phase C.1.1 extends §§12–19, 116, 124–125, 128, 148, 150–151, 153, 157 and 170. Native frontal joints and bounded actuation pass six held-out 85% stance windows. Engineered sensor feedback passes through 80%. Vestibular and proprioceptive timing, CoP measurement, and provenance are exercised in isolated experiments. Six gated physical swings aborted on lost stance contact. The separate VRM audit measures lower-body rest transforms and skin references with permissions still unresolved. [Crosswalk and measured outcomes](LOWER_BODY_C11.md#requirements-crosswalk)
 
 Phase C.1 extends §§12–15, 116, 124–125, 128, 148, 150–151, 153, 157 and 170. The native pelvis and six driven leg joints stand freely and transfer load in both directions. The fixed stance threshold blocks stepping. The isolated experiment produces measured collapses when drive torque is removed. The fixture is separate from household cognition, developmental motor learning and checkpoint requirements. [Phase C.1 requirements and evidence](LOWER_BODY_C1.md#requirements-crosswalk)
 

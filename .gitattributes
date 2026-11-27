@@ -175,3 +175,4 @@ docs/evidence/phase-b-predictive-tray.png -filter -diff -merge -text
 docs/evidence/phase-b1-force-tray.png -filter -diff -merge -text
 docs/evidence/phase-c0-*.png -filter -diff -merge -text
 docs/evidence/phase-c1-observatory.png -filter -diff -merge -text
+docs/evidence/phase-c11-observatory.png -filter -diff -merge -text

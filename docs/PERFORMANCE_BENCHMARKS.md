@@ -111,3 +111,11 @@ In the isolated DX12 editor, native stepping averaged 0.831 ms per 0.05 s experi
 At paused tick 101, 100 direct tray refreshes averaged 27.296 µs with the tray open and 0.090 µs closed. These timings cover dispatch and telemetry formatting. Frame layout, GPU work and retained allocations are outside the timed scope. The export control wrote 101 tick rows with both world-space foot trajectories.
 
 Five fresh Release CLI process launches per cast gave household medians of 44,720 ticks/s for four people (34,814–45,653) and 28,870 for twelve (26,547–29,471). The owner's Unity editor remained open and isolated editor work overlapped this benchmark. The opt-in PhysX fixture has no household kernel call path. The timings are descriptive and do not establish that C.1 changed household throughput.
+
+## Phase C.1.1 lateral balance
+
+Held-out DX12 trials on the same Windows workstation averaged **0.801 ms/tick** for the sagittal ballast reference, **0.835 ms/tick** for frontal pose, and **0.833 ms/tick** for the feedback variant. Each mean combines 36 standing and transfer windows. The timed scope includes ten native substeps, drives, sensor and contact accumulation, including CoP for the extended variants. It excludes logs, CSV capture and rendering. Per-window values and failure conditions are in the [matched data](evidence/phase-c11-heldout-summary.csv).
+
+At the verified paused stance, 100 direct workspace refreshes averaged 47.440 µs open and 0.089 µs closed. These measurements include telemetry formatting and dispatch. Retained memory, Canvas layout, and GPU rendering are outside this timed comparison.
+
+The separate Release household benchmark again used five process runs for each cast. The four-person median was 45,785 ticks/s (45,357–47,485), and the twelve-person median was 29,331 ticks/s (28,316–29,436). The owner Unity editor was open and isolated experiments overlapped the run. These are descriptive figures for the headless kernel.

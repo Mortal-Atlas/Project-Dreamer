@@ -6,7 +6,7 @@ using UnityEngine.SceneManagement;
 
 namespace DreamMachine.UnityBridge
 {
-    public sealed class NativeLowerBodyLab : IDisposable
+    public sealed partial class NativeLowerBodyLab : IDisposable
     {
         public const int Substeps = 10;
         public const float Substep = WorldSimulation.Dt / Substeps;
@@ -51,7 +51,8 @@ namespace DreamMachine.UnityBridge
         public int BodyCount => _bodies.Length;
         public int JointCount => _joints.Length;
 
-        public NativeLowerBodyLab(int seed, float stage, float friction = 0.85f)
+        public NativeLowerBodyLab(int seed, float stage, float friction = 0.85f,
+            LowerBodyController controller = LowerBodyController.Sagittal, float vestibularNoise = 0f)
         {
             if (!Application.isPlaying) throw new InvalidOperationException("Native contact callbacks require Play Mode.");
             if (!(stage >= 0f && stage <= HumanoidAnatomy.AdultAgeDays && friction >= 0f && friction <= 1f))
@@ -59,6 +60,8 @@ namespace DreamMachine.UnityBridge
             Seed = seed;
             Stage = stage;
             Friction = friction;
+            Controller = controller;
+            _vestibularNoise = Mathf.Clamp01(vestibularNoise);
             Dimensions = new HumanoidAnatomy(seed).AtAge(stage);
             _travel = Dimensions.HipWidth * 0.78f;
             _scene = SceneManager.CreateScene("Lower-body PhysX " + Guid.NewGuid().ToString("N"),
@@ -74,6 +77,7 @@ namespace DreamMachine.UnityBridge
             groundBox.size = new Vector3(8, 0.2f, 8);
             groundBox.sharedMaterial = _material;
             groundBox.contactOffset = 0.001f;
+            _groundId = groundBox.GetInstanceID();
 
             float height = NominalPelvisHeight + Clearance;
             _pelvis = MakeBody(0, "Pelvis", Vector3.up * height, Quaternion.identity,
@@ -96,6 +100,8 @@ namespace DreamMachine.UnityBridge
             for (int j = i + 1; j < _bodies.Length; j++)
                 Physics.IgnoreCollision(_bodies[i].GetComponent<BoxCollider>(), _bodies[j].GetComponent<BoxCollider>());
             SampleMass();
+            CaptureSensors(Vector3.zero);
+            if (Controller != LowerBodyController.Sagittal) Physics.ContactEvent += RecordPressure;
         }
 
         void BuildLeg(int side, Collider ground)
@@ -119,9 +125,10 @@ namespace DreamMachine.UnityBridge
                 new Vector3(width, Dimensions.AnkleHeight, Dimensions.Foot), 0.45f, ground);
             _feet[side] = foot.GetComponent<BoxCollider>();
             _initialFeet[side] = centre;
-            _joints[joint] = new JointDrive(prefix + "hip", _pelvis, thigh, hip, rest.Hip, -0.75f, 0.65f, 27f);
+            bool lateralDrive = Controller != LowerBodyController.Sagittal;
+            _joints[joint] = new JointDrive(prefix + "hip", _pelvis, thigh, hip, rest.Hip, -0.75f, 0.65f, 27f, lateralDrive ? .30f : 0f, 16f);
             _joints[joint + 1] = new JointDrive(prefix + "knee", thigh, shin, knee, rest.Knee, 0.015f, 1.28f, 27f);
-            _joints[joint + 2] = new JointDrive(prefix + "ankle", shin, foot, ankle, rest.Ankle, -0.55f, 0.55f, 21f);
+            _joints[joint + 2] = new JointDrive(prefix + "ankle", shin, foot, ankle, rest.Ankle, -0.55f, 0.55f, 21f, lateralDrive ? .27f : 0f, 12f);
         }
 
         GameObject Make(string name, Vector3 position, Quaternion rotation)
@@ -160,7 +167,10 @@ namespace DreamMachine.UnityBridge
         public void RequestLoad(float side)
         {
             if (float.IsNaN(side) || float.IsInfinity(side)) throw new ArgumentOutOfRangeException(nameof(side));
-            _requestedLoad = Mathf.Clamp(side, -1f, 1f);
+            if (Action == SwingOutcome.Swing || Action == SwingOutcome.Recontact) return;
+            float requested = Mathf.Clamp(side, -1f, 1f);
+            if (_requestedLoad != requested) _stanceTicks = 0;
+            _requestedLoad = requested;
         }
 
         public void Step(Vector3 disturbanceImpulse = default)
@@ -169,6 +179,9 @@ namespace DreamMachine.UnityBridge
             if (!(disturbanceImpulse.sqrMagnitude <= 16f))
                 throw new ArgumentOutOfRangeException(nameof(disturbanceImpulse), "Research impulse capped at 4 N s.");
             Vector3 before = Momentum;
+            Vector3 pelvisVelocity = PelvisVelocity;
+            PrepareLateralTargets();
+            Array.Clear(_pressure, 0, _pressure.Length);
             foreach (var c in _contacts) c.ResetTick();
             AbsoluteWork = SignedWork = 0;
             Saturated = false;
@@ -187,7 +200,8 @@ namespace DreamMachine.UnityBridge
                 {
                     int foot = joint == 2 ? 4 : joint == 5 ? 7 : -1;
                     bool enabled = (DisabledDrives & (1u << joint)) == 0;
-                    _joints[joint].Apply(enabled, foot >= 0 && _contacts[foot].Impulse.y > 0f ? balance : 0f);
+                    _joints[joint].Apply(enabled, foot >= 0 && _contacts[foot].Impulse.y > 0f ? balance : 0f,
+                        _rollTarget[joint], PitchTarget(joint));
                     Saturated |= _joints[joint].Saturated;
                 }
                 ShiftBallast();
@@ -197,6 +211,12 @@ namespace DreamMachine.UnityBridge
                     float work = drive.Torque * (drive.Angle - drive.Previous);
                     SignedWork += work;
                     AbsoluteWork += Mathf.Abs(work);
+                    if (drive.RollLimit > 0)
+                    {
+                        float rollWork = drive.RollTorque * (drive.RollAngle - drive.PreviousRoll);
+                        SignedWork += rollWork;
+                        AbsoluteWork += Mathf.Abs(rollWork);
+                    }
                 }
             }
 
@@ -214,7 +234,13 @@ namespace DreamMachine.UnityBridge
                 MaximumPenetration = Mathf.Max(MaximumPenetration, -bounds.min.y);
             }
             foreach (var drive in _joints)
+            {
                 JointLimitOvershoot = Mathf.Max(JointLimitOvershoot, Mathf.Max(drive.Min - drive.Angle, drive.Angle - drive.Max));
+                if (drive.RollLimit > 0)
+                    JointLimitOvershoot = Mathf.Max(JointLimitOvershoot, Mathf.Abs(drive.RollAngle) - drive.RollLimit);
+            }
+            CaptureSensors(pelvisVelocity);
+            UpdateSupportGate();
         }
 
         void ShiftBallast()
@@ -256,7 +282,7 @@ namespace DreamMachine.UnityBridge
         public (string Name, Vector3 Position, Vector3 Axis, float Angle, float Target, float Torque) ReadJoint(int index)
         {
             var j = _joints[index];
-            return (j.Name, j.Position, j.Axis, j.Angle, j.Target, j.Torque);
+            return (j.Name, j.Position, j.Axis, j.Angle, j.AppliedTarget, j.Torque);
         }
 
         public int NonFootContacts => _contacts[0].Touches + _contacts[1].Touches + _contacts[2].Touches +
@@ -266,6 +292,7 @@ namespace DreamMachine.UnityBridge
         {
             if (_disposed) return;
             _disposed = true;
+            if (Controller != LowerBodyController.Sagittal) Physics.ContactEvent -= RecordPressure;
             if (_scene.isLoaded) SceneManager.UnloadSceneAsync(_scene);
             UnityEngine.Object.Destroy(_material);
         }
@@ -275,62 +302,105 @@ namespace DreamMachine.UnityBridge
             public readonly string Name;
             public readonly float Target, Min, Max;
             readonly Rigidbody _parent, _child;
-            readonly HingeJoint _hinge;
+            readonly Vector3 _anchor;
             readonly float _cap, _effectiveInertia;
-            public float Torque, Previous;
+            readonly float _rollCap, _rollInertia;
+            public readonly float RollLimit;
+            public float RollTarget, RollTorque, PreviousRoll;
+            public float Torque, Previous, AppliedTarget;
             public bool Saturated;
             public Vector3 Axis => _parent.rotation * Vector3.right;
-            public Vector3 Position => _child.position + _child.rotation * _hinge.anchor;
+            public Vector3 Position => _child.position + _child.rotation * _anchor;
+            public Vector3 RollAxis => _parent.rotation * Vector3.forward;
+            public float Velocity => Vector3.Dot(_child.angularVelocity - _parent.angularVelocity, Axis);
+            public float RollVelocity => Vector3.Dot(_child.angularVelocity - _parent.angularVelocity, RollAxis);
+            public float RollAngle => Twist(Quaternion.Inverse(_parent.rotation) * _child.rotation, false);
             public float Angle
             {
                 get
                 {
                     Quaternion relative = Quaternion.Inverse(_parent.rotation) * _child.rotation;
-                    return Mathf.DeltaAngle(0, relative.eulerAngles.x) * Mathf.Deg2Rad;
+                    return RollLimit > 0 ? Twist(relative, true) : Mathf.DeltaAngle(0, relative.eulerAngles.x) * Mathf.Deg2Rad;
                 }
             }
 
             public JointDrive(string name, Rigidbody parent, Rigidbody child, Vector3 anchor, float target,
-                float min, float max, float cap)
+                float min, float max, float cap, float rollLimit = 0f, float rollCap = 0f)
             {
                 Name = name; _parent = parent; _child = child; Target = target; Min = min; Max = max; _cap = cap;
-                float parentI = PitchInertia(parent, anchor), childI = PitchInertia(child, anchor);
+                AppliedTarget = target;
+                RollLimit = rollLimit;
+                _rollCap = rollCap;
+                float parentI = Inertia(parent, anchor, Vector3.right), childI = Inertia(child, anchor, Vector3.right);
                 _effectiveInertia = parentI * childI / (parentI + childI);
-                _hinge = child.gameObject.AddComponent<HingeJoint>();
-                _hinge.axis = Vector3.right;
-                _hinge.anchor = Quaternion.Inverse(child.rotation) * (anchor - child.position);
-                _hinge.connectedBody = parent;
-                _hinge.autoConfigureConnectedAnchor = false;
-                _hinge.connectedAnchor = Quaternion.Inverse(parent.rotation) * (anchor - parent.position);
-                _hinge.limits = new JointLimits
+                _anchor = Quaternion.Inverse(child.rotation) * (anchor - child.position);
+                Vector3 parentAnchor = Quaternion.Inverse(parent.rotation) * (anchor - parent.position);
+                if (RollLimit > 0)
                 {
-                    min = (min - target) * Mathf.Rad2Deg, max = (max - target) * Mathf.Rad2Deg,
-                    contactDistance = 0f
-                };
-                _hinge.useLimits = true;
+                    float a = Inertia(parent, anchor, Vector3.forward), b = Inertia(child, anchor, Vector3.forward);
+                    _rollInertia = a * b / (a + b);
+                    var joint = child.gameObject.AddComponent<ConfigurableJoint>();
+                    joint.axis = Vector3.right;
+                    joint.secondaryAxis = Vector3.up;
+                    joint.anchor = _anchor;
+                    joint.connectedBody = parent;
+                    joint.autoConfigureConnectedAnchor = false;
+                    joint.connectedAnchor = parentAnchor;
+                    joint.xMotion = joint.yMotion = joint.zMotion = joint.angularYMotion = ConfigurableJointMotion.Locked;
+                    joint.angularXMotion = joint.angularZMotion = ConfigurableJointMotion.Limited;
+                    joint.lowAngularXLimit = new SoftJointLimit { limit = (min - target) * Mathf.Rad2Deg };
+                    joint.highAngularXLimit = new SoftJointLimit { limit = (max - target) * Mathf.Rad2Deg };
+                    joint.angularZLimit = new SoftJointLimit { limit = rollLimit * Mathf.Rad2Deg };
+                }
+                else
+                {
+                    var hinge = child.gameObject.AddComponent<HingeJoint>();
+                    hinge.axis = Vector3.right;
+                    hinge.anchor = _anchor;
+                    hinge.connectedBody = parent;
+                    hinge.autoConfigureConnectedAnchor = false;
+                    hinge.connectedAnchor = parentAnchor;
+                    hinge.limits = new JointLimits { min = (min - target) * Mathf.Rad2Deg, max = (max - target) * Mathf.Rad2Deg };
+                    hinge.useLimits = true;
+                }
             }
 
-            public void Apply(bool enabled, float balanceTorque)
+            public void Apply(bool enabled, float balanceTorque, float rollTarget, float pitchTarget)
             {
                 Previous = Angle;
                 Vector3 axis = Axis;
-                float speed = Vector3.Dot(_child.angularVelocity - _parent.angularVelocity, axis);
+                float speed = Velocity;
                 // Evaluate spring and damper at the predicted end of the substep.
                 // The projected two-box inertia keeps small distal links from overshooting in one explicit update.
                 const float stiffness = 150f, damping = 5f;
                 float effectiveDamping = damping + stiffness * Substep;
-                float effort = enabled ? (stiffness * (Target - Previous) - effectiveDamping * speed) /
+                AppliedTarget = Mathf.Clamp(pitchTarget, Min, Max);
+                float effort = enabled ? (stiffness * (AppliedTarget - Previous) - effectiveDamping * speed) /
                     (1f + effectiveDamping * Substep / _effectiveInertia) + balanceTorque : 0f;
                 Torque = Mathf.Clamp(effort, -_cap, _cap);
                 Saturated = Mathf.Abs(effort) >= _cap;
                 _child.AddTorque(axis * Torque);
                 _parent.AddTorque(-axis * Torque);
+                if (RollLimit <= 0) return;
+                RollTarget = rollTarget;
+                PreviousRoll = RollAngle;
+                const float rollStiffness = 220f, rollDamping = 9f;
+                float effectiveRollDamping = rollDamping + rollStiffness * Substep;
+                float rollEffort = enabled ? (rollStiffness * (RollTarget - PreviousRoll) - effectiveRollDamping * RollVelocity) /
+                    (1f + effectiveRollDamping * Substep / _rollInertia) : 0f;
+                RollTorque = Mathf.Clamp(rollEffort, -_rollCap, _rollCap);
+                Saturated |= Mathf.Abs(rollEffort) >= _rollCap;
+                _child.AddTorque(RollAxis * RollTorque);
+                _parent.AddTorque(-RollAxis * RollTorque);
             }
 
-            static float PitchInertia(Rigidbody body, Vector3 pivot)
+            static float Twist(Quaternion q, bool pitch) => Mathf.DeltaAngle(0,
+                2f * Mathf.Atan2(pitch ? q.x : q.z, q.w) * Mathf.Rad2Deg) * Mathf.Deg2Rad;
+
+            static float Inertia(Rigidbody body, Vector3 pivot, Vector3 axis)
             {
-                Vector3 arm = Vector3.ProjectOnPlane(body.worldCenterOfMass - pivot, body.rotation * Vector3.right);
-                return body.inertiaTensor.x + body.mass * arm.sqrMagnitude;
+                Vector3 arm = Vector3.ProjectOnPlane(body.worldCenterOfMass - pivot, body.rotation * axis);
+                return Vector3.Dot(body.inertiaTensor, axis) + body.mass * arm.sqrMagnitude;
             }
         }
     }

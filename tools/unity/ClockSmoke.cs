@@ -80,14 +80,20 @@ internal static class ClockSmoke
             if (world.TickCount < steps) return;
             if (world.TickCount != steps) throw new Exception("Unexpected tick " + world.TickCount);
             bool observed = SessionState.GetInt(Key, 0) == 2;
-            if (observed && steps == 690)
+            if (steps == 690)
             {
-                long before = retainedBefore = GC.GetTotalMemory(true);
-                var watch = Stopwatch.StartNew();
-                Invoke("ToggleSimulationTray");
-                watch.Stop();
-                Debug.Log($"CLOCK_TRAY open_ms={watch.Elapsed.TotalMilliseconds:F3} managed_delta={GC.GetTotalMemory(false) - before}");
-                Invoke("CaptureVision");
+                // The standard household now defaults to a visible tray. Establish both
+                // experimental conditions explicitly before collecting paired observations.
+                if (GameObject.Find("Simulation controls") != null) Click("Close");
+                if (observed)
+                {
+                    long before = retainedBefore = GC.GetTotalMemory(true);
+                    var watch = Stopwatch.StartNew();
+                    Invoke("ToggleSimulationTray");
+                    watch.Stop();
+                    Debug.Log($"CLOCK_TRAY open_ms={watch.Elapsed.TotalMilliseconds:F3} managed_delta={GC.GetTotalMemory(false) - before}");
+                    Invoke("CaptureVision");
+                }
             }
             if (observed && steps > 690 && steps % 40 == 0 && steps < 1140)
             {

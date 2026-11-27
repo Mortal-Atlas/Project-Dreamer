@@ -2,7 +2,13 @@
 
 Updated November 27, 2026.
 
-## Active Phase C.1 native lower body
+## Active Phase C.1.1 lateral balance
+
+- Branch `feature/embodiment-contact-lab`, [draft PR #8](https://github.com/Mortal-Atlas/Project-Dreamer/pull/8) targeting protected `main`. Started at `22bca58498a811364d04a1ef8b22e581485ed0c4`. Research and protocol checkpoint `9d8248e`. Keep the owner's existing ProBuilder preference outside commits and the original household and local VRMs out of scratch tests.
+- The frontal pose variant passed 85% for all held-out seed/side pairs. All six commanded swings aborted when the stance foot lost contact, and five later made body contact. The feedback variant passed through 80%. The owner experiment backup `phase-c11` contains the full native traces. [Protocol, results and visual capture](LOWER_BODY_C11.md)
+- Next, add a separately tested prelift interval that aligns stance CoP with the planted footprint and limits lateral COM momentum. Evaluate it with a slower swing command on new seeds. Keep the 85% initial stance, 10 mm clearance, 80 mm travel, and 20 mm stance-slip limits. Preserve the current pose controller as an engineered reference. Run an authorized VRM test on its own workstream. [Retargeting compatibility](ASSET_AND_LICENSE_REGISTRY.md#phase-c11-lower-body-retargeting-compatibility)
+
+## Phase C.1 native lower body
 
 - Branch `feature/embodiment-contact-lab`, [draft PR #8](https://github.com/Mortal-Atlas/Project-Dreamer/pull/8) against protected main. Started from `df76086e69d9866b8bba4221f455ac45190af026`. Protocol and pilot evidence checkpoint at `cb93e58`. The owner's pre-existing ProBuilder preference remains outside the branch commits. No temporary Git worktree was created.
 - Five seeded rigs passed fixed standing and the bilateral transfer gates. The strongest stance carried 67.2% of measured support, below the 85% required for a commanded step. Selected drive disabling caused a measured physical fall. The household smoke check and both regression suites passed. [Protocol, telemetry and screenshot](LOWER_BODY_C1.md)

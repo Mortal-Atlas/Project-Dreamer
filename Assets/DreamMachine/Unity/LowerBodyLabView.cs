@@ -14,10 +14,12 @@ namespace DreamMachine.UnityBridge
         const string Tray = "embodiment.lower-body";
         const int TraceCapacity = 2048;
         static readonly int[] Seeds = { 101, 202, 303, 404, 505 };
+        static readonly float[] Targets = { .60f, .70f, .80f, .85f, .90f };
         readonly TimeGovernor _clock = new TimeGovernor { Paused = true };
-        readonly TracePoint[] _trace = new TracePoint[TraceCapacity];
+        readonly string[] _trace = new string[TraceCapacity];
         readonly Transform[] _segments = new Transform[8];
         readonly Transform[] _axes = new Transform[6];
+        readonly Transform[] _rollAxes = new Transform[4];
         readonly Transform[] _contactMarkers = new Transform[2];
         readonly Transform[] _forces = new Transform[2];
         readonly System.Collections.Generic.List<Material> _materials = new System.Collections.Generic.List<Material>();
@@ -27,10 +29,11 @@ namespace DreamMachine.UnityBridge
         Text _telemetry;
         Font _font;
         Vector3 _impulse, _initialPelvis;
-        int _seedIndex, _traceCount;
+        int _seedIndex, _traceCount, _targetIndex = 3, _loadSide;
         float _nextRefresh;
         string _status = "";
         bool _perturbationEnabled;
+        LowerBodyController _controller = LowerBodyController.FrontalPose;
 
         void Start()
         {
@@ -38,9 +41,9 @@ namespace DreamMachine.UnityBridge
             var camera = new GameObject("Lower-body camera", typeof(Camera)).GetComponent<Camera>();
             camera.transform.SetParent(transform);
             camera.transform.position = new Vector3(1.5f, 1.20f, 2.6f);
-            camera.transform.LookAt(new Vector3(0, .76f, 0));
+            camera.transform.LookAt(new Vector3(0, .81f, 0));
             camera.orthographic = true;
-            camera.orthographicSize = .96f;
+            camera.orthographicSize = 1.02f;
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(.055f, .075f, .095f);
             if (EventSystem.current == null)
@@ -55,6 +58,7 @@ namespace DreamMachine.UnityBridge
                 _segments[i] = Shape("Segment " + i, PrimitiveType.Cube, i == 1 ? new Color(.89f, .58f, .24f) :
                     i < 5 ? new Color(.24f, .63f, .77f) : new Color(.33f, .71f, .55f));
             for (int i = 0; i < _axes.Length; i++) _axes[i] = Shape("Joint axis " + i, PrimitiveType.Cube, Color.white);
+            for (int i = 0; i < _rollAxes.Length; i++) _rollAxes[i] = Shape("Frontal axis " + i, PrimitiveType.Cube, new Color(.80f, .58f, .93f));
             _com = Shape("Measured centre of mass", PrimitiveType.Sphere, new Color(1f, .72f, .24f));
             _com.localScale = Vector3.one * .045f;
             _support = Shape("Footprint envelope", PrimitiveType.Cube, new Color(.25f, .34f, .46f));
@@ -67,7 +71,7 @@ namespace DreamMachine.UnityBridge
             ResetFixture();
             _workspace = new TrayWorkspace("DreamMachine.Workspace.v1.");
             _workspace.Register(Tray, "Lower-body laboratory", new Vector2(480, 300),
-                new TrayWorkspace.Layout { AnchorMin = new Vector2(.02f, .64f), AnchorMax = new Vector2(.98f, .98f), Visible = true },
+                new TrayWorkspace.Layout { AnchorMin = new Vector2(.02f, .61f), AnchorMax = new Vector2(.98f, .98f), Visible = true },
                 BuildTray, () => _telemetry = null, Refresh);
             _workspace.RestoreVisibility();
         }
@@ -75,12 +79,14 @@ namespace DreamMachine.UnityBridge
         void ResetFixture()
         {
             _lab?.Dispose();
-            _lab = new NativeLowerBodyLab(Seeds[_seedIndex], _seedIndex == 2 || _seedIndex == 4 ? 3f : 6f);
+            _lab = new NativeLowerBodyLab(Seeds[_seedIndex], _seedIndex == 2 || _seedIndex == 4 ? 3f : 6f, controller: _controller);
             _initialPelvis = _lab.PelvisPosition;
             _clock.Paused = true;
             _clock.TakeSingleStep();
             _clock.Accumulator = 0;
             _traceCount = 0;
+            Array.Clear(_trace, 0, _trace.Length);
+            _loadSide = 0;
             _impulse = Vector3.zero;
             _perturbationEnabled = false;
             _status = "Fixture reset";
@@ -105,7 +111,7 @@ namespace DreamMachine.UnityBridge
         {
             _lab.Step(_impulse);
             _impulse = Vector3.zero;
-            _trace[_traceCount++ % TraceCapacity] = new TracePoint(_lab);
+            _trace[_traceCount++ % TraceCapacity] = LowerBodyTrace.Capture(_lab, "interactive");
         }
 
         void Draw()
@@ -121,6 +127,13 @@ namespace DreamMachine.UnityBridge
                 var j = _lab.ReadJoint(i);
                 Line(_axes[i], j.Position - j.Axis * .065f, j.Position + j.Axis * .065f, .009f);
             }
+            for (int i = 0; i < _rollAxes.Length; i++)
+            {
+                int joint = (i / 2) * 3 + (i % 2) * 2;
+                Vector3 pivot = _lab.ReadJoint(joint).Position, axis = _lab.RollAxis(joint);
+                _rollAxes[i].gameObject.SetActive(_controller != LowerBodyController.Sagittal);
+                Line(_rollAxes[i], pivot - axis * .065f, pivot + axis * .065f, .008f);
+            }
             _com.position = _lab.CenterOfMass;
             bool boundsSet = false;
             var envelope = new Bounds();
@@ -134,7 +147,8 @@ namespace DreamMachine.UnityBridge
                 if (boundsSet) envelope.Encapsulate(foot);
                 else envelope = foot;
                 boundsSet = true;
-                Vector3 point = _lab.ContactPoint(i);
+                var sole = _lab.ReadSole(i);
+                Vector3 point = sole.PressureValid ? sole.PressureCenter : _lab.ContactPoint(i);
                 Vector3 meanForce = (i == 0 ? _lab.LeftImpulse : _lab.RightImpulse) / WorldSimulation.Dt;
                 _contactMarkers[i].position = point;
                 Line(_forces[i], point, point + meanForce * .0023f, .008f);
@@ -174,7 +188,7 @@ namespace DreamMachine.UnityBridge
 
         void BuildTray(RectTransform parent)
         {
-            _telemetry = Label(parent, new Vector2(.025f, .29f), new Vector2(.985f, .98f), 18, TextAnchor.UpperLeft);
+            _telemetry = Label(parent, new Vector2(.025f, .35f), new Vector2(.985f, .98f), 17, TextAnchor.UpperLeft);
             Button(parent, 0, 0, "Pause / run", () => _clock.Paused = !_clock.Paused);
             Button(parent, 0, 1, "Step", _clock.RequestSingleStep);
             Button(parent, 0, 2, "Load left", () => RequestLoad(-1, "Left transfer"));
@@ -192,28 +206,46 @@ namespace DreamMachine.UnityBridge
                 if (_perturbationEnabled) _impulse = Vector3.right * .35f;
             });
             Button(parent, 1, 4, "Export", Export);
+            Button(parent, 2, 0, "Controller", () => { _controller = (LowerBodyController)(((int)_controller + 1) % 3); ResetFixture(); });
+            Button(parent, 2, 1, "Next target", () =>
+            {
+                _targetIndex = (_targetIndex + 1) % Targets.Length;
+                RequestLoad(_loadSide, "Transfer target changed");
+            });
+            Button(parent, 2, 2, "Request swing", () => _status = _lab.TryRequestSwing() ? "Swing requested" : $"Swing request · {_lab.Action}");
         }
 
         void RequestLoad(float load, string status)
         {
-            _lab.RequestLoad(load);
+            _loadSide = (int)load;
+            _lab.RequestLoad(load * (Targets[_targetIndex] - .5f) / .4f);
             _status = status;
         }
 
         void Refresh()
         {
             var message = new StringBuilder(640);
-            message.AppendLine($"Native lower body · seed {_lab.Seed} · stage {_lab.Stage:F0} · tick {_lab.Tick} · {_lab.Tick * WorldSimulation.Dt:F2} s · {(_clock.Paused ? "paused" : "running")} · F6 toggles tray");
+            message.AppendLine($"Lower body · {_controller} · seed {_lab.Seed} · stage {_lab.Stage:F0} · tick {_lab.Tick} · {_lab.Tick * WorldSimulation.Dt:F2} s · {(_clock.Paused ? "paused" : "running")} · F6 tray");
             message.AppendLine($"Pelvis {_lab.PelvisPosition.y:F3} m · displacement {Vector3.Distance(_lab.PelvisPosition, _initialPelvis):F4} m · tilt {_lab.PelvisTilt:F1}° · COM {_lab.CenterOfMass:F3}");
-            message.AppendLine($"Left {_lab.LeftImpulse.y:F3} / right {_lab.RightImpulse.y:F3} N s · momentum residual {_lab.MomentumResidual.magnitude:F4} N s");
+            var l = _lab.ReadSole(0);
+            var r = _lab.ReadSole(1);
+            message.AppendLine($"Load L {_lab.ReadLoad(0):P0} / R {_lab.ReadLoad(1):P0} · target {Targets[_targetIndex]:P0} · stance {(_loadSide == 0 ? "both" : _loadSide < 0 ? "left" : "right")} · {_lab.StanceTicks}/{NativeLowerBodyLab.RequiredStanceTicks} ticks · {(_lab.SwingReady ? "ready" : "blocked")} · {_lab.Action}");
+            message.AppendLine($"CoP L {PressureLabel(l)} / R {PressureLabel(r)} · clearance {l.Clearance:F3} / {r.Clearance:F3} m · caps {(_lab.Saturated ? "hit" : "clear")}");
+            var v = _lab.Vestibular;
+            message.AppendLine($"Vestibular {v.Tick} · gravity {v.Gravity:F2} m/s² · gyro {v.AngularVelocity:F2} rad/s · acceleration {v.LinearAcceleration:F2} m/s²");
             for (int i = 0; i < _lab.JointCount; i++)
             {
                 var j = _lab.ReadJoint(i);
-                message.AppendLine($"{j.Name} · measured {j.Angle:F3} / target {j.Target:F3} rad · {j.Torque:F2} N m");
+                var p = _lab.ReadProprioception(i);
+                string frontal = p.RollLimit > 0 ? $" · roll {p.Roll:F3}/{p.RollTarget:F3} rad, {p.RollTorque:F2} N m" : "";
+                message.AppendLine($"{j.Name} · pitch {j.Angle:F3}/{j.Target:F3} rad, {j.Torque:F2} N m{frontal}");
             }
-            message.Append($"Slip {_lab.FootDrift:F4} m · work {_lab.AbsoluteWork:F3} J · body contacts {_lab.NonFootContacts} · {_status}");
+            string fall = _lab.FirstFallTick < 0 ? "" : $" · fall at tick {_lab.FirstFallTick}";
+            message.Append($"Slip {_lab.FootDrift:F4} m · work {_lab.AbsoluteWork:F3} J · body contacts {_lab.NonFootContacts} · swing {_lab.SwingClearance:F3}/{_lab.SwingTravel:F3} m · {_lab.ActionReason}{fall} · {_status}");
             _telemetry.text = message.ToString();
         }
+
+        static string PressureLabel(SoleReading foot) => foot.PressureValid ? $"{foot.PressureCenter:F3}" : "—";
 
         void Export()
         {
@@ -221,34 +253,13 @@ namespace DreamMachine.UnityBridge
             {
                 string path = Path.Combine(Application.persistentDataPath, $"lower-body-{_lab.Seed}-{DateTime.UtcNow:yyyyMMdd-HHmmss-fff}.csv");
                 using var writer = new StreamWriter(path);
-                writer.WriteLine("tick,load,ballast_m,left_ns,right_ns,pelvis_m,com_x_m,residual_ns,slip_m,abs_work_j,non_foot_contacts,tap_x_ns,left_foot_x_m,left_foot_y_m,left_foot_z_m,right_foot_x_m,right_foot_y_m,right_foot_z_m");
+                LowerBodyTrace.WriteHeader(writer);
                 for (int i = Math.Max(0, _traceCount - TraceCapacity); i < _traceCount; i++)
-                    writer.WriteLine(_trace[i % TraceCapacity].Csv());
+                    writer.WriteLine(_trace[i % TraceCapacity]);
                 _status = "Exported " + Path.GetFileName(path);
             }
             catch (IOException error) { _status = error.Message; }
             catch (UnauthorizedAccessException error) { _status = error.Message; }
-        }
-
-        readonly struct TracePoint
-        {
-            readonly int _tick, _contacts;
-            readonly float _load, _ballast, _left, _right, _pelvis, _com, _residual, _slip, _work, _tap;
-            readonly Vector3 _leftFoot, _rightFoot;
-
-            internal TracePoint(NativeLowerBodyLab lab)
-            {
-                _tick = lab.Tick; _contacts = lab.NonFootContacts;
-                _load = lab.RequestedLoad; _ballast = lab.BallastOffset;
-                _left = lab.LeftImpulse.y; _right = lab.RightImpulse.y;
-                _pelvis = lab.PelvisPosition.y; _com = lab.CenterOfMass.x;
-                _residual = lab.MomentumResidual.magnitude; _slip = lab.FootDrift;
-                _work = lab.AbsoluteWork; _tap = lab.ExternalImpulse.x;
-                _leftFoot = lab.FootBounds(0).center; _rightFoot = lab.FootBounds(1).center;
-            }
-
-            internal string Csv() => FormattableString.Invariant(
-                $"{_tick},{_load:R},{_ballast:R},{_left:R},{_right:R},{_pelvis:R},{_com:R},{_residual:R},{_slip:R},{_work:R},{_contacts},{_tap:R},{_leftFoot.x:R},{_leftFoot.y:R},{_leftFoot.z:R},{_rightFoot.x:R},{_rightFoot.y:R},{_rightFoot.z:R}");
         }
 
         Text Label(RectTransform parent, Vector2 min, Vector2 max, int size, TextAnchor alignment)
@@ -268,8 +279,8 @@ namespace DreamMachine.UnityBridge
             var b = new GameObject(caption, typeof(RectTransform), typeof(Image), typeof(Button)).GetComponent<Button>();
             var rect = (RectTransform)b.transform;
             rect.SetParent(parent, false);
-            rect.anchorMin = new Vector2(column * .2f + .006f, .02f + row * .13f);
-            rect.anchorMax = new Vector2((column + 1) * .2f - .006f, .14f + row * .13f);
+            rect.anchorMin = new Vector2(column * .2f + .006f, .02f + row * .105f);
+            rect.anchorMax = new Vector2((column + 1) * .2f - .006f, .115f + row * .105f);
             rect.offsetMin = rect.offsetMax = Vector2.zero;
             b.GetComponent<Image>().color = new Color(.20f, .26f, .34f);
             b.onClick.AddListener(action);
