@@ -35,5 +35,16 @@ namespace DreamMachine.Tests
             Assert.AreEqual(lab.Shoulder.Angle, restored.Shoulder.Angle, 1e-9);
             Assert.AreEqual(lab.TotalMechanicalWork, restored.TotalMechanicalWork, 1e-9);
         }
+
+        [Test]
+        public void EngineeredIK_SolvesReachableAndFlagsUnreachableTargets()
+        {
+            var lab = new ShoulderElbowWristLab();
+            var reachable = lab.SolveEngineeredIK(0.45, 0.25, 0.1, elbowUp: false);
+            Assert.IsTrue(reachable.reachable);
+
+            var unreachable = lab.SolveEngineeredIK(2.5, 2.5, 0.0, elbowUp: false);
+            Assert.IsFalse(unreachable.reachable);
+        }
     }
 }

@@ -53,12 +53,13 @@ namespace DreamMachine.Libraries
 
         public static IReadOnlyList<FactorialResult> RunBehavioralBenchmark(int tasksPerCondition = 24, int budgetPerTask = 4)
         {
-            var results = new List<FactorialResult>(9);
+            var results = new List<FactorialResult>(10);
             foreach (var cond in Generate2x2x2Matrix())
             {
-                results.Add(EvaluateAgent(cond.Label, cond, isUnifiedBaseline: false, tasksPerCondition, budgetPerTask));
+                results.Add(EvaluateAgent(cond.Label, cond, isUnifiedBaseline: false, isIntegrated: false, tasksPerCondition, budgetPerTask));
             }
-            results.Add(EvaluateAgent("UnifiedMemoryBaseline", default, isUnifiedBaseline: true, tasksPerCondition, budgetPerTask));
+            results.Add(EvaluateAgent("UnifiedMemoryBaseline", default, isUnifiedBaseline: true, isIntegrated: false, tasksPerCondition, budgetPerTask));
+            results.Add(EvaluateAgent("IntegratedThreeLibrary", new FactorialCondition { UseLibraryI = true, UseLibraryII = true, UseLibraryIII = true }, isUnifiedBaseline: false, isIntegrated: true, tasksPerCondition, budgetPerTask));
             return results;
         }
 
@@ -66,6 +67,7 @@ namespace DreamMachine.Libraries
             string name,
             FactorialCondition cond,
             bool isUnifiedBaseline,
+            bool isIntegrated,
             int totalTasks,
             int budgetPerTask)
         {
@@ -106,6 +108,48 @@ namespace DreamMachine.Libraries
                         }
                     }
                     chosenAction = found >= 0 ? found : (t % 3);
+                }
+                else if (isIntegrated)
+                {
+                    // Shared associative integration: Library III lived experience overrides stale Library I prior;
+                    // Library II cycles through untried alternatives for this context when no positive match exists.
+                    retrievals++;
+                    ops++;
+                    taskBudget++;
+                    int positiveMatch = -1;
+                    bool[] triedFailed = new bool[3];
+                    for (int i = livedMemory.Count - 1; i >= 0; i--)
+                    {
+                        if (livedMemory[i].context == context)
+                        {
+                            if (livedMemory[i].reward > 0.5)
+                            {
+                                positiveMatch = livedMemory[i].action;
+                                break;
+                            }
+                            triedFailed[livedMemory[i].action] = true;
+                        }
+                    }
+
+                    if (positiveMatch >= 0)
+                    {
+                        chosenAction = positiveMatch;
+                    }
+                    else
+                    {
+                        int candidate = priorAction;
+                        if (triedFailed[candidate])
+                        {
+                            counterfactuals++;
+                            ops++;
+                            taskBudget++;
+                            for (int a = 0; a < 3; a++)
+                            {
+                                if (!triedFailed[a]) { candidate = a; break; }
+                            }
+                        }
+                        chosenAction = candidate;
+                    }
                 }
                 else
                 {
@@ -159,7 +203,7 @@ namespace DreamMachine.Libraries
                 double reward = chosenAction == optimalAction ? 1.0 : 0.0;
                 if (reward > 0.5) successes++;
 
-                if (isUnifiedBaseline || cond.UseLibraryIII)
+                if (isUnifiedBaseline || isIntegrated || cond.UseLibraryIII)
                 {
                     livedMemory.Add((context, chosenAction, reward));
                     beliefsFormed++;

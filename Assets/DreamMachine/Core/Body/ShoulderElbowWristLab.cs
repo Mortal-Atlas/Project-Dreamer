@@ -54,6 +54,44 @@ namespace DreamMachine.Body
             return new EndEffectorPose { X = x, Y = y, Orientation = a3 };
         }
 
+        /// <summary>
+        /// Engineered 2-link + wrist-orientation inverse kinematics.
+        /// Explicitly engineered control (not learned movement).
+        /// </summary>
+        public (double shoulder, double elbow, double wrist, bool reachable) SolveEngineeredIK(
+            double targetX, double targetY, double targetOrientation = 0.0, bool elbowUp = false)
+        {
+            double wx = targetX - Wrist.Length * Math.Cos(targetOrientation);
+            double wy = targetY - Wrist.Length * Math.Sin(targetOrientation);
+            double r2 = wx * wx + wy * wy;
+            double l1 = Shoulder.Length;
+            double l2 = Elbow.Length;
+            double maxReach = l1 + l2;
+            double minReach = Math.Abs(l1 - l2);
+            double r = Math.Sqrt(r2);
+            bool reachable = r <= maxReach + 1e-6 && r >= minReach - 1e-6;
+
+            if (!reachable && r > 1e-9)
+            {
+                wx *= maxReach / r;
+                wy *= maxReach / r;
+                r2 = wx * wx + wy * wy;
+            }
+
+            double cosE = DecomposedForceResidual.Clamp((r2 - l1 * l1 - l2 * l2) / (2.0 * l1 * l2), -1.0, 1.0);
+            double sinE = Math.Sqrt(Math.Max(0.0, 1.0 - cosE * cosE)) * (elbowUp ? -1.0 : 1.0);
+            double elbow = Math.Atan2(sinE, cosE);
+            double shoulder = Math.Atan2(wy, wx) - Math.Atan2(l2 * sinE, l1 + l2 * cosE);
+            double wrist = targetOrientation - (shoulder + elbow);
+
+            return (
+                DecomposedForceResidual.Clamp(shoulder, Shoulder.MinAngle, Shoulder.MaxAngle),
+                DecomposedForceResidual.Clamp(elbow, Elbow.MinAngle, Elbow.MaxAngle),
+                DecomposedForceResidual.Clamp(wrist, Wrist.MinAngle, Wrist.MaxAngle),
+                reachable
+            );
+        }
+
         public EndEffectorPose StepCoordinatedReach(
             double targetShoulder,
             double targetElbow,
