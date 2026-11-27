@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using DreamMachine.Body;
+using DreamMachine.Sim;
 using DreamMachine.Social;
 using UnityEngine;
 
@@ -17,6 +18,7 @@ namespace DreamMachine.UnityBridge
         TextMesh _label;
         Transform _rootSpin;
         Transform _pelvis, _chest, _neck, _head, _torsoMesh, _neckMesh;
+        GameObject _infantClothes, _toddlerClothes;
         readonly List<Limb> _limbs = new List<Limb>(4);
         HumanoidAnatomy _anatomy;
         float _sampledAge = -1f;
@@ -53,6 +55,21 @@ namespace DreamMachine.UnityBridge
         }
 
         internal void AddLimb(Limb limb) => _limbs.Add(limb);
+
+        internal void BindEarlyClothes(GameObject infant, GameObject toddler)
+        {
+            _infantClothes = infant;
+            _toddlerClothes = toddler;
+        }
+
+        internal void ShowEarlyClothes(bool living)
+        {
+            if (_infantClothes == null) return;
+            bool infant = living && _sampledAge < WorldSimulation.AgeOf(LifeStage.Toddler);
+            bool toddler = living && !infant && _sampledAge < WorldSimulation.AgeOf(LifeStage.Child);
+            if (_infantClothes.activeSelf != infant) _infantClothes.SetActive(infant);
+            if (_toddlerClothes.activeSelf != toddler) _toddlerClothes.SetActive(toddler);
+        }
 
         /// <summary>View-only sampling. The kernel owns age and the anatomy curve.</summary>
         public void ApplyDevelopmentAge(float developmentDays)
@@ -276,6 +293,26 @@ namespace DreamMachine.UnityBridge
             {
                 Primitive(torsoGeometry, PrimitiveType.Cube, source, accent, new Vector3(0f, 0.50f, -0.30f), new Vector3(0.91f, 0.66f, 0.10f), 0);
                 Primitive(torsoGeometry, PrimitiveType.Cube, source, accent, new Vector3(0f, 0.58f, 0.32f), new Vector3(0.29f, 0.48f, 0.08f), 0);
+            }
+            if (look.IsBaby)
+            {
+                var infant = new GameObject("Infant sleeper");
+                infant.transform.SetParent(torsoGeometry, false);
+                var toddler = new GameObject("Toddler overalls");
+                toddler.transform.SetParent(torsoGeometry, false);
+                Color seam = Color.Lerp(cloth, accent, .55f);
+                Primitive(infant.transform, PrimitiveType.Capsule, source, cloth, new Vector3(0f, .49f, .04f),
+                    new Vector3(.97f, .50f, .64f), 0);
+                Primitive(infant.transform, PrimitiveType.Cube, source, seam, new Vector3(0f, .49f, .36f),
+                    new Vector3(.028f, .60f, .026f), 0);
+                Primitive(toddler.transform, PrimitiveType.Cube, source, seam, new Vector3(0f, .44f, .34f),
+                    new Vector3(.54f, .46f, .065f), 0);
+                foreach (float side in new[] { -.22f, .22f })
+                    Primitive(toddler.transform, PrimitiveType.Cube, source, seam, new Vector3(side, .70f, .31f),
+                        new Vector3(.095f, .36f, .045f), 0);
+                infant.SetActive(false);
+                toddler.SetActive(false);
+                body.BindEarlyClothes(infant, toddler);
             }
 
             Transform head = Pivot(body, neck, "head", Vector3.zero);

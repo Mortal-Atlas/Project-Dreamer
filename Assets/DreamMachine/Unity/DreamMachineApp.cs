@@ -291,6 +291,7 @@ namespace DreamMachine.UnityBridge
             foreach (Actor actor in _actors.Values)
             {
                 actor.LocalAvatar?.SetVisible(false);
+                actor.Body.ShowEarlyClothes(false);
                 Vector3 before = actor.Pos;
                 if (actor.Spec.Role == MemberRole.Baby) StepBaby(actor, dt);
                 else StepMentor(actor, dt);

@@ -30,6 +30,7 @@ internal static class PrivateAvatarSmoke
     public static void Mature() => Start(1);
     public static void Newborn() => Start(2);
     public static void Growth() => Start(3);
+    public static void Toddler() => Start(4);
 
     static void Start(int mode)
     {
@@ -51,6 +52,8 @@ internal static class PrivateAvatarSmoke
             foreach (var learner in world.Children) learner.Body.AgeDays = HumanoidAnatomy.AdultAgeDays;
         if (mode == 3)
             foreach (var learner in world.Children) learner.Body.AgeDays = HumanoidAnatomy.AdultAgeDays - .005f;
+        if (mode == 4)
+            foreach (var learner in world.Children) learner.Body.AgeDays = .84f;
         File.WriteAllBytes(path, world.CaptureCheckpoint());
         SessionState.SetInt(SessionKey, mode);
         EditorSceneManager.OpenScene("Assets/Scenes/DreamMachine.unity");
@@ -88,12 +91,23 @@ internal static class PrivateAvatarSmoke
             var control = WorldSimulation.RestoreCheckpoint(world.CaptureCheckpoint());
             var bodies = Object.FindObjectsByType<SegmentedBody>(FindObjectsSortMode.None);
             if (world.TickCount != 0 || bodies.Length != 4) throw new InvalidOperationException("Incorrect startup fixture.");
-            if (!growth) Capture(Camera.main, "household-private-" + (mature ? "mature-standing" : "newborn"));
+            if (!growth) Capture(Camera.main, "household-private-" + (mature ? "mature-standing" : mode == 4 ? "toddler" : "newborn"));
             foreach (var body in bodies)
             {
                 bool bound = body.GetComponentInChildren<Vrm10Instance>() != null;
                 bool teacher = body.PersonId == "father" || body.PersonId == "mother";
                 if (bound != (mature || teacher)) throw new InvalidOperationException("Wrong age or identity binding for " + body.PersonId);
+                if (!teacher && (mode == 2 || mode == 4))
+                {
+                    var torso = body.RigPivot("torsoGeometry");
+                    var infant = torso.Find("Infant sleeper").gameObject;
+                    var toddler = torso.Find("Toddler overalls").gameObject;
+                    if (infant.activeSelf != (mode == 2) || toddler.activeSelf != (mode == 4))
+                        throw new InvalidOperationException("Wrong early-development garment for " + body.PersonId);
+                    Debug.Log(FormattableString.Invariant($"PRIVATE_GARMENT {body.PersonId} stage={(mode == 2 ? "infant" : "toddler")} anatomy_days={body.SampledDevelopmentDays:F3} height={body.Dimensions.Height:F3}"));
+                    if (body.PersonId == "daughter")
+                        CaptureDevelopment(Camera.main, body, mode == 2 ? "infant" : "toddler");
+                }
                 if (!bound) continue;
                 var instance = body.GetComponentInChildren<Vrm10Instance>();
                 Inspect(instance.gameObject, body.PersonId);
@@ -120,12 +134,17 @@ internal static class PrivateAvatarSmoke
             var animator = model.GetComponentInChildren<Animator>();
             var head = animator.GetBoneTransform(HumanBodyBones.Head);
             var wrist = animator.GetBoneTransform(HumanBodyBones.RightHand);
+            var palm = animator.GetBoneTransform(HumanBodyBones.RightMiddleProximal);
+            var lid = Read<Transform>(app, "_lid");
             var left = animator.GetBoneTransform(HumanBodyBones.LeftFoot);
             Vector3 startFoot = model.transform.InverseTransformPoint(left.position);
             Quaternion startHead = Quaternion.Inverse(model.transform.rotation) * head.rotation;
             Vector3 startHand = model.transform.InverseTransformPoint(wrist.position);
             int moving = 0, motion = 0, looking = 0, blinking = 0, interacting = 0, sleeping = 0;
             long poseTime = 0;
+            int lidSamples = 0;
+            int headOverBed = 0;
+            float minimumLidError = float.PositiveInfinity;
             for (int i = 0; i < 1240; i++)
             {
                 world.Tick();
@@ -145,13 +164,24 @@ internal static class PrivateAvatarSmoke
                     Quaternion.Angle(startHead, Quaternion.Inverse(model.transform.rotation) * head.rotation) > 4f &&
                     Mathf.Abs(model.Runtime.LookAt.Pitch) > 1f) looking++;
                 if (model.Runtime.Expression.GetWeight(ExpressionKey.Blink) > .3f) blinking++;
+                if (person.Phase == HomePhase.Act && (person.Activity == HomeActivity.Open || person.Activity == HomeActivity.Close))
+                {
+                    minimumLidError = Mathf.Min(minimumLidError,
+                        Vector3.Distance(palm.position, lid.TransformPoint(new Vector3(0f, .037f, .27f))));
+                    if (++lidSamples == 12 && mature) Capture(Camera.main, "household-private-lid");
+                }
                 if (person.Phase == HomePhase.Act && person.Activity != HomeActivity.Rest && person.Activity != HomeActivity.Sleep &&
                     person.Activity != HomeActivity.Inspect && (model.transform.InverseTransformPoint(wrist.position) - startHand).sqrMagnitude > .012f)
                 {
                     if (++interacting == 10 && !growth) Capture(Camera.main, "household-private-" + (mature ? "mature-reach" : "merlin-reach"));
                 }
                 if (person.Phase == HomePhase.Act && person.Activity == HomeActivity.Sleep &&
-                    Vector3.Dot(animator.GetBoneTransform(HumanBodyBones.Hips).up, Vector3.up) < .5f) sleeping++;
+                    Vector3.Dot(animator.GetBoneTransform(HumanBodyBones.Hips).up, Vector3.up) < .5f)
+                {
+                    sleeping++;
+                    if (head.position.z < model.transform.position.z - .20f) headOverBed++;
+                    if (sleeping == 30 && mature) Capture(Camera.main, "household-private-sleep");
+                }
             }
             control.RunTicks(1240);
             if (!world.CaptureCheckpoint().SequenceEqual(control.CaptureCheckpoint()))
@@ -161,7 +191,7 @@ internal static class PrivateAvatarSmoke
             if (moving == 0 || motion == 0 || looking == 0 || blinking == 0 || interacting == 0 || sleeping == 0)
                 throw new InvalidOperationException("Missing pose, gait, gaze, expression, reach or sleep evidence.");
             double poseMs = poseTime * 1000.0 / System.Diagnostics.Stopwatch.Frequency / 1240.0;
-            Debug.Log(FormattableString.Invariant($"PRIVATE_LIVING mode={mode} ticks=1240 moving={moving} gait={motion} gaze={looking} blink={blinking} reach={interacting} sleep={sleeping} exact=true view_ms={poseMs:F4}"));
+            Debug.Log(FormattableString.Invariant($"PRIVATE_LIVING mode={mode} ticks=1240 moving={moving} gait={motion} gaze={looking} blink={blinking} reach={interacting} sleep={sleeping} head_over_bed={headOverBed} exact=true view_ms={poseMs:F4} lid_samples={lidSamples} lid_error_m={minimumLidError:F4}"));
             EditorApplication.ExitPlaymode();
         }
         catch (Exception error) { Debug.LogException(error); EditorApplication.Exit(1); }
@@ -197,7 +227,9 @@ internal static class PrivateAvatarSmoke
             RenderTexture.active = target;
             image.ReadPixels(new Rect(0, 0, target.width, target.height), 0, 0);
             image.Apply();
-            File.WriteAllBytes(Path.Combine(Application.persistentDataPath, name + ".png"), image.EncodeToPNG());
+            string tag = Environment.GetEnvironmentVariable("DREAMER_AVATAR_CAPTURE_TAG");
+            string file = string.IsNullOrEmpty(tag) ? name : name + "-" + tag;
+            File.WriteAllBytes(Path.Combine(Application.persistentDataPath, file + ".png"), image.EncodeToPNG());
         }
         finally
         {
@@ -205,6 +237,24 @@ internal static class PrivateAvatarSmoke
             RenderTexture.active = previous;
             Object.Destroy(target);
             Object.Destroy(image);
+        }
+    }
+
+    static void CaptureDevelopment(Camera camera, SegmentedBody body, string stage)
+    {
+        Transform view = camera.transform;
+        Vector3 savedPosition = view.position;
+        Quaternion savedRotation = view.rotation;
+        Vector3 middle = body.transform.position + Vector3.up * body.Dimensions.Height * .53f;
+        try
+        {
+            view.position = middle + new Vector3(.48f, .27f, 1.17f);
+            view.LookAt(middle);
+            Capture(camera, "household-private-" + stage + "-detail");
+        }
+        finally
+        {
+            view.SetPositionAndRotation(savedPosition, savedRotation);
         }
     }
 

@@ -34,6 +34,15 @@ Use the listed abstracts and publications as references. No external trajectory 
 
 The L.2 study imports no paper data or externally trained model. [Experiment design](ACTIVE_LEARNING_L2.md#fixed-retention-comparison)
 
+## Active inspection and context
+
+| Study | Application and limits |
+| --- | --- |
+| Ruzena Bajcsy, *Proceedings of the IEEE* (1988). [Original paper](https://doi.org/10.1109/5.5968) | Informs the deliberate sensing step and the explicit time cost of acquiring a closer observation. The household sensor is a bounded abstract feature port. |
+| Godden and Baddeley, *British Journal of Psychology* (1975). [Original study](https://onlinelibrary.wiley.com/doi/abs/10.1111/j.2044-8295.1975.tb01468.x) | Motivates separating an experience's remembered context from present applicability. The L.4 board experiment tests action predictions under physical rearrangement. |
+
+These studies supply methods background. No external data, graphics or pretraining assets were imported for L.4. [Fixed L.4 protocol](ACTIVE_PERCEPTION_L4.md#prior-result-and-fixed-study)
+
 ## Selected empirical sample
 
 Downloaded only `BDS00001.dat` and its WFDB header. The record contains 6,000 samples at 100 Hz. Decode the signed little-endian 32-bit samples using `(ADC − baseline) / gain` from the header. The 60 s mean vertical load is **537.879 N**. The two horizontal CoP peak-to-peak spans are **16.760 mm** and **8.367 mm**. The force platform reports whole-platform load and CoP. This establishes the millimetre-scale reference and the need for a measured pressure distribution. It does not establish per-foot loads or fixture acceptance limits. The file SHA-256 is `6EE4E19D4C57CE0DAF07AA8FB513A22B83C0CE575E5E50AF32BDDAFB2DD3DE26`. No raw human data or participant metadata is distributed in the project. [PhysioNet dataset and methods](https://physionet.org/content/hbedb/1.0.0/)

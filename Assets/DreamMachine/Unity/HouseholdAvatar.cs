@@ -16,7 +16,9 @@ namespace DreamMachine.UnityBridge
         readonly Bone _hips, _spine, _chest, _neck, _head;
         readonly Chain _leftArm, _rightArm, _leftLeg, _rightLeg;
         readonly Vector3 _restHips;
+        readonly Vector3 _rightPalm;
         readonly float _height, _ground;
+        float _reachWeight;
         bool? _visible;
 
         struct Bone
@@ -88,6 +90,22 @@ namespace DreamMachine.UnityBridge
                 Aim(root, knee, axis * distance - knee);
                 End.Rotate(spin, root);
             }
+
+            public void Reach(Transform root, Vector3 wrist, Quaternion rotation)
+            {
+                Vector3 shoulder = root.InverseTransformPoint(Top.Target.position);
+                Vector3 target = root.InverseTransformPoint(wrist) - shoulder;
+                if (target.sqrMagnitude < .0001f) return;
+                Vector3 axis = target.normalized;
+                Vector3 elbowSide = root.InverseTransformPoint(Mid.Target.position) - shoulder;
+                Vector3 bend = Vector3.ProjectOnPlane(elbowSide, axis).normalized;
+                if (bend.sqrMagnitude < .01f) bend = Vector3.ProjectOnPlane(Vector3.right, axis).normalized;
+                float distance = Mathf.Clamp(target.magnitude, Mathf.Abs(UpperLength - LowerLength) + .001f, UpperLength + LowerLength - .002f);
+                float along = (UpperLength * UpperLength + distance * distance - LowerLength * LowerLength) / (2f * distance);
+                Vector3 elbow = axis * along + bend * Mathf.Sqrt(Mathf.Max(0f, UpperLength * UpperLength - along * along));
+                Aim(root, elbow, axis * distance - elbow);
+                End.Target.rotation = rotation;
+            }
         }
 
         public static HouseholdAvatar Load(SegmentedBody body)
@@ -149,6 +167,8 @@ namespace DreamMachine.UnityBridge
                 Map("leftWrist", HumanBodyBones.LeftHand), _root);
             _rightArm = new Chain(Map("rightShoulder", HumanBodyBones.RightUpperArm), Map("rightElbow", HumanBodyBones.RightLowerArm),
                 Map("rightWrist", HumanBodyBones.RightHand), _root);
+            var knuckle = animator.GetBoneTransform(HumanBodyBones.RightMiddleProximal);
+            _rightPalm = knuckle == null ? Vector3.zero : _rightArm.End.Target.InverseTransformPoint(knuckle.position);
             (_ground, _height) = MeasureMesh();
             vrm.UpdateType = Vrm10Instance.UpdateTypes.None;
             vrm.LookAtTarget = null;
@@ -190,7 +210,7 @@ namespace DreamMachine.UnityBridge
             _vrm.gameObject.SetActive(visible);
         }
 
-        public void Follow(Vector3? attention, bool seated, bool sleeping, bool consuming, float time)
+        public void Follow(Vector3? attention, Vector3? contact, bool seated, bool sleeping, bool consuming, float time, float dt)
         {
             var dimensions = _body.Dimensions;
             float scale = dimensions.Height / _height;
@@ -199,15 +219,30 @@ namespace DreamMachine.UnityBridge
             _root.rotation = _spin.rotation;
             float stand = GroundedGait.PelvisHeight(dimensions, false);
             float lift = (_sourcePelvis.localPosition.y - stand) / scale;
+            bool reaching = contact.HasValue && !seated && !sleeping && !_body.Walking;
+            _reachWeight = Mathf.MoveTowards(_reachWeight, reaching ? 1f : 0f, 5f * dt);
+            float crouch = _reachWeight * dimensions.Height * .31f / scale;
             // A few millimetres of flexion avoids straight-leg locking at the imported leg length.
-            _hips.Target.position = _root.TransformPoint(_restHips + Vector3.up * (lift - .004f));
+            _hips.Target.position = _root.TransformPoint(_restHips + Vector3.up * (lift - .004f - crouch));
             _hips.Rotate(_spin, _root);
             _spine.Rotate(_spin, _root);
+            _spine.Target.rotation = Quaternion.AngleAxis(29f * _reachWeight, _root.right) * _spine.Target.rotation;
             _chest.Rotate(_spin, _root);
             _neck.Rotate(_spin, _root);
             _head.Rotate(_spin, _root);
             _leftArm.Follow(_spin, _root);
             _rightArm.Follow(_spin, _root);
+            if (reaching)
+            {
+                Transform wrist = _rightArm.End.Target;
+                Vector3 palm = wrist.TransformPoint(_rightPalm);
+                Vector3 intent = contact.Value - _rightArm.Top.Target.position;
+                Quaternion pose = wrist.rotation;
+                if (_rightPalm.sqrMagnitude > .0001f && intent.sqrMagnitude > .0001f)
+                    pose = Quaternion.Slerp(pose, Quaternion.FromToRotation(wrist.TransformDirection(_rightPalm), intent) * pose, _reachWeight);
+                Vector3 goal = Vector3.Lerp(palm, contact.Value, _reachWeight) - pose * (_rightPalm * scale);
+                _rightArm.Reach(_root, goal, pose);
+            }
             if (sleeping || seated || _sourcePelvis.localPosition.y < stand * .9f)
             {
                 _leftLeg.Follow(_spin, _root);

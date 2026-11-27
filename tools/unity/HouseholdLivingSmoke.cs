@@ -143,7 +143,9 @@ internal static class HouseholdLivingSmoke
                     for (int actor = 2; actor < 4; actor++)
                     {
                         var person = world.Home.ReadPerson(actor);
-                        if (person.Activity == HomeActivity.Sort && person.Phase == HomePhase.Act)
+                        int scan = world.Home.ActiveSocketDecision(actor);
+                        if (person.Activity == HomeActivity.Sort && person.Phase == HomePhase.Act && scan >= 0 &&
+                            new SocketDecision(world.Home.Experience(scan).Details).Observations > 0)
                             sortingLearner = actor;
                     }
                 if (sortingLearner >= 0)
@@ -179,15 +181,18 @@ internal static class HouseholdLivingSmoke
             }
             using (var trace = File.CreateText(Path.Combine(Application.persistentDataPath, "household-l2-experiences.csv")))
             {
-                trace.WriteLine("id,tick,actor,target,activity,provenance,source,revision,changed");
+                trace.WriteLine("id,tick,actor,target,activity,provenance,source,revision,changed,details");
                 for (int i = 0; i < events.Length; i++)
                 {
                     var e = events[i];
-                    trace.WriteLine($"{i},{e.Tick},{world.Home.PersonId(e.Actor)},{HouseholdLife.ItemName(e.Target)},{e.Activity},{e.Evidence},{e.Source},{e.Revision},{e.Changed}");
+                    trace.WriteLine($"{i},{e.Tick},{world.Home.PersonId(e.Actor)},{HouseholdLife.ItemName(e.Target)},{e.Activity},{e.Evidence},{e.Source},{e.Revision},{e.Changed},{e.Details}");
                 }
             }
             if (world.DayIndex < 4 || !events.Any(e => e.Evidence == HomeEvidence.Replay) || !events.Any(e => e.Evidence == HomeEvidence.Imitation))
                 throw new Exception("Multi-day observation, imitation or replay was not demonstrated.");
+            if (!events.Any(e => e.Evidence == HomeEvidence.SocketDecision && new SocketDecision(e.Details).Observations > 0) ||
+                !events.Any(e => e.Activity == HomeActivity.Sort && e.Changed && e.Details != 0))
+                throw new Exception("Learners did not observe the board and apply its results.");
             Invoke(app, "SaveAll");
             var archive = WorldSimulation.LoadCheckpoint(Path.Combine(Application.persistentDataPath, "world.checkpoint.pre-household"));
             if (archive == null || archive.Home != null || archive.TickCount != 0)

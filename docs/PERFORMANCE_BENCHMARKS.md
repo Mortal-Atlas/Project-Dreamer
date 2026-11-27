@@ -130,6 +130,16 @@ Held-out native means at 5 ms were 0.970 ms/tick for legacy, 0.942 for interlock
 
 Five separate Release headless runs per cast gave median household throughput of 48,117 ticks/s for four people (44,845–52,596) and 30,719 for twelve (28,753–32,550). These were concurrent with editor work on the same workstation. The native rig remains an isolated opt-in experiment.
 
+## Phase L.4 active inspection
+
+Five alternating Release CLI runs for L.3 and L.4 on 16×16 Laptop, seed 11. Four-person Living median moved from 51,144 to 49,795 ticks/s, a 2.6% decrease. Candidate range was 48,491–51,735 ticks/s. Allocation across 2,000 ticks changed from 387,752 to 390,080 bytes. Its checkpoint changed from 26,984 to 27,344 bytes. The twelve-person legacy median was 28,528 ticks/s and measures the inherited numerical path where the four-person household fixture is unavailable.
+
+A warmed synthetic decision-only scratch loop measured roughly 0.012–0.105 μs per call across policies. These are estimates for a repeated fixed input with a preallocated sensor delegate. The controlled study measures elapsed world retention and scheduled observation cost independently. Familiar contextual choices averaged 19.09 scheduled ticks, versus 23.57 for full inspection. Rearranged means were 27.38 and 30.14.
+
+Headless seed 37 Phone snapshots at 1,040-tick boundaries were 22,167, 24,140, 26,242 and 28,414 bytes. They gained 68, 62, 56 and 60 records respectively. A v4 household event occupies 21 serialized bytes. Overall observed checkpoint growth across the last three intervals averaged 2,082 bytes per interval, including other world systems. One hundred restored final snapshots averaged 0.482 ms after warm-up. The private Unity snapshot at tick 4,700 was 29,292 bytes.
+
+The mature DX12 pose update averaged 0.527 ms. The four-day newborn case sampled 0.263 ms per direct view call. Camera CPU submit samples were 1.193 ms with Life & experience closed and 1.421 ms open. Unity household rendering does not benchmark native physical stepping. Device GPU, peak memory and Android APK remain unverified. [Run conditions and evidence](ACTIVE_PERCEPTION_L4.md)
+
 ## Phase L.3 private avatars
 
 The unchanged numerical tick path measured a median of 45,692 ticks/s in four-person Living and 27,303 in the twelve-person legacy benchmark across five processes each on this workstation. Four-person allocation stayed at 387,752 B during 2,000 measured ticks. Unity editors were active during measurement. DX12 posture updates averaged 0.4892 ms for the four skinned mature models and 0.2682 ms for the two skinned teachers and two procedural newborns, across 1,240 steps each. These values time the view update, including retargeting, eyes, expressions and UniVRM's view-side spring processing. The four-day newborn regression measured 0.2742 ms per direct view call. Rendering, GPU skinning time, memory on Android and thermal headroom require separate measurement. [Private model protocol](ACTIVE_LEARNING_L3.md#native-verification)

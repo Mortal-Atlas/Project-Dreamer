@@ -1,5 +1,9 @@
 # Implementation progress
 
+## Phase L.4 · active inspection and developmental presentation · November 27, 2026
+
+The household now separates a learner's shape-board inspection, predicted slot and actual placement. The study used a fixed observation budget and 2,080-tick delay. On changed layouts passive retrieval solved 14/96, context-gated inspection 74/96, and direct inspection and unified scoring 93/96 each. Context gating used fewer looks and missed rearrangements that retained the same mark. Unity validates the original infant sleeper and toddler overalls, scoped palm targets and bed-facing sleep. The four-day native run produced 282 records and restored the exact observed checkpoint. [L.4 report](ACTIVE_PERCEPTION_L4.md) · [Timing](PERFORMANCE_BENCHMARKS.md#phase-l4-active-inspection)
+
 ## Phase L.3 · private skinned household and delayed learning · November 27, 2026
 
 The Unity view uses the supplied Merlin and Marie by default in Living. Arthur and Alice's models bind once the existing learners reach adult dimensions. Research uses the procedural rig. All four supplied meshes were rendered and measured in the mature household. The newborn fixture retained its original anatomy, and byte-identical controls verify both visual bindings. The L.3 study advanced 2,080 real simulation ticks before testing. With retrieval, 81 of 96 fixed-layout probes and 27 of 96 hidden-layout probes passed. Replay alone scored 70 and 27, and the combined condition matched retrieval. [Native tests and study](ACTIVE_LEARNING_L3.md) · [Avatar provenance](ASSET_AND_LICENSE_REGISTRY.md#l3-private-unity-integration)

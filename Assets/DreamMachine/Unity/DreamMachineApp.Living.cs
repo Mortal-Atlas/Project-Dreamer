@@ -14,7 +14,11 @@ namespace DreamMachine.UnityBridge
         readonly Transform[] _livingItems = new Transform[HouseholdLife.ItemCount];
         readonly Actor[] _livingActors = new Actor[4];
         Transform _lid, _revealed, _stackA, _stackB, _food, _water;
-        Transform _shapes, _storedToys;
+        Transform _lidGrip;
+        Transform _storedToys, _boardMark;
+        readonly Transform[] _socketMarks = new Transform[3];
+        static readonly Vector3[] SocketPositions = { new Vector3(-.16f, .107f, -.03f),
+            new Vector3(0, .107f, -.03f), new Vector3(.16f, .107f, -.03f) };
         readonly Transform[] _sortPieces = new Transform[3];
         Text _lifeText;
         int _lifeFocus = 2, _historyDaysBack;
@@ -54,6 +58,8 @@ namespace DreamMachine.UnityBridge
             _lid.SetParent(_livingItems[3], false);
             _lid.localPosition = new Vector3(0, .23f, -.16f);
             Piece(_lid, PrimitiveType.Cube, "Lid", new Vector3(0, 0, .16f), new Vector3(.40f, .034f, .35f), "#D19465");
+            _lidGrip = Piece(_lid, PrimitiveType.Cube, "Lid handle", new Vector3(0, .037f, .27f),
+                new Vector3(.11f, .04f, .055f), "#80513D");
             _revealed = Piece(_livingItems[3], PrimitiveType.Sphere, "Contents", new Vector3(0, .10f, 0), Vector3.one * .14f, "#83B8A4");
             Box(_livingItems[4], .37f, .19f, "#A87857");
             _food = Piece(_livingItems[4], PrimitiveType.Sphere, "Food portions", new Vector3(0, .22f, 0), new Vector3(.25f, .12f, .25f), "#87A95D");
@@ -69,19 +75,18 @@ namespace DreamMachine.UnityBridge
             {
                 var bed = _livingItems[i];
                 if (i >= 10) bed.localScale = new Vector3(.84f, 1f, .72f);
-                Piece(bed, PrimitiveType.Cube, "Bed frame", new Vector3(0, .10f, -.12f), new Vector3(.66f, .20f, 1.48f), "#775641");
-                Piece(bed, PrimitiveType.Cube, "Linen", new Vector3(0, .22f, -.12f), new Vector3(.64f, .14f, 1.42f), "#8FA9AE");
-                Piece(bed, PrimitiveType.Cube, "Pillow", new Vector3(0, .31f, -.70f), new Vector3(.50f, .09f, .25f), "#E8D8BC");
+                Piece(bed, PrimitiveType.Cube, "Bed frame", new Vector3(0, .10f, -.69f), new Vector3(.66f, .20f, 1.48f), "#775641");
+                Piece(bed, PrimitiveType.Cube, "Linen", new Vector3(0, .22f, -.69f), new Vector3(.64f, .14f, 1.42f), "#8FA9AE");
+                Piece(bed, PrimitiveType.Cube, "Pillow", new Vector3(0, .31f, -1.27f), new Vector3(.50f, .09f, .25f), "#E8D8BC");
             }
             Piece(root, PrimitiveType.Cube, "Supply shelf", new Vector3(-2.45f, .34f, 1.38f), new Vector3(.54f, .69f, .85f), "#8A614D");
             Piece(root, PrimitiveType.Cube, "Supply table", new Vector3(2.40f, .27f, 2.90f), new Vector3(.55f, .54f, .61f), "#A77454");
             var sort = _livingItems[HouseholdLife.SortingBoard];
             Piece(sort, PrimitiveType.Cube, "Shape board", new Vector3(0, .05f, 0), new Vector3(.60f, .10f, .35f), "#6A858F");
-            _shapes = new GameObject("Rotating shape sockets").transform;
-            _shapes.SetParent(sort, false);
-            Piece(_shapes, PrimitiveType.Cylinder, "Round socket", new Vector3(-.13f,.102f,-.09f), new Vector3(.12f,.002f,.12f), "#F0D491");
-            Piece(_shapes, PrimitiveType.Cube, "Square socket", new Vector3(.13f,.103f,-.09f), new Vector3(.11f,.004f,.11f), "#D78A74");
-            Piece(_shapes, PrimitiveType.Capsule, "Long socket", new Vector3(0,.109f,.10f), new Vector3(.064f,.008f,.11f), "#B3CCC3");
+            _socketMarks[0] = Piece(sort, PrimitiveType.Cylinder, "Round socket", SocketPositions[0], new Vector3(.12f,.002f,.12f), "#F0D491");
+            _socketMarks[1] = Piece(sort, PrimitiveType.Cube, "Square socket", SocketPositions[1], new Vector3(.11f,.004f,.11f), "#D78A74");
+            _socketMarks[2] = Piece(sort, PrimitiveType.Cube, "Long socket", SocketPositions[2], new Vector3(.064f,.008f,.13f), "#B3CCC3");
+            _boardMark = Piece(sort, PrimitiveType.Cube, "Orientation mark", Vector3.zero, new Vector3(.044f, .014f, .045f), "#EFD796");
             var cuePosition = new Vector3(0, .065f, .24f);
             _sortPieces[0] = Piece(sort, PrimitiveType.Cylinder, "Round piece", cuePosition, new Vector3(.10f, .054f, .10f), "#F0D491");
             _sortPieces[1] = Piece(sort, PrimitiveType.Cube, "Square piece", cuePosition, new Vector3(.098f, .11f, .098f), "#D78A74");
@@ -128,19 +133,26 @@ namespace DreamMachine.UnityBridge
             _food.gameObject.SetActive(life.ReadItem(4).Value > 0);
             _water.gameObject.SetActive(life.ReadItem(5).Value > 0);
             int sortingState = life.ReadItem(HouseholdLife.SortingBoard).Value;
-            _shapes.localRotation = Quaternion.Slerp(_shapes.localRotation, Quaternion.Euler(0f, ShapeBoard.Rotation(sortingState) * 120f, 0f), blend);
+            int rotation = ShapeBoard.Rotation(sortingState);
+            _boardMark.localPosition = new Vector3(SocketPositions[rotation].x, .107f, -.136f);
             for (int i = 0; i < _sortPieces.Length; i++)
+            {
+                _socketMarks[i].localPosition = SocketPositions[ShapeBoard.Socket(i, rotation)];
                 _sortPieces[i].gameObject.SetActive(i == ShapeBoard.Cue(sortingState));
+            }
             _storedToys.gameObject.SetActive(life.ReadItem(HouseholdLife.ToyBin).Value > 0);
             for (int i = 0; i < _livingActors.Length; i++)
             {
                 if (_livingActors[i] == null) _livingActors[i] = _actors[life.PersonId(i)];
                 Actor actor = _livingActors[i];
                 var state = life.ReadPerson(i);
+                bool sleeping = state.Activity == HomeActivity.Sleep && state.Phase == HomePhase.Act;
                 Vector3 previous = actor.Pos;
                 actor.Pos = new Vector3(state.X, 0f, state.Z);
-                actor.Yaw = Mathf.LerpAngle(actor.Yaw, state.Yaw, blend);
+                // Every pillow is on the negative-Z side of its bed.
+                actor.Yaw = Mathf.LerpAngle(actor.Yaw, sleeping ? 0f : state.Yaw, blend);
                 if (actor.State != null) actor.Body.ApplyDevelopmentAge(WorldSimulation.AnatomyAge(actor.State.Physiology.AgeDays));
+                actor.Body.ShowEarlyClothes(!_researchPresentation);
                 float moved = Vector3.Distance(previous, actor.Pos);
                 actor.GaitDistance += moved;
                 actor.Body.transform.position = actor.Pos;
@@ -164,13 +176,34 @@ namespace DreamMachine.UnityBridge
                 bool acting = state.Phase == HomePhase.Act && state.Activity != HomeActivity.Sleep && state.Activity != HomeActivity.Rest &&
                     state.Activity != HomeActivity.Inspect;
                 bool seated = state.Activity == HomeActivity.Rest && state.Item >= 0 && moved < .002f;
-                bool sleeping = state.Activity == HomeActivity.Sleep && state.Phase == HomePhase.Act;
                 actor.Body.ApplyHouseholdPose(attention, acting, seated, sleeping, dt, _sim.SimSeconds);
-                UpdateLocalAvatar(actor, attention, seated, sleeping, acting && (state.Activity == HomeActivity.Eat || state.Activity == HomeActivity.Drink));
+                Vector3? contact = acting ? ContactPoint(state.Activity, state.Item, actor.Pos) : null;
+                int scan = life.ActiveSocketDecision(i);
+                if (acting && state.Activity == HomeActivity.Sort && scan >= 0)
+                    contact = _livingItems[HouseholdLife.SortingBoard].TransformPoint(SocketPositions[new SocketDecision(life.Experience(scan).Details).Choice]);
+                UpdateLocalAvatar(actor, attention, contact,
+                    seated, sleeping, acting && (state.Activity == HomeActivity.Eat || state.Activity == HomeActivity.Drink), dt);
             }
         }
 
-        void UpdateLocalAvatar(Actor actor, Vector3? attention, bool seated, bool sleeping, bool consuming)
+        Vector3? ContactPoint(HomeActivity activity, int item, Vector3 origin)
+        {
+            Vector3 center = _livingItems[item].position;
+            switch (activity)
+            {
+                case HomeActivity.Open:
+                case HomeActivity.Close: return _lidGrip.position;
+                case HomeActivity.Roll: return center + Vector3.up * .19f + (origin - center).normalized * .09f;
+                case HomeActivity.Stack: return _stackA.position + Vector3.up * .071f;
+                case HomeActivity.Drink: return center + Vector3.up * .19f + (origin - center).normalized * .1f;
+                case HomeActivity.Eat: return _food.position + Vector3.up * .05f;
+                case HomeActivity.Sort: return center + Vector3.up * .11f;
+                case HomeActivity.Tidy: return center + Vector3.up * .17f;
+                default: return null;
+            }
+        }
+
+        void UpdateLocalAvatar(Actor actor, Vector3? attention, Vector3? contact, bool seated, bool sleeping, bool consuming, float dt)
         {
             // The supplied learner meshes have mature proportions. Infant and child anatomy retains its own view.
             bool ageAppropriate = HasAgeAppropriateAvatar(actor);
@@ -182,7 +215,7 @@ namespace DreamMachine.UnityBridge
             if (actor.LocalAvatar == null) return;
             bool visible = ageAppropriate && !_researchPresentation;
             actor.LocalAvatar.SetVisible(visible);
-            if (visible) actor.LocalAvatar.Follow(attention, seated, sleeping, consuming, _sim.SimSeconds);
+            if (visible) actor.LocalAvatar.Follow(attention, contact, seated, sleeping, consuming, _sim.SimSeconds, dt);
         }
 
         static bool HasAgeAppropriateAvatar(Actor actor) =>
@@ -192,10 +225,11 @@ namespace DreamMachine.UnityBridge
         {
             _researchPresentation = !_researchPresentation;
             foreach (var actor in _livingActors)
-                if (actor?.LocalAvatar != null)
+                if (actor != null)
                 {
                     bool visible = !_researchPresentation && (_remote == null || !_remote.Active) && HasAgeAppropriateAvatar(actor);
-                    actor.LocalAvatar.SetVisible(visible);
+                    actor.Body.ShowEarlyClothes(!_researchPresentation && (_remote == null || !_remote.Active));
+                    actor.LocalAvatar?.SetVisible(visible);
                 }
             _hud.ShowResearch(_researchPresentation);
         }
@@ -250,7 +284,22 @@ namespace DreamMachine.UnityBridge
             if (sort.LastIndependentSuccess >= 0)
             {
                 var evidence = home.Experience(sort.LastIndependentSuccess);
-                text.AppendLine(evidence.Source >= 0 ? $"Last fit reused episode {evidence.Source}" : $"Last fit  ·  tick {evidence.Tick}");
+                text.AppendLine(evidence.Source >= 0 ? $"Last fit  ·  source {evidence.Source}" : $"Last fit  ·  tick {evidence.Tick}");
+            }
+            int scan = home.LastSocketDecision(_lifeFocus);
+            if (scan >= 0)
+            {
+                var record = home.Experience(scan);
+                var decision = new SocketDecision(record.Details);
+                text.AppendLine($"Socket {decision.Choice + 1}  ·  {decision.Observations} inspections");
+                text.AppendLine($"Uncertainty {decision.UncertaintyBefore} → {decision.UncertaintyAfter}{(decision.Contradiction ? "  ·  context changed" : "")}");
+                if (record.Source >= 0) text.AppendLine($"Prior fit  ·  episode {record.Source}");
+                for (int slot = 0; slot < 3; slot++)
+                    if ((decision.ObservedSlots & (1 << slot)) != 0)
+                    {
+                        SocketFeatures visible = decision.Observed(slot);
+                        text.AppendLine($"Socket {slot + 1}  ·  aspect {visible.Aspect}  ·  edge {visible.Edge}");
+                    }
             }
             if (p.Replay >= 0) text.AppendLine($"Night replay  {home.Experience(p.Replay).Activity}  ·  tick {home.Experience(p.Replay).Tick}");
             int historyDay = Mathf.Max(0, _sim.DayIndex - _historyDaysBack);
