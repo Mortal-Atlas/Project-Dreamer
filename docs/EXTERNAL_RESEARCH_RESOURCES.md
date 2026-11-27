@@ -13,6 +13,18 @@ Reviewed November 27, 2026. Phase C.1.1 uses one force-plate record to check mea
 | AddBiomechanics, Stanford FAIR Center. Credit the dataset and the contributing studies listed in `DATA_CITATIONS.txt`. [Dataset catalog](https://faircenter.stanford.edu/resources/datasets/) · [Download and terms](https://www.addbiomechanics.org/download_data.html) | Released data CC BY 4.0. Software GPL v3.0. Follow contributor and data-source credits. | Downloads include `.b3d` and source-specific movement files. The core includes thousands of trials and about 71 study hours. Obtain an individual trial before allocating storage for a whole release. | Future comparison of measured loads and foot contact under documented movements. |
 | WHO Motor Development Milestones. WHO Multicentre Growth Reference Study Group, *Windows of achievement for six gross motor development milestones*, 2006. [Milestone tables](https://www.who.int/toolkits/child-growth-standards/standards/motor-development-milestones) · [WHO terms](https://www.who.int/about/policies/publishing/copyright) | Public summary tables. Follow the terms on the specific publication for republication. | PDF tables and charts. Use the published small tables as references. | Interpret milestones as empirical ranges for developmental comparisons. |
 
+## Dynamic stability and gait initiation
+
+| Study | Application and limits |
+| --- | --- |
+| Hof, Gazendam and Sinke, *Journal of Biomechanics* (2005). [Abstract and DOI](https://pubmed.ncbi.nlm.nih.gov/15519333/) | Use COM position and velocity to estimate a signed margin relative to support edges under the linear inverted pendulum model. |
+| Lu, Amundsen Huffmaster, Harvey and MacKinnon, *Gait & Posture* (2017). [Primary study](https://pubmed.ncbi.nlm.nih.gov/28651215/) | Adult gait-initiation trials demonstrate variation in anticipatory pressure shifts. A single sequence is an engineered reference for this fixture. |
+| Honeine, Schieppati, Crisafulli and Do, *Frontiers in Human Neuroscience* (2016). [Primary study](https://doi.org/10.3389/fnhum.2016.00445) | Examine the initial pressure shift toward the swing foot, COM acceleration toward stance and coordination of knee and hip. |
+| Yiou et al., *World Journal of Orthopedics* (2017). [Review](https://pubmed.ncbi.nlm.nih.gov/29184756/) | Distinguish preparation, toe clearance and placement. Use these observations to choose physical transition evidence. |
+| Curtze, Buurke and McCrum, *Journal of Biomechanics* (2024). [Paper](https://doi.org/10.1016/j.jbiomech.2024.112045) | Treat the margin as an instantaneous model estimate. A negative margin can coexist with recovery by a later action. Articulation, variable COM height and external impulses limit interpretation. |
+
+Use the listed abstracts and publications as references. No external trajectory files or adult movement norms were imported for C.1.2.
+
 ## Selected empirical sample
 
 Downloaded only `BDS00001.dat` and its WFDB header. The record contains 6,000 samples at 100 Hz. Decode the signed little-endian 32-bit samples using `(ADC − baseline) / gain` from the header. The 60 s mean vertical load is **537.879 N**. The two horizontal CoP peak-to-peak spans are **16.760 mm** and **8.367 mm**. The force platform reports whole-platform load and CoP. This establishes the millimetre-scale reference and the need for a measured pressure distribution. It does not establish per-foot loads or fixture acceptance limits. The file SHA-256 is `6EE4E19D4C57CE0DAF07AA8FB513A22B83C0CE575E5E50AF32BDDAFB2DD3DE26`. No raw human data or participant metadata is distributed in the project. [PhysioNet dataset and methods](https://physionet.org/content/hbedb/1.0.0/)
