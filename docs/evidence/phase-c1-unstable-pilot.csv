@@ -1,0 +1,4 @@
+seed,stage,condition,pass,mean_left_share,analytic_left_share,bilateral_fraction,mean_vertical_ns,rms_momentum_residual_ns,max_height_error_m,max_tilt_deg,min_knee_rad,max_knee_rad,max_joint_overshoot_rad,max_slip_m,max_penetration_m,saturation_fraction,non_foot_contacts,mean_abs_work_j,native_us
+101,6,standing,False,0.496703,0.000000,0.7750,1.170853,0.702650,0.690406,107.1228,0.021433,0.339405,0.000000,2.644938,0.002226,1.0000,1172,60.372280,985.42
+202,6,standing,False,0.506044,0.000000,0.8250,1.137346,1.239988,0.857021,103.2006,0.015001,0.314516,0.000000,0.372340,0.001128,1.0000,1195,58.345790,833.99
+303,3,standing,False,0.483160,0.000000,0.6250,1.024509,0.786079,0.570185,112.8836,0.047157,0.411947,0.000000,2.991690,0.001598,1.0000,997,70.790080,789.85
