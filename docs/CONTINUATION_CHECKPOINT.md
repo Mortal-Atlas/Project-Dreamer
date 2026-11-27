@@ -81,3 +81,24 @@ Updated November 26, 2026.
   - Added `Assets/DreamMachine/Core/Body/ShoulderElbowWristLab.cs` + `ShoulderElbowWristLabTests.cs` (3-DOF planar reaching, joint limits, forward kinematics, contact damping, mechanical work, binary persistence).
 - **Track C (Cognitive Benchmark Integrity):**
   - Replaced synthetic placeholder in `LibraryFactorialStudy.cs` with a real behavioral benchmark (contingency shifts, misleading priors, counterfactuals, lived memory, and `UnifiedMemoryBaseline`).
+
+
+---
+## Session Closure & Handoff Checkpoint (2026-11-26)
+- **Branch:** `feature/embodiment-contact-lab` (Draft PR #8 targeting `main`; do NOT merge into `main`)
+- **Latest Verified .NET Regression Suite:** `dotnet test dotnet/DreamMachine.Core.Tests -c Release --no-restore --nologo` → **67/67 passed** (0 failed, 0 skipped).
+- **Phase B.2 Conclusions & Limitations:**
+  - `FrozenDecomposed` reduced peak impulse by ~69.6% (`0.2229` vs `0.7333 N·s`), but increased tracking error by ~387% (`0.0263` vs `0.0054`) and mechanical work by ~9.7% (`0.9155` vs `0.8346`).
+  - `0.72 N·s` is an adaptation-disable trigger, not a hard physical safety guarantee (engineered fallback produced `0.7333 N·s`).
+  - A–B–A retention was inconclusive (`SignedInterference = 0.0000` across all 5 modes).
+- **Track A (Multi-Joint Engineered IK):**
+  - `Assets/DreamMachine/Core/Body/ShoulderElbowWristLab.cs` + `ShoulderElbowWristLabTests.cs` (3-DOF planar reaching, `SolveEngineeredIK`, joint limits, forward kinematics, contact damping, mechanical work, binary persistence).
+- **Track C (Three-Library Behavioral Benchmark):**
+  - Original unintegrated `L1=1_L2=1_L3=1`: `15/24` (`0.625`, `Ops=55`)
+  - `IntegratedThreeLibrary`: `21/24` (`0.875`, `Ops=27`, `CF=3`, `MemRet=24`)
+  - `UnifiedMemoryBaseline`: `21/24` (`0.875`, `Ops=24`, `CF=0`, `MemRet=24`)
+  - Associative integration fixed a functional exploration limitation; architectural superiority is **not** established; independent held-out evaluation remains necessary.
+- **Unresolved Blocker:** Native Unity verification (Edit Mode, Play Mode, screenshots, observatory UI) is incomplete because `unityMCP` returned `no_unity_session`.
+- **Exact Next Tasks for Next Agent:**
+  1. Connect to running Unity Editor (`unityMCP`), verify compilation, run Unity Edit Mode & Play Mode tests, and capture screenshots of the isolated multi-joint lab.
+  2. Expand `LibraryFactorialStudy.cs` with independent held-out task families (delayed consequences, source attribution, imagined vs. experienced events).

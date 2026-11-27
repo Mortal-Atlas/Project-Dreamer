@@ -357,3 +357,5 @@ The clock checkpoint extends K evidence for §§5–7, 116, 124, 133 and 169. Pa
 | §§211–260 | Three-Library $2^3$ Factorial Study Harness | Implemented (Core + Tests) | `Assets/DreamMachine/Core/Libraries/LibraryFactorialStudy.cs`, `LibraryFactorialTests.cs` |
 | §§261–348 | Developmental Embodiment, Senses & Town Director | Not started / Experimental | Planned for subsequent phases |
 | §§349–362 | Unity CLI/MCP, Agent Interop, Security & Reproducibility | In progress | `AGENTS.md`, `unityMCP` console/refresh integration |
+| Track A | `ShoulderElbowWristLab` + `SolveEngineeredIK` | Implemented (.NET Core + Tests); Unity verification pending | `Assets/DreamMachine/Core/Body/ShoulderElbowWristLab.cs`, `ShoulderElbowWristLabTests.cs` |
+| Track C | `IntegratedThreeLibrary` vs `UnifiedMemoryBaseline` | Implemented (21/24 vs 21/24; held-out eval pending) | `Assets/DreamMachine/Core/Libraries/LibraryFactorialStudy.cs` |
