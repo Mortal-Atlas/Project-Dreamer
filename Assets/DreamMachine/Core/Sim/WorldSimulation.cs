@@ -63,10 +63,19 @@ namespace DreamMachine.Sim
         public PopulationConfig Population;
         public readonly List<SimChild> Children = new List<SimChild>();
         public readonly List<PhysiologySample> PhysiologyLog = new List<PhysiologySample>();
+        public HouseholdLife Home { get; private set; }
         readonly float[] _parentA = new float[10];
         readonly float[] _parentB = new float[10];
         readonly float[] _wetIn = new float[4];
         int _lastLoggedDay = -1;
+
+        public bool EnableHouseholdLife()
+        {
+            if (!Population.IsHousehold || Population.People.Count != 4 || Population.Find("father") == null ||
+                Population.Find("mother") == null || Find("son") == null || Find("daughter") == null) return false;
+            if (Home == null) Home = new HouseholdLife(this);
+            return true;
+        }
 
         public bool IsNight
         {
@@ -150,6 +159,7 @@ namespace DreamMachine.Sim
             if (child == null) return null;
             BindChildState(child, AgentPersistentState.CreateNew(child.Spec));
             child.SawParentPour = false;
+            Home?.ReplaceLearner(child);
             return child;
         }
 
@@ -166,6 +176,7 @@ namespace DreamMachine.Sim
         {
             Elements.Step(Dt);
             bool night = IsNight;
+            Home?.Step(night);
             FamilyRoutine routine = PopulationConfig.RoutineAt(SimSeconds, DayLength, AwakeLength);
             string parentClip = ClipFor(routine, night);
             PersonSpec father = Population.Find("father");
@@ -320,7 +331,7 @@ namespace DreamMachine.Sim
             child.Wetware.Step(Dt, _wetIn);
             float[] brain = child.Wetware.Readout();
             bool meal = routine == FamilyRoutine.MorningMeal || routine == FamilyRoutine.EveningMeal;
-            bool eat = meal && child.Body.Hunger > 0.35f && !night;
+            bool eat = Home != null ? Home.Ate(child.Spec.Id) : meal && child.Body.Hunger > 0.35f && !night;
             PersonSpec same = Population.PrimaryRoleModel(child.Spec);
             PersonSpec other = Population.OtherParent(child.Spec);
             var input = new PhysInput
@@ -348,14 +359,14 @@ namespace DreamMachine.Sim
                 if (burn >= 0) Elements.Pour(burn, 0.35f);
                 child.SawParentPour = true;
             }
-            if ((TickCount % LearnEvery) == 0)
+            if (Home == null && (TickCount % LearnEvery) == 0)
             {
                 if (night) Dream(child);
                 else Practice(child, same, other);
             }
             if ((TickCount % PerceiveEvery) == 0) Perceive(child, pain, smoke, cell);
             if ((TickCount % 40) == 0) child.Body.WriteRom(child.State.Muscles, DayIndex);
-            if (!night && routine == FamilyRoutine.Play)
+            if (Home == null && !night && routine == FamilyRoutine.Play)
             {
                 float speed = child.State.Walker.BestDistance / 4f;
                 if (speed < 0f) speed = 0f;
@@ -418,7 +429,7 @@ namespace DreamMachine.Sim
             }
             if (smoke > 0.15f) Remember(child, "smoke", "class:smoke");
             if (Elements.Steam[cell] > 0.1f) Remember(child, "steam", "class:steam");
-            if ((TickCount % 48) == 0 && child.Mind != null)
+            if (Home == null && (TickCount % 48) == 0 && child.Mind != null)
             {
                 var pool = HiddenRuleWorld.StandardPool();
                 int pick = (TickCount + child.Spec.BirthSeed) % pool.Count;

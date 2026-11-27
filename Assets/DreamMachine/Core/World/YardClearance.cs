@@ -9,6 +9,9 @@ namespace DreamMachine.World
         public const int Columns = 6, Rows = 4;
         public const float HouseHalfX = 1.2f, HouseHalfZ = 0.8f, HouseZ = -1.4f;
 
+        public static float HouseMotionFraction(float x, float z, float dx, float dz, float radius) =>
+            EnterBox(x, z - HouseZ, dx, dz, HouseHalfX + radius, HouseHalfZ + radius);
+
         public static float MotionFraction(float x, float z, float dx, float dz, float radius)
         {
             if (dx == 0f && dz == 0f) return 1f;

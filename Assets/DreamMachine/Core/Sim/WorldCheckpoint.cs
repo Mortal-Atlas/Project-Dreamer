@@ -36,6 +36,7 @@ namespace DreamMachine.Sim
     {
         // Version 1 stores the embedded kernel at a completed tick boundary.
         const int CheckpointVersion = 1;
+        const int HouseholdCheckpointVersion = 2;
         const int MaxCheckpointBytes = 64 * 1024 * 1024;
         readonly System.Collections.Generic.List<ResearchIntervention> _interventions =
             new System.Collections.Generic.List<ResearchIntervention>();
@@ -114,12 +115,13 @@ namespace DreamMachine.Sim
                 writer.Write(entry.Result);
                 writer.Write(entry.Reason);
             }
+            Home?.Write(writer);
             byte[] bytes = payload.ToArray();
             using var envelope = new MemoryStream();
             using var manifest = new BinaryWriter(envelope);
             using var digest = SHA256.Create();
             manifest.Write("DreamMachine.World");
-            manifest.Write(CheckpointVersion);
+            manifest.Write(Home == null ? CheckpointVersion : HouseholdCheckpointVersion);
             manifest.Write(bytes.Length);
             manifest.Write(digest.ComputeHash(bytes));
             manifest.Write(bytes);
@@ -131,8 +133,10 @@ namespace DreamMachine.Sim
             try
             {
                 using var envelope = new BinaryReader(new MemoryStream(checkpoint, writable: false));
-                if (checkpoint.Length > MaxCheckpointBytes || envelope.ReadString() != "DreamMachine.World" ||
-                    envelope.ReadInt32() != CheckpointVersion)
+                if (checkpoint.Length > MaxCheckpointBytes || envelope.ReadString() != "DreamMachine.World")
+                    throw new InvalidDataException("Unsupported world checkpoint.");
+                int version = envelope.ReadInt32();
+                if (version != CheckpointVersion && version != HouseholdCheckpointVersion)
                     throw new InvalidDataException("Unsupported world checkpoint.");
                 int length = envelope.ReadInt32();
                 if (length < 0 || length != envelope.BaseStream.Length - envelope.BaseStream.Position - 32)
@@ -144,6 +148,11 @@ namespace DreamMachine.Sim
                     throw new InvalidDataException("World checkpoint checksum failed.");
                 using var payload = new BinaryReader(new MemoryStream(bytes, writable: false));
                 WorldSimulation world = ReadCheckpoint(payload);
+                if (version == HouseholdCheckpointVersion)
+                {
+                    if (!world.EnableHouseholdLife()) throw new InvalidDataException("Household activity roster does not match.");
+                    world.Home.Read(payload);
+                }
                 if (payload.BaseStream.Position != payload.BaseStream.Length)
                     throw new InvalidDataException("Unexpected trailing checkpoint data.");
                 return world;

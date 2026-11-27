@@ -48,12 +48,20 @@ namespace DreamMachine.Cli
                         }
                         PopulationConfig pop = agents >= 12 ? PopulationConfig.CreateBalanced(3) : PopulationConfig.CreateDefault();
                         WorldSimulation world = WorldSimulation.Create(pop, QualityPreset.Laptop, 11);
+                        bool living = Array.IndexOf(args, "--living") >= 0;
+                        if (living && !world.EnableHouseholdLife())
+                        {
+                            Console.Error.WriteLine("The living benchmark uses the four-person founding household.");
+                            return 1;
+                        }
                         int warmup = 30;
                         world.RunTicks(warmup);
                         var watch = Stopwatch.StartNew();
+                        long allocationStart = GC.GetAllocatedBytesForCurrentThread();
                         int measured = 2000;
                         world.RunTicks(measured);
                         watch.Stop();
+                        long allocated = GC.GetAllocatedBytesForCurrentThread() - allocationStart;
                         double seconds = watch.Elapsed.TotalSeconds;
                         double rate = measured / seconds;
                         Console.WriteLine("agents " + (pop.BabyCount + pop.MentorCount));
@@ -63,6 +71,12 @@ namespace DreamMachine.Cli
                         Console.WriteLine("seconds " + seconds.ToString("0.000"));
                         Console.WriteLine("ticks_per_second " + rate.ToString("0.0"));
                         Console.WriteLine("sim_seconds_per_wall_second " + (rate * WorldSimulation.Dt).ToString("0.00"));
+                        if (living)
+                        {
+                            Console.WriteLine("experience_records " + world.Home.ExperienceCount);
+                            Console.WriteLine("measured_allocated_bytes " + allocated);
+                            Console.WriteLine("checkpoint_bytes " + world.CaptureCheckpoint().Length);
+                        }
                         return 0;
                     }
                     if (args[i] == "--serve")
