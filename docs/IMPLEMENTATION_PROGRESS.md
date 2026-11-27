@@ -1,5 +1,9 @@
 # Implementation progress
 
+## Phase L.3 · private skinned household and delayed learning · November 27, 2026
+
+The Unity view uses the supplied Merlin and Marie by default in Living. Arthur and Alice's models bind once the existing learners reach adult dimensions. Research uses the procedural rig. All four supplied meshes were rendered and measured in the mature household. The newborn fixture retained its original anatomy, and byte-identical controls verify both visual bindings. The L.3 study advanced 2,080 real simulation ticks before testing. With retrieval, 81 of 96 fixed-layout probes and 27 of 96 hidden-layout probes passed. Replay alone scored 70 and 27, and the combined condition matched retrieval. [Native tests and study](ACTIVE_LEARNING_L3.md) · [Avatar provenance](ASSET_AND_LICENSE_REGISTRY.md#l3-private-unity-integration)
+
 ## Phase L.2 · independent play and retention · November 27, 2026
 
 Living mode now has a shape board and toy cleanup. The archive indexes evidence for independent competence, failed attempts, observation and imitation. The matched four-day run reduced demonstrations from 142 to 27 and increased learner firsthand outcomes from 57 to 69. Witnesses fell from 57 to five and imitations from nine to two. The held-out shape study found a replay-only advantage over exploration and a ceiling for direct retrieval. The combined condition equaled direct retrieval. Passed 80 .NET tests, 81 Unity Edit Mode tests and the isolated DX12 household smoke. The owner clarified the exact embedded asset names and origin. Private Merlin preview awaits manual installation of the pinned official UniVRM packages. [L.2 experiment and evidence](ACTIVE_LEARNING_L2.md) · [Asset registry](ASSET_AND_LICENSE_REGISTRY.md#l2-owner-provenance-and-local-use)

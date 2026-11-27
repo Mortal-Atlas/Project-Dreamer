@@ -67,16 +67,7 @@ namespace DreamMachine.Sim
         public static IReadOnlyList<RetentionTrial> Probe(int seed, RetentionAccess access)
         {
             ShapeEpisode[] events = Acquisition(seed);
-            int[] plans = { -1, -1, -1 };
-            if ((access & RetentionAccess.Replay) != 0)
-            {
-                int start = (seed & int.MaxValue) % 3;
-                for (int i = 0; i < 2; i++)
-                {
-                    int cue = (start + i) % 3;
-                    plans[cue] = LastSuccess(events, cue);
-                }
-            }
+            int[] plans = CompilePlans(events, seed, access);
             // Acquisition episodes remain in the archive. Replay-only daytime code sees only its two plans.
             var visible = (access & RetentionAccess.Retrieval) != 0 ? events : null;
             var planSlots = new int[3];
@@ -106,7 +97,20 @@ namespace DreamMachine.Sim
             return trials;
         }
 
-        static int LastSuccess(ShapeEpisode[] events, int cue)
+        internal static int[] CompilePlans(ShapeEpisode[] events, int seed, RetentionAccess access)
+        {
+            int[] plans = { -1, -1, -1 };
+            if ((access & RetentionAccess.Replay) == 0) return plans;
+            int start = (seed & int.MaxValue) % 3;
+            for (int i = 0; i < 2; i++)
+            {
+                int cue = (start + i) % 3;
+                plans[cue] = LastSuccess(events, cue);
+            }
+            return plans;
+        }
+
+        internal static int LastSuccess(ShapeEpisode[] events, int cue)
         {
             for (int i = events.Length - 1; i >= 0; i--)
                 if (events[i].Cue == cue && events[i].Success) return i;

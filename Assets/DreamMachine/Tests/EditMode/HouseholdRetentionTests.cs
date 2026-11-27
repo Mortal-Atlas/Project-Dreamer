@@ -30,6 +30,22 @@ namespace DreamMachine.Tests
         }
 
         [Test]
+        public void DelayedStudyKeepsProbeInputsMatchedAndWithholdsTheNewLayout()
+        {
+            var trials = HouseholdDelayedRetention.Run(1209);
+            Assert.That(trials.Count, Is.EqualTo(48));
+            Assert.That(trials.All(t => t.ProbeTick - t.LastTrainingTick == HouseholdDelayedRetention.DelayTicks), Is.True);
+            Assert.That(trials.Any(t => t.Transfer && t.ActualSlot != t.Cue), Is.True);
+            foreach (var group in trials.GroupBy(t => (t.Cue, t.Transfer)))
+                Assert.That(group.Select(t => t.ActualSlot).Distinct().Count(), Is.EqualTo(1));
+            foreach (var group in trials.Where(t => t.Access == RetentionAccess.Replay && t.Source >= 0).GroupBy(t => t.Cue))
+                Assert.That(group.Select(t => t.Choice).Distinct().Count(), Is.EqualTo(1));
+            Assert.That(trials.Where(t => t.Access == RetentionAccess.Replay && t.Source >= 0).Select(t => t.Cue).Distinct().Count(),
+                Is.LessThanOrEqualTo(2));
+            Assert.That(trials.Where(t => t.Access == RetentionAccess.None).All(t => t.Source < 0), Is.True);
+        }
+
+        [Test]
         public void ReconstructedCompetenceReferencesOnlyActualIndependentOutcomes()
         {
             var world = WorldSimulation.Create(PopulationConfig.CreateDefault(), QualityPreset.Laptop, 37);

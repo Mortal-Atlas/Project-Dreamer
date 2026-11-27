@@ -38,6 +38,7 @@ namespace DreamMachine.Cli
                     if (args[i] == "--discover") return DiscoveryCommand.Run(args);
                     if (args[i] == "--lower-body") return RunLowerBodyReference();
                     if (args[i] == "--retention" && i + 1 < args.Length) return RunHouseholdRetention(args[i + 1]);
+                    if (args[i] == "--delayed-retention" && i + 1 < args.Length) return RunDelayedRetention(args[i + 1]);
                     if (args[i] == "--elbow-lab" && i + 1 < args.Length) return ElbowLabCommand.Run(args[i + 1]);
                     if (args[i] == "--archive-pilots") return ArchivePilotCommand.Run(args, i);
                     if (args[i] == "--benchmark")
@@ -148,6 +149,19 @@ namespace DreamMachine.Cli
                 foreach (RetentionAccess access in Enum.GetValues(typeof(RetentionAccess)))
                 foreach (RetentionTrial trial in HouseholdRetention.Probe(seed, access))
                     report.WriteLine(FormattableString.Invariant($"{cohort},{trial.Seed},{trial.Access},{trial.Cue},{trial.Rotation},{trial.Choice},{trial.Decision},{trial.Source},{trial.Transfer},{trial.Success},{trial.RepeatedTrainingMistake}"));
+            }
+            return 0;
+        }
+
+        static int RunDelayedRetention(string path)
+        {
+            using var report = System.IO.File.CreateText(path);
+            report.WriteLine("cohort,seed,access,cue,choice,actual_slot,source,transfer,success,repeated_error,training_tick,probe_tick");
+            for (int seed = 1201; seed <= 1224; seed++)
+            {
+                string cohort = seed < 1209 ? "development" : "heldout";
+                foreach (var trial in HouseholdDelayedRetention.Run(seed))
+                    report.WriteLine(FormattableString.Invariant($"{cohort},{seed},{trial.Access},{trial.Cue},{trial.Choice},{trial.ActualSlot},{trial.Source},{trial.Transfer},{trial.Success},{trial.RepeatedError},{trial.LastTrainingTick},{trial.ProbeTick}"));
             }
             return 0;
         }

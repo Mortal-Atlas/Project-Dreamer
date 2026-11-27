@@ -130,6 +130,10 @@ Held-out native means at 5 ms were 0.970 ms/tick for legacy, 0.942 for interlock
 
 Five separate Release headless runs per cast gave median household throughput of 48,117 ticks/s for four people (44,845–52,596) and 30,719 for twelve (28,753–32,550). These were concurrent with editor work on the same workstation. The native rig remains an isolated opt-in experiment.
 
+## Phase L.3 private avatars
+
+The unchanged numerical tick path measured a median of 45,692 ticks/s in four-person Living and 27,303 in the twelve-person legacy benchmark across five processes each on this workstation. Four-person allocation stayed at 387,752 B during 2,000 measured ticks. Unity editors were active during measurement. DX12 posture updates averaged 0.4892 ms for the four skinned mature models and 0.2682 ms for the two skinned teachers and two procedural newborns, across 1,240 steps each. These values time the view update, including retargeting, eyes, expressions and UniVRM's view-side spring processing. The four-day newborn regression measured 0.2742 ms per direct view call. Rendering, GPU skinning time, memory on Android and thermal headroom require separate measurement. [Private model protocol](ACTIVE_LEARNING_L3.md#native-verification)
+
 ## Phase L.2 independent activity
 
 Five Release CLI processes per configuration, Laptop 16×16 grid, seed 11, 30 warm-up ticks and 2,000 timed ticks. The twelve-person option measures the legacy kernel. The household affordance scene supports the four founding people.
