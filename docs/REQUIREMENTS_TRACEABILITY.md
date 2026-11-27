@@ -395,6 +395,16 @@ The clock checkpoint extends K evidence for §§5–7, 116, 124, 133 and 169. Pa
 | §§14, 16–17 · Extend activity scope, grounded words and independent locomotion | Existing household and isolated C.1.3 fixture | Partial | Active inspection enriches sorting. Cooperative activities, grounded vocabulary and a physical first step remain future requirements. [Continuation checkpoint](CONTINUATION_CHECKPOINT.md) |
 | §§18–20 · Profile and synchronize | Desktop DX12, .NET, GitHub draft review | Partial | Measured numerical throughput, close-look cost, checkpoint growth, restoration and CPU view and camera cost. Device GPU and Android verification remain open. [Benchmarks](PERFORMANCE_BENCHMARKS.md#phase-l4-active-inspection) |
 
+## Phase L.5 spatial learning
+
+| Requirement | Implementation and dependency | Status | Verification |
+| --- | --- | --- | --- |
+| L.5 sections 3-6, 9. Stable identity, uncertainty, bounded search and library links | Fixed-tick household approach, reached observation, typed containment projection and linked decision/lived episodes | Verified for the household fixture | Six held-out conditions, including lookalike and exhaustion. [Results and code](SPATIAL_LEARNING_L5.md#held-out-household-study) |
+| L.5 sections 7, 21, 23. Restoration, visible experience and observer independence | v5 checkpoint, passive tray and native props | Verified for the household fixture | Fresh-process byte match and actual D3D12 render and observer comparison. [Validation](SPATIAL_LEARNING_L5.md#native-verification-and-cost) |
+| L.5 section 8. Cheap context confirmation | Coarse visible rim and detailed fallback | Verified as a separate experiment | Five policies, held-out aliases and unchanged L.4 CSV. [Comparison](SPATIAL_LEARNING_L5.md#separate-socket-confirmation-study) |
+| L.5 section 22. Cost | Release Laptop benchmark and native scratch camera | Partial | Numerical throughput, allocations, checkpoint and CPU view measured. Isolated decision, GPU and Android are open. [Costs](SPATIAL_LEARNING_L5.md#native-verification-and-cost) |
+| Grounded words, precision manipulation and additional developmental meshes | Live conversation, native hand fixture, age-calibrated visual assets | Open | Kinematic reach verified. [Continuation](CONTINUATION_CHECKPOINT.md) |
+
 ## Physical development and motor vocabulary addendum
 
 The [nervous-system audit](PHYSICAL_NERVOUS_SYSTEM_SPECIFICATION.md#existing-system-audit) identifies existing fixture evidence and integration gaps. The [acceptance plan](PHYSICAL_NERVOUS_SYSTEM_SPECIFICATION.md#experimental-acceptance) records matched tests and scope for the related master requirements §§5–6, 12–21, 46–49, 56–57, 62–64, 92, 128–132, 137, 156–158, 170, 172 and 175.

@@ -29,6 +29,7 @@ internal static class HouseholdLivingSmoke
 
     public static void Before() => Start(1);
     public static void Run() => Start(2);
+    public static void RunSpatial() => Start(3);
 
     static void Start(int mode)
     {
@@ -71,6 +72,12 @@ internal static class HouseholdLivingSmoke
         {
             var app = Object.FindAnyObjectByType<DreamMachineApp>();
             var world = Read<WorldSimulation>(app, "_sim");
+            if (SessionState.GetInt(Key, 0) == 3)
+            {
+                VerifySpatial(app, world);
+                EditorApplication.ExitPlaymode();
+                return;
+            }
             bool expectLive = !BeforeMode;
             if ((world.Home != null) != expectLive) throw new Exception("Unexpected household baseline mode.");
             if (world.TickCount != 0) throw new Exception("Household advanced while the clock was paused.");
@@ -206,6 +213,62 @@ internal static class HouseholdLivingSmoke
             EditorApplication.ExitPlaymode();
         }
         catch (Exception error) { Debug.LogException(error); EditorApplication.Exit(1); }
+    }
+
+    static void VerifySpatial(DreamMachineApp app, WorldSimulation world)
+    {
+        if (world.Home == null || world.TickCount != 0) throw new Exception("Spatial fixture did not start paused.");
+        var control = WorldSimulation.RestoreCheckpoint(world.CaptureCheckpoint());
+        var home = world.Home;
+        int absent = -1, found = -1;
+        bool trayOpen = false;
+        while (world.TickCount < 3600 && found < 0)
+        {
+            world.Tick();
+            Invoke(app, "StepActors", WorldSimulation.Dt);
+            if (world.TickCount % 127 == 0)
+            {
+                Click("Life & experience");
+                trayOpen = !trayOpen;
+            }
+            var search = home.ReadSpatialSearch();
+            if (search.LastObservation < 0) continue;
+            var evidence = home.Experience(search.LastObservation);
+            bool isAbsent = evidence.Evidence == HomeEvidence.ToyAbsent && absent < 0;
+            bool isFound = evidence.Evidence == HomeEvidence.ToyFound;
+            if (!isAbsent && !isFound) continue;
+            int box = evidence.Target - HouseholdLife.FirstSearchBox;
+            var contents = home.ReadSearchBox(box);
+            var rendered = GameObject.Find(HouseholdLife.TargetToyId);
+            if (!contents.Open || (isAbsent && (contents.VisibleToy != 0 || rendered != null)) ||
+                (isFound && (contents.VisibleToy != HouseholdLife.TargetToy || rendered == null)))
+                throw new Exception("Rendered toy does not match the observed contents.");
+            if (isAbsent) absent = world.TickCount;
+            if (isFound) found = world.TickCount;
+            if (!trayOpen) { Click("Life & experience"); trayOpen = true; }
+            var watch = Stopwatch.StartNew();
+            for (int i = 0; i < 120; i++) Invoke(app, "RefreshLife");
+            var viewMs = watch.Elapsed.TotalMilliseconds / 120;
+            for (int frame = 0; frame < 18; frame++) Invoke(app, "DrawLiving", WorldSimulation.Dt);
+            string capture = isAbsent ? "phase-l5-empty-container" : "phase-l5-rediscovery";
+            Capture(capture);
+            Click("Close", GameObject.Find("Life and experience"));
+            trayOpen = false;
+            var camera = Camera.main.transform;
+            var position = camera.position;
+            var rotation = camera.rotation;
+            var reached = home.ReadItem(evidence.Target);
+            var focus = new Vector3(reached.X, .27f, reached.Z);
+            camera.position = focus + new Vector3(.65f, 1.32f, 1.65f);
+            camera.LookAt(focus);
+            try { Capture(capture + "-detail"); }
+            finally { camera.SetPositionAndRotation(position, rotation); }
+            Debug.Log(FormattableString.Invariant($"SPATIAL_SMOKE tick={world.TickCount} evidence={evidence.Evidence} box={box} expected={search.Expected} visited={search.Visited} negative={search.Negative} observer_refresh_ms={viewMs:F4}"));
+        }
+        if (absent < 0 || found <= absent) throw new Exception("The fixture did not exercise a negative observation and later rediscovery.");
+        control.RunTicks(world.TickCount);
+        if (!world.CaptureCheckpoint().SequenceEqual(control.CaptureCheckpoint()))
+            throw new Exception("The Unity observer changed the authoritative continuation.");
     }
 
     static void Capture(string title)

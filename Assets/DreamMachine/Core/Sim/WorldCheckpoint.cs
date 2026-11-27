@@ -36,7 +36,7 @@ namespace DreamMachine.Sim
     {
         // Version 1 stores the embedded kernel at a completed tick boundary.
         const int CheckpointVersion = 1;
-        const int HouseholdCheckpointVersion = 4;
+        const int HouseholdCheckpointVersion = 5;
         const int MaxCheckpointBytes = 64 * 1024 * 1024;
         readonly System.Collections.Generic.List<ResearchIntervention> _interventions =
             new System.Collections.Generic.List<ResearchIntervention>();

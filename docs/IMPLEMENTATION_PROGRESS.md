@@ -2,7 +2,7 @@
 
 ## Physical development planning · November 27, 2026
 
-The planning addendum defines an optional household Physical Development Mode, persistent motor records, the Motor Vocabulary Browser, Babel composition, and generational and regulatory experiments. The nervous-system specification audits the actual fixtures and defines control interfaces, sensing, supported manipulation, and mode and persistence boundaries. The verified implementation remains the L.4 checkpoint. L.5 moved-toy search and C.1.3 controlled return are first in the implementation sequence. [Addendum](PHYSICAL_DEVELOPMENT_ADDENDUM.md) · [Nervous-system specification](PHYSICAL_NERVOUS_SYSTEM_SPECIFICATION.md)
+The planning addendum defines an optional household Physical Development Mode, persistent motor records, the Motor Vocabulary Browser, Babel composition, and generational and regulatory experiments. The nervous-system specification audits the actual fixtures and defines control interfaces, sensing, supported manipulation, and mode and persistence boundaries. L.5 adds a verified moved-toy search and checkpoint continuation. C.1.3 controlled return is the next independent slice. [L.5 results](SPATIAL_LEARNING_L5.md) [Addendum](PHYSICAL_DEVELOPMENT_ADDENDUM.md) · [Nervous-system specification](PHYSICAL_NERVOUS_SYSTEM_SPECIFICATION.md)
 
 ## Phase L.4 · active inspection and developmental presentation · November 27, 2026
 

@@ -6,10 +6,10 @@ using DreamMachine.World;
 
 namespace DreamMachine.Sim
 {
-    public enum HomeActivity { Rest, Inspect, Roll, Stack, Open, Close, Watch, Eat, Drink, Sleep, Sort, Tidy }
+    public enum HomeActivity { Rest, Inspect, Roll, Stack, Open, Close, Watch, Eat, Drink, Sleep, Sort, Tidy, FindToy }
     public enum HomePhase { Resting, Approach, Act, Observe, Scan }
-    public enum HomeEvidence { Firsthand, Demonstration, Witnessed, Imitation, Failed, Replay, SocketDecision }
-    public enum HomeReason { Resting, Curiosity, Practice, ObservedExample, Teach, Hunger, Thirst, Night, Blocked }
+    public enum HomeEvidence { Firsthand, Demonstration, Witnessed, Imitation, Failed, Replay, SocketDecision, ToySighting, SearchCandidate, ToyAbsent, ToyFound, SearchInterrupted, SearchOutcome }
+    public enum HomeReason { Resting, Curiosity, Practice, ObservedExample, Teach, Hunger, Thirst, Night, Blocked, Search }
 
     public readonly struct HomeExperience
     {
@@ -51,12 +51,13 @@ namespace DreamMachine.Sim
     }
 
     /// <summary>Fixed-tick household affordances. All contacts here are kinematic references.</summary>
-    public sealed class HouseholdLife
+    public sealed partial class HouseholdLife
     {
         const int PreviousItemCount = 12;
-        public const int ItemCount = 14;
+        const int SocketItemCount = 14;
+        public const int ItemCount = 17;
         public const int SortingBoard = 12, ToyBin = 13;
-        static readonly string[] Names = { "Picture cards", "Ball", "Wooden blocks", "Lidded box", "Food", "Water", "Left seat", "Right seat", "Merlin's bed", "Marie's bed", "Arthur's bed", "Alice's bed", "Shape board", "Toy bin" };
+        static readonly string[] Names = { "Picture cards", "Ball", "Wooden blocks", "Lidded box", "Food", "Water", "Left seat", "Right seat", "Merlin's bed", "Marie's bed", "Arthur's bed", "Alice's bed", "Shape board", "Toy bin", "Cedar chest", "Blue basket", "Green trunk" };
         static readonly (int Item, HomeActivity Activity)[] Play = { (0, HomeActivity.Inspect), (1, HomeActivity.Roll),
             (2, HomeActivity.Stack), (3, HomeActivity.Open), (SortingBoard, HomeActivity.Sort), (ToyBin, HomeActivity.Tidy) };
         readonly WorldSimulation _world;
@@ -109,6 +110,7 @@ namespace DreamMachine.Sim
             _items[11] = new Item(2.86f, -.09f);
             _items[SortingBoard] = new Item(.95f, .53f);
             _items[ToyBin] = new Item(-.87f, .68f);
+            BuildSearchBoxes();
         }
 
         public int FindPerson(string id)
@@ -120,6 +122,7 @@ namespace DreamMachine.Sim
         internal void Step(bool night)
         {
             int tick = _world.TickCount;
+            AdvanceSearchFixture(tick);
             var ball = _items[1];
             if (Math.Abs(ball.V) > .001f)
             {
@@ -139,7 +142,8 @@ namespace DreamMachine.Sim
                 p.Eating = false;
                 if (night && p.Activity != HomeActivity.Sleep)
                 {
-                    if (p.Phase == HomePhase.Approach || p.Phase == HomePhase.Act || p.Phase == HomePhase.Scan)
+                    if (p.Activity == HomeActivity.FindToy) InterruptSearch(index, tick);
+                    else if (p.Phase == HomePhase.Approach || p.Phase == HomePhase.Act || p.Phase == HomePhase.Scan)
                         Record(index, HomeEvidence.Failed, p.Source, false);
                     Assign(p, HomeActivity.Sleep, 8 + index, HomeReason.Night, tick);
                     if (p.LastActual >= 0)
@@ -186,6 +190,8 @@ namespace DreamMachine.Sim
                 Assign(p, HomeActivity.Rest, 6 + index % 2, HomeReason.Resting, tick);
                 return;
             }
+
+            if (SelectSearch(index, tick)) return;
 
             // Recent observed actions are candidates. They never increment independent practice.
             if (p.Child != null && p.ObservedSource >= 0 && p.ObservedSource != p.LastImitation && tick - _memory[p.ObservedSource].Tick < 220)
@@ -280,7 +286,8 @@ namespace DreamMachine.Sim
             }
             if (tick >= p.Until)
             {
-                Record(index, HomeEvidence.Failed, p.Source, false);
+                if (p.Activity == HomeActivity.FindToy) InterruptSearch(index, tick, blocked: true);
+                else Record(index, HomeEvidence.Failed, p.Source, false);
                 Rest(p, tick + 25, HomeReason.Blocked);
                 return;
             }
@@ -327,6 +334,7 @@ namespace DreamMachine.Sim
         {
             Person p = _people[index];
             Item target = _items[p.Item];
+            if (p.Activity == HomeActivity.FindToy) { InspectSearchBox(index, tick); return; }
             if (p.Activity == HomeActivity.Sleep) { p.Until = tick + 2000; return; }
             if (p.Activity == HomeActivity.Rest) { p.Phase = HomePhase.Resting; p.Until = tick + 40; return; }
             bool changed = false;
@@ -420,9 +428,12 @@ namespace DreamMachine.Sim
             _memory.Add(record);
             IndexEvidence(record, id);
             _people[index].Last = id;
-            if (kind != HomeEvidence.Replay && kind != HomeEvidence.SocketDecision) _people[index].LastActual = id;
+            if (IsLivedEvidence(kind)) _people[index].LastActual = id;
             return id;
         }
+
+        static bool IsLivedEvidence(HomeEvidence kind) => kind != HomeEvidence.Replay &&
+            kind != HomeEvidence.SocketDecision && kind != HomeEvidence.SearchCandidate && kind != HomeEvidence.SearchOutcome;
 
         void IndexEvidence(HomeExperience record, int id)
         {
@@ -527,12 +538,13 @@ namespace DreamMachine.Sim
             writer.Write(_memory.Count);
             foreach (var e in _memory)
             { writer.Write(e.Tick); writer.Write((byte)e.Actor); writer.Write((byte)e.Activity); writer.Write((byte)e.Target); writer.Write((byte)e.Evidence); writer.Write(e.Source); writer.Write(e.Revision); writer.Write(e.Changed); writer.Write(e.Details); }
+            WriteSearch(writer);
         }
 
         internal void Read(BinaryReader reader, int version)
         {
             _wasNight = reader.ReadBoolean();
-            int itemCount = version == 2 ? PreviousItemCount : ItemCount;
+            int itemCount = version == 2 ? PreviousItemCount : version < 5 ? SocketItemCount : ItemCount;
             for (int i = 0; i < itemCount; i++)
             { Item item = _items[i]; item.X = ReadFinite(reader); item.Z = ReadFinite(reader); item.V = ReadFinite(reader); item.Value = reader.ReadInt32(); item.Revision = reader.ReadInt32(); }
             foreach (Person p in _people)
@@ -561,9 +573,13 @@ namespace DreamMachine.Sim
                 var e = new HomeExperience(reader.ReadInt32(), reader.ReadByte(), (HomeActivity)reader.ReadByte(), reader.ReadByte(),
                     (HomeEvidence)reader.ReadByte(), reader.ReadInt32(), reader.ReadInt32(), reader.ReadBoolean(),
                     version >= 4 ? reader.ReadInt32() : 0);
-                if (e.Actor >= PersonCount || e.Target >= ItemCount || e.Source < -1 || e.Source >= i || e.Tick < 0 || e.Tick > _world.TickCount)
+                if (e.Actor >= PersonCount || e.Target >= itemCount || e.Source < -1 || e.Source >= i || e.Tick < 0 || e.Tick > _world.TickCount)
                     throw new InvalidDataException("Invalid household memory reference.");
-                if (e.Details != 0 && (e.Activity != HomeActivity.Sort || e.Target != SortingBoard || new SocketDecision(e.Details).Choice >= 3))
+                if (!Enum.IsDefined(typeof(HomeActivity), e.Activity) || !Enum.IsDefined(typeof(HomeEvidence), e.Evidence) ||
+                    ((e.Activity == HomeActivity.FindToy || e.Evidence >= HomeEvidence.ToySighting) &&
+                        (version < 5 || !ValidSearchRecord(e))))
+                    throw new InvalidDataException("Invalid household spatial record.");
+                if (e.Activity != HomeActivity.FindToy && e.Details != 0 && (e.Activity != HomeActivity.Sort || e.Target != SortingBoard || new SocketDecision(e.Details).Choice >= 3))
                     throw new InvalidDataException("Invalid household socket decision.");
                 if (e.Evidence == HomeEvidence.SocketDecision && (e.Details == 0 || e.Changed))
                     throw new InvalidDataException("Invalid household observation.");
@@ -583,6 +599,7 @@ namespace DreamMachine.Sim
                         throw new InvalidDataException("Invalid active household observation.");
                 }
             }
+            if (version >= 5) ReadSearch(reader);
         }
 
         static float ReadFinite(BinaryReader reader)

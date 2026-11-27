@@ -39,6 +39,9 @@ namespace DreamMachine.Cli
                     if (args[i] == "--lower-body") return RunLowerBodyReference();
                     if (args[i] == "--retention" && i + 1 < args.Length) return RunHouseholdRetention(args[i + 1]);
                     if (args[i] == "--delayed-retention" && i + 1 < args.Length) return RunDelayedRetention(args[i + 1]);
+                    if (args[i] == "--spatial-study" && i + 1 < args.Length) return SpatialStudyCommand.Run(args[i + 1]);
+                    if (args[i] == "--spatial-checkpoint" && i + 2 < args.Length) return SpatialStudyCommand.Checkpoint(args[i + 1], args[i + 2]);
+                    if (args[i] == "--socket-confirmation" && i + 1 < args.Length) return SocketConfirmationCommand.Run(args[i + 1]);
                     if (args[i] == "--active-socket" && i + 1 < args.Length) return RunActiveSocket(args[i + 1]);
                     if (args[i] == "--elbow-lab" && i + 1 < args.Length) return ElbowLabCommand.Run(args[i + 1]);
                     if (args[i] == "--archive-pilots") return ArchivePilotCommand.Run(args, i);

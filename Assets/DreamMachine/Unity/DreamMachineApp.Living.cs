@@ -20,6 +20,9 @@ namespace DreamMachine.UnityBridge
         static readonly Vector3[] SocketPositions = { new Vector3(-.16f, .107f, -.03f),
             new Vector3(0, .107f, -.03f), new Vector3(.16f, .107f, -.03f) };
         readonly Transform[] _sortPieces = new Transform[3];
+        readonly Transform[] _searchLids = new Transform[HouseholdLife.SearchBoxCount];
+        readonly Transform[] _searchLabels = new Transform[HouseholdLife.SearchBoxCount];
+        Transform _redBoat, _stripedBoat;
         Text _lifeText;
         int _lifeFocus = 2, _historyDaysBack;
         bool _researchPresentation;
@@ -93,9 +96,66 @@ namespace DreamMachine.UnityBridge
             _sortPieces[2] = Piece(sort, PrimitiveType.Cube, "Long piece", cuePosition, new Vector3(.055f, .11f, .12f), "#B3CCC3");
             Box(_livingItems[HouseholdLife.ToyBin], .43f, .15f, "#89756A");
             _storedToys = Piece(_livingItems[HouseholdLife.ToyBin], PrimitiveType.Cube, "Blocks stored in bin", new Vector3(0, .097f, 0), new Vector3(.21f,.12f,.17f), "#BC775B");
+            BuildLivingSearchProps(root);
             _zoom = 5.5f;
             _orbitYaw = 157f;
             _orbitPitch = 27f;
+        }
+
+        void BuildLivingSearchProps(Transform root)
+        {
+            string[] colors = { "#AD764D", "#658BA1", "#66896C" };
+            for (int box = 0; box < _searchLids.Length; box++)
+            {
+                var parent = _livingItems[HouseholdLife.FirstSearchBox + box];
+                Box(parent, .35f, .14f, colors[box]);
+                var lid = new GameObject("Search container lid").transform;
+                lid.SetParent(parent, false);
+                lid.localPosition = new Vector3(0, .14f, -.16f);
+                Piece(lid, PrimitiveType.Cube, "Lid panel", new Vector3(0, 0, .16f),
+                    new Vector3(.37f, .03f, .35f), colors[box]);
+                _searchLabels[box] = Piece(lid, PrimitiveType.Cube, "Visible label", new Vector3(0, .019f, .24f),
+                    new Vector3(.075f, .006f, .05f), "#EBCB77");
+                _searchLids[box] = lid;
+            }
+            _redBoat = BuildSearchBoat(root, HouseholdLife.TargetToyId, false);
+            _stripedBoat = BuildSearchBoat(root, HouseholdLife.SimilarToyId, true);
+        }
+
+        Transform BuildSearchBoat(Transform root, string id, bool stripe)
+        {
+            Transform boat = new GameObject(id).transform;
+            boat.SetParent(root, false);
+            Piece(boat, PrimitiveType.Cube, "Boat hull", new Vector3(0, .018f, 0),
+                new Vector3(.115f, .033f, .19f), "#CC483A");
+            Piece(boat, PrimitiveType.Cube, "Cabin", new Vector3(0, .06f, -.018f),
+                new Vector3(.063f, .068f, .071f), "#EAA77B");
+            if (stripe) Piece(boat, PrimitiveType.Cube, "Ivory stripe", new Vector3(0, .04f, .064f),
+                new Vector3(.105f, .009f, .025f), "#EFE0C2");
+            return boat;
+        }
+
+        void DrawLivingSearch(HouseholdLife life, float blend)
+        {
+            int red = -1, striped = -1;
+            for (int box = 0; box < _searchLids.Length; box++)
+            {
+                var visible = life.ReadSearchBox(box);
+                var lid = _searchLids[box];
+                lid.localRotation = Quaternion.Slerp(lid.localRotation,
+                    Quaternion.Euler(visible.Open ? -83f : 0f, 0f, 0f), blend);
+                _searchLabels[box].gameObject.SetActive(life.HasSearchLabel(box));
+                if (visible.VisibleToy == HouseholdLife.TargetToy) red = box;
+                if (visible.VisibleToy == HouseholdLife.SimilarToy) striped = box;
+            }
+            PlaceSearchBoat(_redBoat, red);
+            PlaceSearchBoat(_stripedBoat, striped);
+        }
+
+        void PlaceSearchBoat(Transform boat, int box)
+        {
+            boat.gameObject.SetActive(box >= 0);
+            if (box >= 0) boat.position = _livingItems[HouseholdLife.FirstSearchBox + box].position + Vector3.up * .049f;
         }
 
         void Box(Transform parent, float width, float height, string color)
@@ -141,6 +201,7 @@ namespace DreamMachine.UnityBridge
                 _sortPieces[i].gameObject.SetActive(i == ShapeBoard.Cue(sortingState));
             }
             _storedToys.gameObject.SetActive(life.ReadItem(HouseholdLife.ToyBin).Value > 0);
+            DrawLivingSearch(life, blend);
             for (int i = 0; i < _livingActors.Length; i++)
             {
                 if (_livingActors[i] == null) _livingActors[i] = _actors[life.PersonId(i)];
@@ -199,6 +260,7 @@ namespace DreamMachine.UnityBridge
                 case HomeActivity.Eat: return _food.position + Vector3.up * .05f;
                 case HomeActivity.Sort: return center + Vector3.up * .11f;
                 case HomeActivity.Tidy: return center + Vector3.up * .17f;
+                case HomeActivity.FindToy: return center + Vector3.up * .16f + (origin - center).normalized * .13f;
                 default: return null;
             }
         }
@@ -279,6 +341,7 @@ namespace DreamMachine.UnityBridge
             text.AppendLine($"Thirst {p.Thirst:P0}  ·  Planned {p.Prediction}");
             if (p.KnowledgeEvidence >= 0) text.AppendLine($"Learned affordance  {p.Knowledge}  ·  evidence {p.KnowledgeEvidence}");
             text.AppendLine($"Attempts {p.Attempts}  ·  Outcomes {p.Successes}\nWitnessed {p.Observed}  ·  Imitated {p.Imitated}");
+            if (_lifeFocus == HouseholdLife.SearchActor) AppendSpatialSearch(text, home);
             var sort = home.ReadCompetence(_lifeFocus, HouseholdLife.SortingBoard);
             text.AppendLine($"Shape board  ·  independent {sort.IndependentSuccesses}/{sort.IndependentAttempts}  ·  failed {sort.Failures}");
             if (sort.LastIndependentSuccess >= 0)
@@ -318,6 +381,30 @@ namespace DreamMachine.UnityBridge
             }
             _lifeText.text = text.ToString();
         }
+
+        static void AppendSpatialSearch(StringBuilder text, HouseholdLife home)
+        {
+            var search = home.ReadSpatialSearch();
+            if (search.Sighting < 0) return;
+            var knowledge = home.ReadSupportedToyLocation();
+            text.AppendLine($"Red boat search | {search.Stage}");
+            text.AppendLine($"Last seen {SearchBoxName(knowledge.Box)} | tick {knowledge.Tick} | episode {knowledge.Evidence}");
+            if (search.Stage == SpatialStage.Introduction || search.Stage == SpatialStage.Waiting) return;
+            text.AppendLine($"Expected {SearchBoxName(search.Expected)} | {search.Confidence}");
+            text.AppendLine($"Observed {SearchBoxName(search.Observed)} | {search.Remaining} checks left");
+            bool approaching = home.ReadPerson(HouseholdLife.SearchActor).Activity == HomeActivity.FindToy;
+            if (search.Stage == SpatialStage.Searching && search.Selected >= 0)
+                text.AppendLine($"{(approaching ? "Selected" : "Last checked")} {SearchBoxName(search.Selected)} | {search.Selection}");
+            for (int box = 0; box < HouseholdLife.SearchBoxCount; box++)
+            {
+                int flag = 1 << box;
+                if ((search.Negative & flag) != 0) text.AppendLine($"Boat absent at {SearchBoxName(box)}");
+                else if ((search.Candidates & flag) != 0 && box != search.Selected)
+                    text.AppendLine($"Possible {SearchBoxName(box)}");
+            }
+        }
+
+        static string SearchBoxName(int box) => box < 0 ? "unknown" : HouseholdLife.ItemName(HouseholdLife.FirstSearchBox + box);
 
         static int LowerExperienceBound(HouseholdLife home, int tick)
         {
