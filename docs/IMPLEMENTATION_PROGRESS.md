@@ -1,5 +1,9 @@
 # Implementation progress
 
+## Playable household · November 27, 2026
+
+Living mode now presents a furnished four-person activity area, target-driven gaze and body posture, an experience tray, and object changes driven by the shared fixed-tick simulation. Four completed days in isolated Unity produced 307 provenance-stamped events. The original household identities and seeded anatomy persist. The provided models await asset permission and package installation verification. [Implementation report](PLAYABLE_HOUSEHOLD.md) · [Benchmarks](PERFORMANCE_BENCHMARKS.md#playable-household)
+
 ## Phase C.1.2 · dynamic stability and physical lift · November 27, 2026
 
 Added absolute support, contact-region, XCoM and signed margin measurements, a staged preparation and swing controller, and native timestep comparisons. Four of six held-out combined trials achieved supported lift. Maximum clearance was 17.04 mm and forward displacement 57.14 mm. No trial completed a step. Two combined trials fell before lift and four after abort. The 5 ms native substep preserved eligibility where all three coarser settings failed. [Audit, failed gates and native evidence](LOWER_BODY_C12.md)

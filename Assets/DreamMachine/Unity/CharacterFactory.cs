@@ -21,6 +21,7 @@ namespace DreamMachine.UnityBridge
         HumanoidAnatomy _anatomy;
         float _sampledAge = -1f;
         Transform _leftHip, _leftKnee, _leftAnkle, _rightHip, _rightKnee, _rightAnkle;
+        float _seatAmount, _sleepAmount;
 
         public HumanoidDimensions Dimensions { get; private set; }
         public int AnatomySeed => _anatomy.BirthSeed;
@@ -161,6 +162,48 @@ namespace DreamMachine.UnityBridge
             hip.localRotation = Quaternion.Euler(pose.Hip * Mathf.Rad2Deg, 0f, 0f);
             knee.localRotation = Quaternion.Euler(pose.Knee * Mathf.Rad2Deg, 0f, 0f);
             ankle.localRotation = Quaternion.Euler(pose.Ankle * Mathf.Rad2Deg, 0f, 0f);
+        }
+
+        public void ApplyHouseholdPose(Vector3? target, bool reach, bool seated, bool sleeping, float dt, float time)
+        {
+            float blend = 1f - Mathf.Exp(-8f * dt);
+            _seatAmount = Mathf.Lerp(_seatAmount, seated ? 1f : 0f, blend);
+            _sleepAmount = Mathf.Lerp(_sleepAmount, sleeping ? 1f : 0f, blend);
+            if (!Walking)
+            {
+                float seatedHeight = Dimensions.AnkleHeight + Dimensions.Shin;
+                _pelvis.localPosition = Vector3.up * Mathf.Lerp(Mathf.Lerp(_pelvis.localPosition.y, seatedHeight, _seatAmount), .36f, _sleepAmount);
+                float bend = _seatAmount * (1f - _sleepAmount);
+                _leftHip.localRotation = Quaternion.Slerp(_leftHip.localRotation, Quaternion.Euler(-89f, 0f, 0f), bend);
+                _rightHip.localRotation = Quaternion.Slerp(_rightHip.localRotation, Quaternion.Euler(-89f, 0f, 0f), bend);
+                _leftKnee.localRotation = Quaternion.Slerp(_leftKnee.localRotation, Quaternion.Euler(89f, 0f, 0f), bend);
+                _rightKnee.localRotation = Quaternion.Slerp(_rightKnee.localRotation, Quaternion.Euler(89f, 0f, 0f), bend);
+            }
+            _pelvis.localRotation = Quaternion.Euler(-90f * _sleepAmount, 0f, 0f);
+            Quaternion head = Quaternion.identity;
+            if (target.HasValue && !sleeping)
+            {
+                Vector3 aim = _head.parent.InverseTransformDirection(target.Value - _head.position);
+                if (aim.sqrMagnitude > .0001f)
+                {
+                    float yaw = Mathf.Clamp(Mathf.Atan2(aim.x, aim.z) * Mathf.Rad2Deg, -58f, 58f);
+                    float pitch = Mathf.Clamp(-Mathf.Atan2(aim.y, new Vector2(aim.x, aim.z).magnitude) * Mathf.Rad2Deg, -20f, 32f);
+                    head = Quaternion.Euler(pitch, yaw, 0f);
+                }
+                if (reach && !Walking)
+                {
+                    Transform shoulder = RigPivot("rightShoulder");
+                    Vector3 handAim = shoulder.parent.InverseTransformDirection(target.Value - shoulder.position);
+                    if (handAim.sqrMagnitude > .0001f)
+                        shoulder.localRotation = Quaternion.Slerp(shoulder.localRotation, Quaternion.FromToRotation(Vector3.down, handAim.normalized), .72f);
+                    SetJoint("rightElbow", -.36f);
+                }
+            }
+            _head.localRotation = Quaternion.Slerp(_head.localRotation, head, blend);
+            float blinkTime = Mathf.Repeat(time + (AnatomySeed % 11) * .29f, 4.7f);
+            float blink = sleeping ? .12f : blinkTime < .14f ? Mathf.Lerp(.12f, 1f, Mathf.Abs(blinkTime - .07f) / .07f) : 1f;
+            RigPivot("leftEye").localScale = new Vector3(1f, blink, 1f);
+            RigPivot("rightEye").localScale = new Vector3(1f, blink, 1f);
         }
 
         public void SetJoint(string joint, float radians)

@@ -264,6 +264,8 @@ The source is the [consolidated specification](MASTER_IMPLEMENTATION_SPECIFICATI
 
 ## Evidence register
 
+The playable household adds shared fixed-tick access to real object state, autonomous actions, teacher demonstrations, separate learner witnesses and imitation outcomes, optional presentation, and persistent replay references. Retained identity, observer independence and legacy save migration have measured evidence. Licensed import, native grasp and full developmental locomotion remain open. [Household crosswalk and actual Unity evidence](PLAYABLE_HOUSEHOLD.md#verification)
+
 Phase C.1.2 adds evidence for §§14, 17–19, 116, 128, 148, 150–151, 153, 157 and 170. XCoM, two signed support margins and absolute impulse gate native staged movement. Four held-out combined trials held the intended swing foot above 10 mm while supported. Forward placement and controlled return failed, including two prelift falls. No complete step or learned movement is credited. [Phase C.1.2 crosswalk](LOWER_BODY_C12.md#requirements-crosswalk)
 
 Phase C.1.1 extends §§12–19, 116, 124–125, 128, 148, 150–151, 153, 157 and 170. Native frontal joints and bounded actuation pass six held-out 85% stance windows. Engineered sensor feedback passes through 80%. Vestibular and proprioceptive timing, CoP measurement, and provenance are exercised in isolated experiments. Six gated physical swings aborted on lost stance contact. The separate VRM audit measures lower-body rest transforms and skin references with permissions still unresolved. [Crosswalk and measured outcomes](LOWER_BODY_C11.md#requirements-crosswalk)

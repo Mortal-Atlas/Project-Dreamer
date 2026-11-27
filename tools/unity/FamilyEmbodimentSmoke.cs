@@ -45,8 +45,10 @@ internal static class FamilyEmbodimentSmoke
     {
         if (change == PlayModeStateChange.EnteredPlayMode)
         {
-            if (Object.FindAnyObjectByType<DreamMachineApp>() == null)
-                new GameObject("DreamMachine").AddComponent<DreamMachineApp>();
+            var app = Object.FindAnyObjectByType<DreamMachineApp>();
+            if (app == null) app = new GameObject("DreamMachine").AddComponent<DreamMachineApp>();
+            // Older C.0 revisions have no living mode. Current runs explicitly exercise their legacy scene.
+            typeof(DreamMachineApp).GetField("LegacyHouseholdPresentation", Private)?.SetValue(app, true);
             EditorApplication.update += Verify;
         }
         if (change != PlayModeStateChange.EnteredEditMode) return;

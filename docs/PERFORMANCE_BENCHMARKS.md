@@ -129,3 +129,17 @@ Native development timing per 50 ms clock tick was 0.912 ms at 5 ms substeps, 0.
 Held-out native means at 5 ms were 0.970 ms/tick for legacy, 0.942 for interlock-only, 0.957 for smooth-only, 0.968 for prepared and 0.959 for prepared lift-only. Each is the mean of six trial means and includes contact, angular momentum and diagnostic collection. CSV generation and rendering are outside those timings. Direct paused tray refreshes averaged 55.353 µs open and 0.102 µs closed. [Per-trial data](evidence/phase-c12-heldout-summary.csv)
 
 Five separate Release headless runs per cast gave median household throughput of 48,117 ticks/s for four people (44,845–52,596) and 30,719 for twelve (28,753–32,550). These were concurrent with editor work on the same workstation. The native rig remains an isolated opt-in experiment.
+
+## Playable household
+
+Five matched-process triples used Release, the Laptop 16×16 grid, seed 11, 30 warm-up ticks and 2,000 measured ticks. The active four-person household gets new event selection, object updates and experience recording in place of the repeated abstract walking exercise and hidden-rule encounters. These numbers measure the whole kernel. They do not isolate each changed operation.
+
+| Mode | Median ticks/s | Range |
+| --- | ---: | ---: |
+| Four-person legacy | 44,286 | 41,782–44,689 |
+| Four-person living | 49,531 | 49,143–51,625 |
+| Twelve-person legacy | 29,535 | 27,438–31,118 |
+
+The living benchmark recorded 137 episodes, allocated 387,896 current-thread bytes across the timed whole ticks, and captured a 26,649-byte checkpoint. The fixed binary archive stores 17 bytes per episode before outer checkpoint overhead. Whole-file size also depends on older learner and environmental state. Run `dotnet run --project dotnet/DreamMachine.Cli -c Release -- --benchmark --living` to reproduce the active household benchmark.
+
+In DX12 editor Play Mode, 160 direct household view updates averaged 0.0223 ms each, including applying actor root, foot pose, gaze, blink and current object presentation. Twelve warmed 1280×720 `Camera.Render` calls averaged 1.228 ms with the legacy presentation, 0.787 ms in living mode, and 1.305 ms with the experience panel visible. These are CPU-side elapsed submit/call timings on a frozen scene with each mode's default camera composition. GPU-only time, per-operation activity attribution and supplied-model costs remain unmeasured.

@@ -177,3 +177,4 @@ docs/evidence/phase-c0-*.png -filter -diff -merge -text
 docs/evidence/phase-c1-observatory.png -filter -diff -merge -text
 docs/evidence/phase-c11-observatory.png -filter -diff -merge -text
 docs/evidence/phase-c12-observatory.png -filter -diff -merge -text
+docs/evidence/household-*.png -filter -diff -merge -text

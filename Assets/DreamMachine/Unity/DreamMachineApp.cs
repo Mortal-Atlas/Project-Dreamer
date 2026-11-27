@@ -26,7 +26,7 @@ namespace DreamMachine.UnityBridge
     /// The scored learning lives in the pure C# core. This class only shows it and feeds it
     /// what the bodies and cameras can actually sense.
     /// </summary>
-    public sealed class DreamMachineApp : MonoBehaviour
+    public sealed partial class DreamMachineApp : MonoBehaviour
     {
         const float AwakeSeconds = 36f;
         const float NightSeconds = 16f;
@@ -72,6 +72,7 @@ namespace DreamMachine.UnityBridge
         Transform _dreamAnchor;
         TextMesh _banner;
         string _startupFailure;
+        bool _archiveHouseholdBaseline;
 
         int _focus;
         int _day;
@@ -127,6 +128,7 @@ namespace DreamMachine.UnityBridge
                 _preset = _sim.Preset;
                 _night = _sim.IsNight;
                 _day = _sim.DayIndex;
+                EnableLivingPresentation();
             }
             catch (System.Exception error) when (error is IOException || error is InvalidDataException ||
                 error is System.UnauthorizedAccessException)
@@ -152,12 +154,14 @@ namespace DreamMachine.UnityBridge
             _world = new HiddenRuleWorld { ShiftAt = 18 };
             _pool = HiddenRuleWorld.StandardPool();
             var looks = LoadLooks();
-            BuildProps();
+            if (_sim.Home == null) BuildProps();
+            else BuildLivingRoom();
             BuildPeople(looks);
             BuildCameras();
             BuildHud();
             _dreamAnchor = new GameObject("DreamAnchor").transform;
             _banner = CreateBanner();
+            if (_sim.Home != null) _banner.text = "";
             TextAsset replay = Resources.Load<TextAsset>("Wetware/brian2_replay");
             if (replay != null)
             {
@@ -169,10 +173,13 @@ namespace DreamMachine.UnityBridge
             _ready = true;
             SelectBaby(0);
             _workspace = new TrayWorkspace("DreamMachine.Workspace.v1.");
-            _workspace.Register(SimulationTrayId, "Simulation controls", new Vector2(480, 105),
-                DefaultSimulationTray(),
+            var clockLayout = DefaultSimulationTray();
+            if (_sim.Home != null) clockLayout.Visible = false;
+            _workspace.Register(SimulationTrayId, "Simulation controls", new Vector2(480, 105), clockLayout,
                 BuildSimulationControls, () => _timeLabel = null, RefreshSimulationControls);
+            if (_sim.Home != null) RegisterLivingTray();
             _workspace.RestoreVisibility();
+            if (_sim.Home != null) DrawLiving(0.1f);
         }
 
         void OnGUI()
@@ -255,7 +262,7 @@ namespace DreamMachine.UnityBridge
             BillboardLabels();
             _visionTimer += dt;
             float visionEvery = _performance ? 0.8f : 0.45f;
-            if (_achieved < 12f && _visionTimer >= visionEvery)
+            if ((_sim.Home == null || _researchPresentation) && _achieved < 12f && _visionTimer >= visionEvery)
             {
                 _visionTimer = 0f;
                 CaptureVision();
@@ -274,6 +281,7 @@ namespace DreamMachine.UnityBridge
 
         void StepActors(float dt)
         {
+            if (_sim.Home != null && (_remote == null || !_remote.Active)) { DrawLiving(dt); return; }
             for (int g = 0; g < 2; g++)
             {
                 MoveAnchor(g, dt);
@@ -502,6 +510,7 @@ namespace DreamMachine.UnityBridge
         void BeginNight()
         {
             _night = true;
+            if (_sim.Home != null) { _banner.text = ""; return; }
             _banner.text = "Night. They dream what they saw, and amend what they believe.";
             for (int i = 0; i < _babies.Count; i++)
             {
@@ -519,7 +528,7 @@ namespace DreamMachine.UnityBridge
             _dreams.Clear();
             _night = false;
             _clock = 0f;
-            _banner.text = "Day " + (_day + 1) + ". Awake. Touch the world and try the legs again.";
+            _banner.text = _sim.Home == null ? "Day " + (_day + 1) + ". Awake. Touch the world and try the legs again." : "";
             for (int i = 0; i < _babies.Count; i++) LogGrowth(_babies[i], "awake");
             SaveAll();
         }
@@ -608,6 +617,7 @@ namespace DreamMachine.UnityBridge
                 PersonSpec spec = _pop.People[i];
                 AppearanceProfile look;
                 if (!looks.TryGetValue(spec.Id, out look)) look = AppearanceCatalog.For(spec);
+                if (_sim.Home != null) look.DisplayName = LivingName(spec);
                 SimChild child = _sim.Find(spec.Id);
                 HumanoidAnatomy anatomy = child == null ? new HumanoidAnatomy(spec.BirthSeed) : child.State.Anatomy;
                 float developmentAge = child == null ? HumanoidAnatomy.AdultAgeDays : WorldSimulation.AnatomyAge(child.Body.AgeDays);
@@ -722,10 +732,15 @@ namespace DreamMachine.UnityBridge
             for (int i = 0; i < _babies.Count; i++)
             {
                 int index = i;
-                _hud.AddPersonButton(_babies[i].Spec.DisplayName, delegate { SelectBaby(index); });
+                _hud.AddPersonButton(_babies[i].Look.DisplayName, delegate { SelectBaby(index); });
             }
             _hud.AddActionButton("Experiment", RunShortExperiment);
             _hud.AddSimulationEntryPoints(ToggleSimulationTray, ResetSimulationLayout);
+            if (_sim.Home != null)
+            {
+                _hud.AddLivingEntryPoints(() => _workspace.Toggle(LifeTray), ToggleResearchPresentation);
+                _hud.ShowResearch(false);
+            }
             _hud.AddActionButton(_performance ? "Detail" : "Fast", TogglePerformance);
             _hud.AddActionButton("Reset", ResetBabies);
             _hud.AddActionButton("Quality", CyclePreset);
@@ -785,6 +800,12 @@ namespace DreamMachine.UnityBridge
             try
             {
                 if (_remote != null && _remote.Active) return;
+                if (_archiveHouseholdBaseline)
+                {
+                    string source = WorldPath(), archive = source + ".pre-household";
+                    if (File.Exists(source) && !File.Exists(archive)) File.Copy(source, archive);
+                    _archiveHouseholdBaseline = false;
+                }
                 _sim.SaveCheckpoint(WorldPath());
                 WriteGrowth();
             }
@@ -814,6 +835,7 @@ namespace DreamMachine.UnityBridge
                         throw new InvalidDataException("The checkpoint roster differs from this scene.");
                 }
                 _sim = restored;
+                EnableLivingPresentation();
                 _pop = restored.Population;
                 _preset = restored.Preset;
                 _day = restored.DayIndex;
@@ -860,6 +882,7 @@ namespace DreamMachine.UnityBridge
 
         void RefreshHud()
         {
+            if (_sim.Home != null && !_researchPresentation) return;
             if (_babies.Count == 0) return;
             Actor baby = _babies[_focus];
             EmotionState mood = baby.State.Emotions;
@@ -883,7 +906,7 @@ namespace DreamMachine.UnityBridge
                 + (_idShader == null ? "   (no ID shader)" : ""));
             _hud.SetEmotions(mood.Curiosity, mood.Frustration, mood.Satisfaction, mood.FearOfFalling, mood.Fatigue, mood.Valence, mood.Arousal, mood.SleepPressure);
             _hud.SetBeliefs(BeliefText(baby));
-            _hud.HighlightPerson(baby.Spec.DisplayName);
+            _hud.HighlightPerson(baby.Look.DisplayName);
         }
 
         static string BeliefText(Actor baby)
@@ -1016,6 +1039,7 @@ namespace DreamMachine.UnityBridge
             _zoom = Mathf.Clamp(_zoom, 3.5f, 16f);
             Transform target = _babies[_focus].Body.transform;
             Vector3 look = target.position + Vector3.up * 0.9f;
+            if (_sim.Home != null && !_researchPresentation) look = new Vector3(0f, .63f, 1.27f);
             Vector3 offset = Quaternion.Euler(_orbitPitch, _orbitYaw, 0f) * new Vector3(0f, 0f, -_zoom);
             Camera.main.transform.position = look + offset;
             Camera.main.transform.LookAt(look);

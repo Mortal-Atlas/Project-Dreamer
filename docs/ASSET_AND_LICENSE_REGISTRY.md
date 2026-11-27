@@ -33,3 +33,18 @@ The read-only GLB JSON audit traversed the original scene graph and resolved hip
 All four export the same local rest orientation offsets for the measured channels. Around their local X axes the hips start at +7.21°, upper legs at −6.01°, lower legs at +2.61° and feet at −3.50°. Three skins and inverse bind matrix accessors are present per model, and the inspected lower-body joint nodes occur in the skin data. Those checks establish a mapping candidate. They leave actual vertex deformation, coordinate conversion and ground alignment for a rendered trial. Compute the observed physical joint delta relative to its own rest frame, convert it to the avatar joint frame and compose it with the avatar rest rotation. Include hip and ankle frontal rotations as well as sagittal pitch. Keep visible bone scale and per-avatar ground offsets on the view side. The seed and identity remain with the physical individual.
 
 Current per-file permission terms keep these four local source assets out of a shared build. No paid or replacement assets were acquired. Assess actual skinning, adult and infant mesh compatibility, and joint transfer with an authorized test model after permission is resolved. [VRM 1.0 humanoid convention](https://vrm.dev/en/vrm1/humanoid/)
+
+## Playable household inventory and local import
+
+The November 27 inventory found the four listed VRM exports in the owner's Documents folder, plus `Able.vroid` (7,714,716 bytes) and `Alice.vroid` (8,332,016 bytes). Editable source filenames do not establish authorship, correspondence or use rights. No associated standalone textures, materials or character animation files were established for these supplied exports. The existing MToon and skin metadata refer to their own GLB data. The directory also contains unrelated FBX files with no confirmed household mapping.
+
+The owner authorized local import subject to the applicable licenses. The four inspected VRMs still specify `onlyAuthor` alongside third-party author credits, `modification: prohibited` and `allowRedistribution: false`. The `.vroid` files remain private source material. Keep their originals outside Unity and Git until an authorized export or rights-holder permission covers the intended local preview and retargeting. [VRM license fields](https://vrm.dev/licenses/1.0/)
+
+UniVRM **v0.131.4** is the candidate for Unity 6000.3.19f1 and URP 17.3.0. The official MIT-licensed release documents Unity 2022.3 LTS or later. It uses the following pinned UPM paths. The automated tool review rejected the isolated installation command with `blocked by policy`, so these package manifests were verified against the publisher and the editor installation remains unverified. The shared project manifest was left intact. [UniVRM release and installation](https://github.com/vrm-c/UniVRM/releases/tag/v0.131.4)
+
+```text
+com.vrmc.gltf  https://github.com/vrm-c/UniVRM.git?path=/Packages/UniGLTF#v0.131.4
+com.vrmc.vrm   https://github.com/vrm-c/UniVRM.git?path=/Packages/VRM10#v0.131.4
+```
+
+Use a separate local Unity project for the first cleared VRM 1.0 export. Preserve its metadata and original bytes. Validate MToon and textures in the active render pipeline, then inspect `Animator` bone mapping, bind-pose deltas and skinned mesh floor contact against the seeded functional anatomy. Check facial and gaze bindings on the actual rendered mesh. Keep animation data and model files out of the shared repository unless redistribution terms explicitly cover them. Where only a cleared `.vroid` source exists, use VRoid Studio's VRM 1.0 export dialog and carry forward the correct authorship and terms. [VRM import workflow](https://vrm.dev/en/univrm/import/univrm_import/)

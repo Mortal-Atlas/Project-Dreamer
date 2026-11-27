@@ -2,7 +2,13 @@
 
 Updated November 27, 2026.
 
-## Active Phase C.1.2 dynamic support
+## Active playable household
+
+- Branch `feature/embodiment-contact-lab`, [draft PR #8](https://github.com/Mortal-Atlas/Project-Dreamer/pull/8) targeting protected main. Started at `05c733b857e8246ce5df83e2c2502ab02e495eb2`. Shared household checkpoint `6fa5734`. Preserve the owner's ProBuilder preference, local source avatars and past native experiment records.
+- Living mode now runs the four people, furnishing, attention and typed experiences from the fixed-tick kernel. Isolated DX12 verified four days and 307 recorded events, paused controls, observer comparison and checkpoint restoration. The four VRM exports carry author-only terms. The authored appearance remains the existing procedural rig. [Report and Unity screenshots](PLAYABLE_HOUSEHOLD.md)
+- With a cleared source, run the isolated UniVRM preview on one teacher and verify actual MToon, facial bindings, skinned grounded pose and identity invariance. Then expand the household trial to a delayed replay/retention comparison. Continue C.1.3 prelift cancellation and controlled lowering separately. [Asset workflow](ASSET_AND_LICENSE_REGISTRY.md#playable-household-inventory-and-local-import)
+
+## Phase C.1.2 dynamic support
 
 - Branch `feature/embodiment-contact-lab`, [draft PR #8](https://github.com/Mortal-Atlas/Project-Dreamer/pull/8) targeting protected main. Started at `d7efca112d46167f70da77a1380b4b5123e8fde9`. Audit and numerical gates committed in `edd7169`. Exclude the owner's existing ProBuilder preference and local VRMs.
 - Held-out prepared trials achieved four supported lifts and 57.14 mm maximum native forward travel. No configuration completed a step. Seed 1010 fell during prelift on both sides. All attempted combined forward swings touched down early and later fell. Controlled return is open. Full raw trials and failed pilots are stored in the owner's `phase-c12` experiment backup. [Experiment evidence](LOWER_BODY_C12.md)
