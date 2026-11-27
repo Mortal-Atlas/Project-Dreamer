@@ -347,3 +347,13 @@ The clock checkpoint extends K evidence for §§5–7, 116, 124, 133 and 169. Pa
 ### G evidence
 
 [Active branch rules](IMPLEMENTATION_PROGRESS.md) and [continuation checkpoint](CONTINUATION_CHECKPOINT.md). GitHub confirmed the active main rules on November 26, 2026. Owner-controlled merging remains in effect.
+
+
+## Phase B.2 & Extended Master Specification (§§187–362)
+
+| Req ID | Summary | Status | Evidence / Implementation |
+| --- | --- | --- | --- |
+| §§187–210 | Phase B.2 Decomposed Residual, Safeguards, A–B–A Retention, Fallback Ledger | Implemented (Core + Tests) | `Assets/DreamMachine/Core/Body/DecomposedForceResidual.cs`, `RetentionExperiment.cs`, `DecomposedForceResidualTests.cs`, `RetentionExperimentTests.cs` |
+| §§211–260 | Three-Library $2^3$ Factorial Study Harness | Implemented (Core + Tests) | `Assets/DreamMachine/Core/Libraries/LibraryFactorialStudy.cs`, `LibraryFactorialTests.cs` |
+| §§261–348 | Developmental Embodiment, Senses & Town Director | Not started / Experimental | Planned for subsequent phases |
+| §§349–362 | Unity CLI/MCP, Agent Interop, Security & Reproducibility | In progress | `AGENTS.md`, `unityMCP` console/refresh integration |

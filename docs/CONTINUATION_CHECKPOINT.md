@@ -54,3 +54,17 @@ Updated November 26, 2026.
 - Executed Unity 6000.3.19f1 `-batchmode -nographics -projectPath <isolated project> -runTests -testPlatform EditMode -assemblyNames DreamMachine.Tests -testResults <results XML> -logFile <test log>`. The temporary DX12 harness ran two separate Unity launches with `-batchmode -force-d3d12 -projectPath <isolated project> -executeMethod SaveSmoke.Valid` and `SaveSmoke.Corrupt`. Harness and logs are under the workstation temporary directory `dreamer-editor-smoke-72ab91aae5194037bced0f66f0f2a4ab`. Play Mode checked app state and disk effects. [Results and limits](IMPLEMENTATION_PROGRESS.md)
 - Pending issues include the complete checkpoint contract, native crash reproduction in the owner workspace, visual and Android passes, and asset rights and rendering validation. The four avatar files were structurally inspected in their supplied location. [Avatar mapping and growth plan](ASSET_AND_LICENSE_REGISTRY.md)
 - Resume by fetching and inspecting the existing PR stack and uncommitted changes. On a dedicated feature branch start the single-learner step/save/restore scenario in §169. Verify that observer rendering leaves the authoritative state unchanged before introducing a new physics, audio or cognition subsystem.
+
+
+---
+## Checkpoint: Phase B.2 Adaptive Residual Redesign, Retention & Spec Reconciliation
+- **Branch:** `feature/embodiment-contact-lab`
+- **Tests:** `dotnet test dotnet/DreamMachine.Core.Tests -c Release --no-restore --nologo` -> **64/64 passed** (57 baseline + 7 new Phase B.2 tests).
+- **Implemented:**
+  - `Assets/DreamMachine/Core/Body/DecomposedForceResidual.cs`
+  - `Assets/DreamMachine/Core/Body/RetentionExperiment.cs`
+  - `Assets/DreamMachine/Core/Libraries/LibraryFactorialStudy.cs`
+  - `Assets/DreamMachine/Tests/EditMode/DecomposedForceResidualTests.cs`
+  - `Assets/DreamMachine/Tests/EditMode/RetentionExperimentTests.cs`
+  - `Assets/DreamMachine/Tests/EditMode/LibraryFactorialTests.cs`
+- **Docs Reconciled:** `docs/MASTER_IMPLEMENTATION_SPECIFICATION.md` (§§187–362), `docs/REQUIREMENTS_TRACEABILITY.md`.

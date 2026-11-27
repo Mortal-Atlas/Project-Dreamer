@@ -984,6 +984,28 @@ Read the whole specification, including repository governance and Appendix A. St
 
 ---
 
+# PART XXXIII–XL — EXTENDED MASTER SPECIFICATION (§§187–348)
+
+*Reconciled against `PROJECT_DREAMER_MASTER_IMPLEMENTATION_SPECIFICATION_v348.md` (348 master sections + 69 Appendix A sections = 417 total numbered requirements).*
+
+- **§§187–210 (Part XXXIII–XXXIV): Phase B.2 Adaptive Residual Redesign, Retention & Recovery**
+  - Decomposed functional residual components (`TrackingAssist`, `ContactAnticipation`, `LoadRegulation`, `EfficiencyCoasting`) with individual ($\pm 0.5\text{ N}\cdot\text{m}$), aggregate ($\pm 0.5\text{ N}\cdot\text{m}$), slew ($0.18\text{ N}\cdot\text{m/tick}$), and total actuator ($\pm 2.0\text{ N}\cdot\text{m}$) bounds.
+  - Strict prediction terminology (`SignedPredictionError = ObservedImpulse - PredictedImpulse`, `PredictedTargetDeviation`, `ActualTargetDeviation`) recorded before observation.
+  - A–B–A retention and interference protocol with physical-state resets between trials and signed performance metrics.
+  - Structured `FallbackLedger` separating `SensorInvalid` from `AdaptiveDivergence` and requiring explicit recovery authorization after $\ge 6$ consecutive stable ticks.
+- **§§211–260 (Part XXXV–XXXVII): Three-Library Cognitive Architecture & Factorial Evaluation**
+  - $2^3 = 8$ factorial evaluation of Library I (priors), Library II (hypothesis generator), and Library III (append-only beliefs) under matched inference budgets.
+- **§§261–348 (Part XXXVIII–XL): Developmental Embodiment, Senses, & Town Director**
+  - Infant-to-adult growth curves during sleep, directional hearing, articulatory synth, touch/pain bindings, and scripted NPC Town Director.
+
+# PART XLI — UNITY CLI, AGENT INTEROPERABILITY & REPRODUCIBILITY (§§349–362)
+
+- **§§349–354**: Unity CLI / MCP inspection, console error retrieval, screenshot verification, and headless batchmode test execution.
+- **§§355–358**: Multi-agent interoperability (`AGENTS.md` ground rules, branch protection, PR-only merges).
+- **§§359–362**: Security, sandboxed execution, deterministic seed reproducibility, and development-cost optimization.
+
+---
+
 # APPENDIX A — ORIGINAL PHASE II DIRECTIVE (RETAINED SOURCE)
 
 The following is the earlier supplied Phase II text, retained verbatim for detailed implementation continuity. Its section numbers are local to the appendix (1–69), not the master numbering above. Historical status reports and candidate technologies are not verified current facts. Apply the current roster (Merlin and Marie teach; Arthur and Alice learn), authoritative repository governance, ethical boundaries, resource constraints and dependency ordering from the master specification wherever the older text differs. Preserve all applicable detailed requirements and map them in the traceability document. Review source links and licenses before integrating dependencies.
