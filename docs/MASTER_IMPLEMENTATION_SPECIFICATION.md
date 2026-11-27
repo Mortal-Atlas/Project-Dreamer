@@ -857,6 +857,8 @@ Complete seeded growth, semantic skeleton, physical movement, VRM adapter, topol
 
 The [Physical Development Mode and Motor Vocabulary addendum](PHYSICAL_DEVELOPMENT_ADDENDUM.md) defines the household integration after L.5 moved-toy search and C.1.3 controlled return to double support. It specifies visible physical practice, a browser for motor evidence, Babel composition, and later generational and regulatory experiments.
 
+The [physical nervous-system specification](PHYSICAL_NERVOUS_SYSTEM_SPECIFICATION.md) maps this milestone to the existing anatomy and physical fixtures, defines the intention-to-actuation and sensory contracts, and gives acceptance criteria for supported manipulation in the household. C.1.3 advances lower-body support under its existing gates. Supported hand practice and the developmental ground route can progress without a complete bipedal step.
+
 ## 171. Milestone Three — Founding preschool
 
 Create Merlin and Marie as established teachers and Arthur and Alice as developing squires, using verified user avatar mappings. Introduce headless foundational incubator, attractive anime classroom, physical demonstrations, guidance withdrawal, drawing/writing and curriculum evaluation. Preserve sensorimotor checkpoints without flooding autobiography. Acceptance: a student observes a shape, attempts a physical reproduction, receives tactile/proprioceptive feedback and shows measurable retention/generalization or a documented inconclusive outcome. Teacher and student states, actual classroom visuals and persistence must be inspected.
