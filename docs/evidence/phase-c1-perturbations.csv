@@ -1,0 +1,8 @@
+case,static_friction,disabled_drive_mask,impulse_x_ns,impulse_z_ns,peak_tilt_deg,lowest_pelvis_m,max_slip_m,non_bilateral_ticks,non_foot_contacts,peak_body_impulse_ns
+lateral,0.85,0,0.35,0,0.1545,0.799147,0.000085,0,0,0.000000
+forward,0.85,0,0,0.35,0.7928,0.799138,0.000017,0,0,0.000000
+backward,0.85,0,0,-0.35,0.5009,0.799032,0.000019,0,0,0.000000
+large-lateral,0.85,0,4,0,3.0459,0.799105,0.008784,4,0,0.000000
+left-knee-off,0.85,2,0,0.35,96.4844,0.195427,1.132442,58,1169,16.818450
+drives-off,0.85,63,0,0.35,135.9680,0.109862,0.213990,0,1489,20.318420
+low-friction,0.1,0,0,1,1.9935,0.799110,0.000017,0,0,0.000000

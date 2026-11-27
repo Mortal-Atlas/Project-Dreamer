@@ -1,5 +1,11 @@
 # Implementation progress
 
+## Phase C.1 · native standing and transfer · November 27, 2026
+
+Built an opt-in PhysX rig with a free pelvis, six sagittal hinges and an actuated internal ballast. Five seeded anatomies passed six seconds of standing, left/re-centered/right transfer and momentum checks. The highest stance share was 67.2%, below the 85% stepping prerequisite. The perturbation trials produced measured falls under selected and full drive disabling. The lower-body tray exports both foot trajectories and stays separate from household saves and motor policies. [Protocol, traces and actual Unity capture](LOWER_BODY_C1.md)
+
+Release .NET passed 70 tests and isolated Unity Edit Mode passed 71. DX12 Play Mode exercised the laboratory study, visible tray and household scene. GitHub listed no submitted reviews or inline comments on #6 or #8 at the Phase C.1 check. [Native and household timing](PERFORMANCE_BENCHMARKS.md#phase-c1-native-lower-body)
+
 ## Phase C.0 · family standing, movement and controls · November 27, 2026
 
 Native DX12 family startup reproduced the hovering teacher rest poses and movement cycles at a stopped root. Neutral knee flexion now measures 5.1° instead of 65.9° for the teachers in the matched rest sample. Seeded crown height is within 1.1 mm and the sampled stance soles remain at ground height. Both teachers moved more than 0.55 m in the matched Play interval. The idle learner that moved zero metres kept a constant knee angle. The stable Simulation and Reset layout buttons preserved the paused checkpoint. An isolated static bilateral support reference begins C.1 without altering the household.

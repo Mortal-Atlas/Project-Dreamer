@@ -7,6 +7,16 @@ namespace DreamMachine.EditorTools
 {
     static class ElbowLabMenu
     {
+        [MenuItem("Dream Machine/Start Lower-Body Laboratory")]
+        static void OpenLowerBody()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode ||
+                !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            new GameObject("Lower-body laboratory").AddComponent<LowerBodyLabView>();
+            EditorApplication.EnterPlaymode();
+        }
+
         [MenuItem("Dream Machine/Start Elbow Laboratory")]
         static void Open() => Open(false);
 

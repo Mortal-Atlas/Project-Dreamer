@@ -20,7 +20,7 @@ The source is the [consolidated specification](MASTER_IMPLEMENTATION_SPECIFICATI
 | [12 Seeded anatomical generation](MASTER_IMPLEMENTATION_SPECIFICATION.md#12-seeded-anatomical-generation) | Anatomy and motion | §§5–7, 10 | Partial | [R](#r-evidence) |
 | [13 Growth and recalibration](MASTER_IMPLEMENTATION_SPECIFICATION.md#13-growth-and-recalibration) | Anatomy and motion | §§5–7, 10 | Partial | [R](#r-evidence) |
 | [14 Functional skeleton and movement](MASTER_IMPLEMENTATION_SPECIFICATION.md#14-functional-skeleton-and-movement) | Anatomy and motion | §§5–7, 10 | Partial | [R](#r-evidence) |
-| [15 Physical affordances and interaction](MASTER_IMPLEMENTATION_SPECIFICATION.md#15-physical-affordances-and-interaction) | Anatomy and motion | §§5–7, 10 | Not started | — |
+| [15 Physical affordances and interaction](MASTER_IMPLEMENTATION_SPECIFICATION.md#15-physical-affordances-and-interaction) | Anatomy and motion | §§5–7, 10 | Partial | [R](#r-evidence) · [C.1](LOWER_BODY_C1.md) |
 | [16 Topological skin architecture](MASTER_IMPLEMENTATION_SPECIFICATION.md#16-topological-skin-architecture) | Contact and motor learning | §§7, 12–15 | Not started | — |
 | [17 Material interaction and tactile signals](MASTER_IMPLEMENTATION_SPECIFICATION.md#17-material-interaction-and-tactile-signals) | Contact and motor learning | §§7, 12–15 | Not started | — |
 | [18 Proprioception and body schema](MASTER_IMPLEMENTATION_SPECIFICATION.md#18-proprioception-and-body-schema) | Contact and motor learning | §§7, 12–15 | Not started | — |
@@ -129,7 +129,7 @@ The source is the [consolidated specification](MASTER_IMPLEMENTATION_SPECIFICATI
 | [121 Facial expression and vocal synchronization](MASTER_IMPLEMENTATION_SPECIFICATION.md#121-facial-expression-and-vocal-synchronization) | Presentation | §§4–5, 9–15, 67–72 | Partial | [K](#k-evidence) |
 | [122 Stylized environmental effects and fidelity modes](MASTER_IMPLEMENTATION_SPECIFICATION.md#122-stylized-environmental-effects-and-fidelity-modes) | Presentation | §§4–5, 9–15, 67–72 | Not started | — |
 | [123 Immersive three-library presentation](MASTER_IMPLEMENTATION_SPECIFICATION.md#123-immersive-three-library-presentation) | Presentation | §§4–5, 9–15, 67–72 | Partial | [L](#l-evidence) |
-| [124 Modular workspace foundation](MASTER_IMPLEMENTATION_SPECIFICATION.md#124-modular-workspace-foundation) | Workspace and observatories | §§4, 7–8, 116 | Not started | — |
+| [124 Modular workspace foundation](MASTER_IMPLEMENTATION_SPECIFICATION.md#124-modular-workspace-foundation) | Workspace and observatories | §§4, 7–8, 116 | Partial | [C.1](LOWER_BODY_C1.md#observatory-and-continuation) |
 | [125 Workspace persistence and presets](MASTER_IMPLEMENTATION_SPECIFICATION.md#125-workspace-persistence-and-presets) | Workspace and observatories | §§4, 7–8, 116 | Not started | — |
 | [126 Shared interface components and accessibility](MASTER_IMPLEMENTATION_SPECIFICATION.md#126-shared-interface-components-and-accessibility) | Workspace and observatories | §§4, 7–8, 116 | Partial | [O](#o-evidence) |
 | [127 Brain observatory](MASTER_IMPLEMENTATION_SPECIFICATION.md#127-brain-observatory) | Workspace and observatories | §§4, 7–8, 116 | Partial | [O](#o-evidence) |
@@ -175,7 +175,7 @@ The source is the [consolidated specification](MASTER_IMPLEMENTATION_SPECIFICATI
 | [167 Version control and continuation](MASTER_IMPLEMENTATION_SPECIFICATION.md#167-version-control-and-continuation) | Reliability and release | §§3–8, 57, 181–186 | Partial | [Z](#z-evidence) |
 | [168 Milestone Zero — Repository recovery and audit](MASTER_IMPLEMENTATION_SPECIFICATION.md#168-milestone-zero--repository-recovery-and-audit) | Milestone Zero | §§2–3, 181–186 | Partial | [Z](#z-evidence) |
 | [169 Milestone One — Core infrastructure](MASTER_IMPLEMENTATION_SPECIFICATION.md#169-milestone-one--core-infrastructure) | Milestone delivery | §168 | Not started | — |
-| [170 Milestone Two — Functional embodiment](MASTER_IMPLEMENTATION_SPECIFICATION.md#170-milestone-two--functional-embodiment) | Milestone delivery | §169 | Not started | — |
+| [170 Milestone Two — Functional embodiment](MASTER_IMPLEMENTATION_SPECIFICATION.md#170-milestone-two--functional-embodiment) | Milestone delivery | §169 | Partial | [C.1](LOWER_BODY_C1.md) |
 | [171 Milestone Three — Founding preschool](MASTER_IMPLEMENTATION_SPECIFICATION.md#171-milestone-three--founding-preschool) | Milestone delivery | §170 | Not started | — |
 | [172 Milestone Four — Integrated memory and cognition](MASTER_IMPLEMENTATION_SPECIFICATION.md#172-milestone-four--integrated-memory-and-cognition) | Milestone delivery | §171 | Not started | — |
 | [173 Milestone Five — Persistent living world](MASTER_IMPLEMENTATION_SPECIFICATION.md#173-milestone-five--persistent-living-world) | Milestone delivery | §172 | Not started | — |
@@ -264,7 +264,9 @@ The source is the [consolidated specification](MASTER_IMPLEMENTATION_SPECIFICATI
 
 ## Evidence register
 
-Phase C.0 adds evidence for §§6, 12–15, 116, 124–125, 128, 148, 150–151, 153 and 170. Isolated native family runs verify grounded pose and movement-coupled display, scene startup, layout recovery without checkpoint changes and the stable geometry anchors. A separate static C.1 support reference checks analytical bilateral load redistribution. Native lower-body contact forces, physical walking, falling and developmental ground locomotion remain open. [Audit and screenshots](FUNCTIONAL_EMBODIMENT_C0.md)
+Phase C.1 extends §§12–15, 116, 124–125, 128, 148, 150–151, 153, 157 and 170. The native pelvis and six driven leg joints stand freely and transfer load in both directions. The fixed stance threshold blocks stepping. The isolated experiment produces measured collapses when drive torque is removed. The fixture is separate from household cognition, developmental motor learning and checkpoint requirements. [Phase C.1 requirements and evidence](LOWER_BODY_C1.md#requirements-crosswalk)
+
+Phase C.0 adds evidence for §§6, 12–15, 116, 124–125, 128, 148, 150–151, 153 and 170. Isolated native family runs verify grounded pose and movement-coupled display, scene startup, layout recovery without checkpoint changes and the stable geometry anchors. C.0 also supplied the ideal static bilateral support reference now used for C.1. [Audit and screenshots](FUNCTIONAL_EMBODIMENT_C0.md)
 
 Phase B.1 extends §§14, 16–21, 57, 124, 128–129, 148, 157 and 170 with a separately scored impulse predictor, bounded and uncertainty-gated corrections, a persisted fallback record, and predeclared matched control gates. Passing a baseline margin does not establish a competitive force-aware advantage. Proposed §§240–316 and their v239 base remain programmatically untraceable until the authoritative texts are supplied. Existing Appendix A is unchanged. [B.1 evidence and source gap](FORCE_AWARE_PHASE_B1.md)
 

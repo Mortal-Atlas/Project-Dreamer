@@ -2,7 +2,13 @@
 
 Updated November 27, 2026.
 
-## Active Phase C.0 household audit
+## Active Phase C.1 native lower body
+
+- Branch `feature/embodiment-contact-lab`, [draft PR #8](https://github.com/Mortal-Atlas/Project-Dreamer/pull/8) against protected main. Started from `df76086e69d9866b8bba4221f455ac45190af026`. Protocol and pilot evidence checkpoint at `cb93e58`. The owner's pre-existing ProBuilder preference remains outside the branch commits. No temporary Git worktree was created.
+- Five seeded rigs passed fixed standing and the bilateral transfer gates. The strongest stance carried 67.2% of measured support, below the 85% required for a commanded step. Selected drive disabling caused a measured physical fall. The household smoke check and both regression suites passed. [Protocol, telemetry and screenshot](LOWER_BODY_C1.md)
+- In the existing fixture, add bounded native frontal-plane hip and ankle actuation with joint limits. Evaluate on fresh anatomies at the existing fixed step, with the same joint, effort, momentum, penetration and slip gates. Gate one physical swing on ≥85% measured stance load. Preserve the selected-drive and friction controls. Leave adaptive locomotion and recovery separate until this engineered step is verified.
+
+## Phase C.0 household audit
 
 - Branch `feature/embodiment-contact-lab`, [draft PR #8](https://github.com/Mortal-Atlas/Project-Dreamer/pull/8) against protected main. Started from `4f03b84a842eed4db1a447806b6629273262641b`. The owner's pre-existing `ProjectSettings/Packages/com.unity.probuilder/Settings.json` edit remains outside the branch commits. No temporary Git worktree was created.
 - Baseline passed 67 .NET and 68 Unity Edit Mode tests. Corrected core passed 70 tests, including the B.2 regression, and the isolated Unity Edit Mode suite passed 71. Run the family startup and posture verification from [tools/unity](../tools/unity/README.md). Actual native screenshots and witness measurements are in the [Phase C.0 audit](FUNCTIONAL_EMBODIMENT_C0.md). Run `dotnet run --project dotnet/DreamMachine.Cli -c Release -- --lower-body` for the first isolated support reference.

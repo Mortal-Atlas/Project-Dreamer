@@ -103,3 +103,11 @@ Seven alternating Windows Release pairs used seed 11, Laptop preset, the 16×16 
 | Twelve | 29,621 | 29,094 | −1.8% |
 
 These measured deltas are smaller than the between-run variation and do not replace the historical environment-specific baseline. Exact tick progression is unchanged. The yard sweep runs only when a learner requests movement.
+
+## Phase C.1 native lower body
+
+In the isolated DX12 editor, native stepping averaged 0.831 ms per 0.05 s experiment tick across 20 configuration and condition means (0.788–0.937 ms range). The timed scope includes ten PhysX substeps, drive evaluation and physics telemetry and excludes CSV formatting and rendering. This corresponds to about 1,200 fixture ticks/s for the measured workload. The 200-tick matched run used four ticks per frame in its observed condition and returned identical pelvis and foot-impulse samples. This does not establish a sustained rendered acceleration rate.
+
+At paused tick 101, 100 direct tray refreshes averaged 27.296 µs with the tray open and 0.090 µs closed. These timings cover dispatch and telemetry formatting. Frame layout, GPU work and retained allocations are outside the timed scope. The export control wrote 101 tick rows with both world-space foot trajectories.
+
+Five fresh Release CLI process launches per cast gave household medians of 44,720 ticks/s for four people (34,814–45,653) and 28,870 for twelve (26,547–29,471). The owner's Unity editor remained open and isolated editor work overlapped this benchmark. The opt-in PhysX fixture has no household kernel call path. The timings are descriptive and do not establish that C.1 changed household throughput.
