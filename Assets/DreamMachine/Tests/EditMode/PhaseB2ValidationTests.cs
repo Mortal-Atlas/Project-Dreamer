@@ -54,12 +54,12 @@ namespace DreamMachine.Tests
                 TestContext.Out.WriteLine($"Mode={mode}: A1Final={rep.PhaseA1FinalScore:F4}, BFinal={rep.PhaseBFinalScore:F4}, A2Init={rep.PhaseA2InitialScore:F4}, A2Final={rep.PhaseA2FinalScore:F4}, SignedInterf={rep.SignedInterference:F4}, Relearn={rep.RelearningSpeed:F4}");
             }
 
-            // 3. 3-Library Factorial Pilot
-            TestContext.Out.WriteLine("=== 3-LIBRARY FACTORIAL PILOT ===");
-            var factorial = LibraryFactorialStudy.RunMatchedBudgetStudy(100);
+            // 3. 3-Library Behavioral Benchmark (8 factorial + UnifiedMemoryBaseline)
+            TestContext.Out.WriteLine("=== 3-LIBRARY BEHAVIORAL BENCHMARK ===");
+            var factorial = LibraryFactorialStudy.RunBehavioralBenchmark(24, 4);
             foreach (var f in factorial)
             {
-                TestContext.Out.WriteLine($"{f.Condition.Label}: Acc={f.TaskAccuracy:F2}, Rate={f.AdaptationRate:F2}, Beliefs={f.BeliefCount}, Budget={f.InferenceStepsUsed}");
+                TestContext.Out.WriteLine($"{f.Name}: Tasks={f.TotalTasks}, Succ={f.SuccessfulOutcomes}, Acc={f.TaskAccuracy:F3}, Ops={f.CognitiveOperations}, Budget={f.BudgetConsumed}, Beliefs={f.BeliefsFormed}, CF={f.CounterfactualsEvaluated}, MemRet={f.MemoryRetrievals}");
             }
         }
     }

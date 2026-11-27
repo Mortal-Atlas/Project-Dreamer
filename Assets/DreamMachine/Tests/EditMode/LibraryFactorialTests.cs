@@ -6,16 +6,17 @@ namespace DreamMachine.Tests
     public class LibraryFactorialTests
     {
         [Test]
-        public void FactorialStudy_GeneratesAllEightConditions_WithMatchedBudget()
+        public void BehavioralBenchmark_RunsAllEightConditionsAndUnifiedBaseline()
         {
-            var results = LibraryFactorialStudy.RunMatchedBudgetStudy(100);
-            Assert.AreEqual(8, results.Count);
-            for (int i = 0; i < results.Count; i++)
+            var results = LibraryFactorialStudy.RunBehavioralBenchmark(24, 4);
+            Assert.AreEqual(9, results.Count);
+            for (int i = 0; i < 8; i++)
             {
                 Assert.AreEqual(i, results[i].Condition.ConditionIndex);
-                Assert.AreEqual(100, results[i].InferenceStepsUsed);
+                Assert.AreEqual(24, results[i].TotalTasks);
             }
-            Assert.Greater(results[7].TaskAccuracy, results[0].TaskAccuracy);
+            Assert.AreEqual("UnifiedMemoryBaseline", results[8].Name);
+            Assert.Greater(results[8].CognitiveOperations, 0);
         }
     }
 }

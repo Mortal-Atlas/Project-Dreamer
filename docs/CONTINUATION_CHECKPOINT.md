@@ -68,3 +68,16 @@ Updated November 26, 2026.
   - `Assets/DreamMachine/Tests/EditMode/RetentionExperimentTests.cs`
   - `Assets/DreamMachine/Tests/EditMode/LibraryFactorialTests.cs`
 - **Docs Reconciled:** `docs/MASTER_IMPLEMENTATION_SPECIFICATION.md` (§§187–362), `docs/REQUIREMENTS_TRACEABILITY.md`.
+
+
+---
+## Checkpoint: Phase B.2 Closure, Track A Multi-Joint & Track C Benchmark Integrity
+- **Phase B.2 Closure (Honest Limitations):**
+  - `FrozenDecomposed` reduced peak impulse by ~69.6% (`0.2229` vs `0.7333 N·s`) but increased tracking error by ~387% (`0.0263` vs `0.0054`) and mechanical work by ~9.7% (`0.9155` vs `0.8346`).
+  - `0.72 N·s` is an adaptation-disable trigger, not a hard physical safety guarantee (the engineered fallback itself produced `0.7333 N·s`).
+  - A–B–A retention was inconclusive (`SignedInterference = 0.0000` across all 5 modes).
+  - Native Unity verification remains incomplete (`unityMCP` returned `no_unity_session`).
+- **Track A (Multi-Joint Functional Embodiment):**
+  - Added `Assets/DreamMachine/Core/Body/ShoulderElbowWristLab.cs` + `ShoulderElbowWristLabTests.cs` (3-DOF planar reaching, joint limits, forward kinematics, contact damping, mechanical work, binary persistence).
+- **Track C (Cognitive Benchmark Integrity):**
+  - Replaced synthetic placeholder in `LibraryFactorialStudy.cs` with a real behavioral benchmark (contingency shifts, misleading priors, counterfactuals, lived memory, and `UnifiedMemoryBaseline`).
