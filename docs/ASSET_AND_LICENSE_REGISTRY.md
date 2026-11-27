@@ -18,3 +18,18 @@ All four metadata blocks specify `onlyAuthor`, `personalNonProfit`, required cre
 The same learner and semantic skeleton persist from birth. Keep the seeded functional rig authoritative for segment proportions, joints and control. At birth, use the existing labeled procedural baby representation as a baseline. For the finished art, create or obtain appropriately licensed baby and child meshes for Arthur and Alice. Carry recognizable facial features, hair and palette across age variants. Bind each mesh to the same semantic skeleton and change its visual binding at documented developmental stages. Preserve the identity ID, policy, saved age and receptor bindings through the transition. Use a compatible authorized mature mesh when the body reaches its intended human proportions.
 
 Start with one licensed test avatar in the isolated Unity project. Verify URP and MToon, facing direction, bind pose, joint mapping, and scale. Test that changing the display asset leaves the same simulated pose, geometry and saved identity. Inspect age transitions for clothing fit and skin distortion. No importer or package was installed during this audit. [Anatomy baseline](HUMANOID_RIG.md) · [Existing dependency reviews](PHASE_II_DEPENDENCIES.md)
+
+## Phase C.1.1 lower-body retargeting compatibility
+
+The read-only GLB JSON audit traversed the original scene graph and resolved hips, both upper and lower legs, feet and toes. Distances use the authored glTF rest transforms. The shoe mesh sole can sit below a toe bone. The listed toe heights are landmarks, so the adapter still needs measured sole alignment after an authorized import.
+
+| Avatar | Rest hips Y (m) | Thigh (m) | Shin (m) | Both toe Y (m) |
+| --- | ---: | ---: | ---: | ---: |
+| Merlin | 1.007 | 0.370 | 0.461 | 0.048 |
+| Marie | 0.874 | 0.340 | 0.400 | 0.036 |
+| Arthur | 0.940 | 0.356 | 0.414 | 0.053 |
+| Alice | 0.758 | 0.291 | 0.346 | 0.039 |
+
+All four export the same local rest orientation offsets for the measured channels. Around their local X axes the hips start at +7.21°, upper legs at −6.01°, lower legs at +2.61° and feet at −3.50°. Three skins and inverse bind matrix accessors are present per model, and the inspected lower-body joint nodes occur in the skin data. Those checks establish a mapping candidate. They leave actual vertex deformation, coordinate conversion and ground alignment for a rendered trial. Compute the observed physical joint delta relative to its own rest frame, convert it to the avatar joint frame and compose it with the avatar rest rotation. Include hip and ankle frontal rotations as well as sagittal pitch. Keep visible bone scale and per-avatar ground offsets on the view side. The seed and identity remain with the physical individual.
+
+Current per-file permission terms keep these four local source assets out of a shared build. No paid or replacement assets were acquired. Assess actual skinning, adult and infant mesh compatibility, and joint transfer with an authorized test model after permission is resolved. [VRM 1.0 humanoid convention](https://vrm.dev/en/vrm1/humanoid/)
