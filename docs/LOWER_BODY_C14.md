@@ -1,4 +1,4 @@
-﻿# C.1.4 active prelift stabilization
+# C.1.4 active prelift stabilization
 
 ## Diagnosis and response
 
@@ -22,5 +22,7 @@ After freezing the response, four fresh anatomies at two ages each received a si
 The C.1.3 combined comparator also had two return timeouts without a body fall. Peak effort fraction averaged 0.70 for the two active policies, with no recorded saturation. Development peak clearance was 17.352 mm, and maximum travel across development conditions was 51.499 mm versus the unchanged 80 mm full-step gate. No automatic reattempt was evaluated. The prelift response expands the validated recovery envelope on these fixtures. Full locomotion remains open.
 
 ## Reproduction and continuation
+
+The isolated visual run captured the brake at tick 244 and double support at tick 277. The paired unobserved scene matched through 480 ticks with zero measured difference. The C.1.4 commit passed 98 .NET tests and 99 Unity Edit Mode tests. The PNG evidence remains local.
 
 Run `PreliftStabilizationStudy.Development` and `PreliftStabilizationStudy.HeldOut` from the guarded scratch editor on Unity 6000.3.19f1 and D3D12. Full native telemetry remains under the scratch product's persistent data directory. Run `LowerBodyDynamicStudy.PreliftVisual` for local frames and observer parity. Compact measurements are committed. The next development priority is the supported hand and collision diagnostics. [Study harness](../tools/unity/PreliftStabilizationStudy.cs)

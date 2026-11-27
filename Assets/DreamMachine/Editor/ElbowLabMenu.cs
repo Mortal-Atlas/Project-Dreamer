@@ -17,6 +17,16 @@ namespace DreamMachine.EditorTools
             EditorApplication.EnterPlaymode();
         }
 
+        [MenuItem("Dream Machine/Start Supported Hand Laboratory")]
+        static void OpenSupportedHand()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode ||
+                !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            new GameObject("Supported hand laboratory").AddComponent<HandLabView>();
+            EditorApplication.EnterPlaymode();
+        }
+
         [MenuItem("Dream Machine/Start Elbow Laboratory")]
         static void Open() => Open(false);
 

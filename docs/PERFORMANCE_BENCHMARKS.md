@@ -182,3 +182,7 @@ Five matched-process triples used Release, the Laptop 16×16 grid, seed 11, 30 w
 The living benchmark recorded 137 episodes, allocated 387,896 current-thread bytes across the timed whole ticks, and captured a 26,649-byte checkpoint. The fixed binary archive stores 17 bytes per episode before outer checkpoint overhead. Whole-file size also depends on older learner and environmental state. Run `dotnet run --project dotnet/DreamMachine.Cli -c Release -- --benchmark --living` to reproduce the active household benchmark.
 
 In DX12 editor Play Mode, 160 direct household view updates averaged 0.0223 ms each, including applying actor root, foot pose, gaze, blink and current object presentation. Twelve warmed 1280×720 `Camera.Render` calls averaged 1.228 ms with the legacy presentation, 0.787 ms in living mode, and 1.305 ms with the experience panel visible. These are CPU-side elapsed submit/call timings on a frozen scene with each mode's default camera composition. GPU-only time, per-operation activity attribution and supplied-model costs remain unmeasured.
+
+## C.1.4 and H1
+
+Independent native comparisons retain 5 ms substeps. C.1.4 reports recovery-specific work and timing by controller, separate from household kernel throughput. H1 reports native integration, hand command, contact, capture, browser refresh and CPU camera cost, plus an eight-pair Living benchmark against the rebuilt L.4 baseline. [Prelift measurements](LOWER_BODY_C14.md#native-comparisons) [Hand and Living measurements](PHYSICAL_HAND_H1.md#measured-cost)

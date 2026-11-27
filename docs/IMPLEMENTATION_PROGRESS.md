@@ -1,5 +1,7 @@
 # Implementation progress
 
+C.1.4 and H1 verify active prelift recovery, an anatomical pair registry, pose diagnostics, a native supported grasp, and small scalar acquisition with parameter retention. The Motor attempts tray replays actual laboratory successes and failures. The next milestone is learner-bound practice inside Physical Development Mode. [H1 report](PHYSICAL_HAND_H1.md) [Body audit](BODY_INTEGRITY_AUDIT.md)
+
 ## Physical development planning · November 27, 2026
 
 The planning addendum defines an optional household Physical Development Mode, persistent motor records, the Motor Vocabulary Browser, Babel composition, and generational and regulatory experiments. The nervous-system specification audits the actual fixtures and defines control interfaces, sensing, supported manipulation, and mode and persistence boundaries. L.5 adds a verified moved-toy search and checkpoint continuation. C.1.3 demonstrated controlled bilateral return after swing in the isolated native experiment. C.1.4 recovered both seed-1010 prelift cases and all eight held-out perturbed cases with active stabilization. A complete step remains open. [C.1.4 results](LOWER_BODY_C14.md) [L.5 results](SPATIAL_LEARNING_L5.md) [C.1.3 results](LOWER_BODY_C13.md) [Addendum](PHYSICAL_DEVELOPMENT_ADDENDUM.md) · [Nervous-system specification](PHYSICAL_NERVOUS_SYSTEM_SPECIFICATION.md)

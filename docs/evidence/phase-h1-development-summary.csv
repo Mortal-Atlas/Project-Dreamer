@@ -1,0 +1,6 @@
+attempt,seed,mass_kg,radius_m,friction,closing_cap_n,close_ticks,yaw_deg,result,duration_ticks,hold_ticks,lift_mm,support_mean_n,weight_n,slip_ticks,peak_pad_n,penetration_mm,peak_guide_mm,work_j,mean_tick_us,command_us,sensing_us,record_us
+nominal,37,0.080,0.028,0.75,3.200,12,0,physical-lift-hold-release,71,12,57.526,0.78456,0.78480,0,3.200,0.063,18.64,1.73705,630.72,39.09,12.16,4.21
+low-force,37,0.080,0.028,0.75,0.180,12,0,hold-gate-failed,78,0,0.000,0.78456,0.78480,6,2.901,0.110,33.21,1.65207,505.53,23.76,5.69,0.93
+high-force,37,0.080,0.028,0.75,6.500,12,0,physical-lift-hold-release,71,12,58.534,0.78456,0.78480,0,3.339,0.029,18.02,1.76751,572.40,26.95,8.41,0.93
+smoother-close,443,0.063,0.029,0.68,2.600,18,27,physical-lift-hold-release,77,12,58.243,0.61784,0.61803,0,2.600,0.041,21.41,1.74068,549.71,24.45,7.76,0.89
+lower-friction,587,0.105,0.027,0.26,3.200,12,48,physical-lift-hold-release,71,12,56.430,1.02974,1.03005,0,3.135,0.072,19.19,1.74248,503.02,23.36,6.97,0.82

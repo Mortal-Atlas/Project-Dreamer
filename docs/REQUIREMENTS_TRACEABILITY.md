@@ -419,6 +419,15 @@ The clock checkpoint extends K evidence for §§5–7, 116, 124, 133 and 169. Pa
 | --- | --- | --- | --- |
 | C.1.4 sections 4-7. Prelift diagnosis, physical braking and intact gates | Existing PhysX actuation, pressure and edge support, explicit stabilization stage | Verified for the matched native cohort | Both 1010 sides and all eight fresh perturbed attempts returned under the active policy. Complete step remains open. [C.1.4 measurements](LOWER_BODY_C14.md) |
 
+## Phase H1 body integrity and physical manipulation
+
+| Requirement | Dependency and implementation | Status | Verification |
+| --- | --- | --- | --- |
+| C.1.4 sections 8-11. Body integrity and visual-versus-physical diagnosis | Seeded source proxies, executable adjacent collision registry and private posed Unity captures | Partial | 52 imposed poses, 520 pair samples, 9 over the 2 mm reporting threshold. No moving skin or garment correction or solver claim. [Audit](BODY_INTEGRITY_AUDIT.md) |
+| C.1.4 sections 12-16. Supported physical hand, calibrated contact and grasp | Native isolated constrained wrist, opposing guides and a free object under gravity | Verified for H1 fixture | Known table load, actual hold and release, native 4/4 fixed-policy fresh results and weak-grip failure. Effective pad area and angular digit dexterity open. [Physical hand](PHYSICAL_HAND_H1.md) |
+| C.1.4 sections 17-20. Adaptation, retention and transfer | Measured slip update, stable individual and versioned skill | Verified for bounded scalar practice, partial transfer | Separate Unity process restored eight practice records and scored 2/2 familiar and 2/4 held-out. [Acquisition evidence](PHYSICAL_HAND_H1.md#acquisition-retention-and-transfer) |
+| C.1.4 sections 21-24. Browser, movement composition, libraries and live integration | Bounded laboratory replay, typed practice records, shared clock and household-mode prerequisites | Partial | Actual laboratory playback passes observer checks. Babel composition, durable library links and learner-bound household practice remain open. [Browser](PHYSICAL_HAND_H1.md#browser-and-provenance) |
+
 ## Physical development and motor vocabulary addendum
 
 The [nervous-system audit](PHYSICAL_NERVOUS_SYSTEM_SPECIFICATION.md#existing-system-audit) identifies existing fixture evidence and integration gaps. The [acceptance plan](PHYSICAL_NERVOUS_SYSTEM_SPECIFICATION.md#experimental-acceptance) records matched tests and scope for the related master requirements §§5–6, 12–21, 46–49, 56–57, 62–64, 92, 128–132, 137, 156–158, 170, 172 and 175.
