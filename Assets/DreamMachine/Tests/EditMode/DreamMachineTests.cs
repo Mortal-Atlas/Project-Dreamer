@@ -22,6 +22,41 @@ namespace DreamMachine.Tests
     public class ElbowLabTests
     {
         [Test]
+        public void ImpulseForecastIgnoresQueryLabelAndForceFallbackPersists()
+        {
+            var previous = new ElbowLab.StepSample(1, 0.9, 0, 0.1, 999, 999,
+                new ElbowLab.Proprioception(0.25, 2, 1.5, -0.3));
+            var data = new List<ImpulsePredictor.Example>();
+            for (int i = 0; i < 10; i++) data.Add(new ImpulsePredictor.Example(previous, 0.9, 0.2 + i * 0.01));
+            var model = new ImpulsePredictor(data).Calibrate(data);
+            var p = model.Predict(new ImpulsePredictor.Example(previous, 0.9, 0));
+            Assert.AreEqual(p, model.Predict(new ImpulsePredictor.Example(previous, 0.9, 100)));
+            var force = new ForceResidual(true);
+            var ungated = new ForceResidual(false);
+            for (int n = 0; n < 4; n++)
+            {
+                force.Before(previous, 0.9, p.Impulse, 0.4);
+                ungated.Before(previous, 0.9, p.Impulse, 0.4);
+            }
+            Assert.That(Math.Abs(force.PreviousCorrection), Is.LessThan(Math.Abs(ungated.PreviousCorrection)));
+            var impact = new ElbowLab.StepSample(2, 0.9, 0.25, 0.8, 0, 0, previous.Feedback);
+            force.After(impact, 0.9, p.Impulse, p.Uncertainty);
+            Assert.AreEqual(ForceFallback.PeakImpulse, force.Fallback);
+            Assert.AreEqual(2, force.FallbackTick);
+            using var memory = new MemoryStream();
+            using var writer = new BinaryWriter(memory);
+            model.Write(writer);
+            force.Write(writer);
+            memory.Position = 0;
+            using var reader = new BinaryReader(memory);
+            Assert.AreEqual(p, ImpulsePredictor.Read(reader).Predict(data[0]));
+            var copy = ForceResidual.Read(reader);
+            Assert.AreEqual(force.SignedError, copy.SignedError);
+            Assert.AreEqual(ForceFallback.PeakImpulse, copy.Fallback);
+            Assert.AreEqual(0, copy.Before(previous, 0.9, p.Impulse, p.Uncertainty));
+        }
+
+        [Test]
         public void PredictiveCorrectionAndLearningAreBoundedAndPersisted()
         {
             var predictor = new ContactPredictor();

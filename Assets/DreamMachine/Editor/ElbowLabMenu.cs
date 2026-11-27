@@ -16,7 +16,10 @@ namespace DreamMachine.EditorTools
         [MenuItem("Dream Machine/Start Predictive Elbow Laboratory")]
         static void OpenPredictive() => Open(true, true);
 
-        static void Open(bool native, bool predictive = false)
+        [MenuItem("Dream Machine/Start Force-Aware Elbow Laboratory")]
+        static void OpenForceAware() => Open(true, false, true);
+
+        static void Open(bool native, bool predictive = false, bool force = false)
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode ||
                 !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
@@ -24,6 +27,7 @@ namespace DreamMachine.EditorTools
             var view = new GameObject("Elbow Laboratory").AddComponent<ElbowLabView>();
             view.UseNativePhysics = native;
             view.UsePredictiveMotor = predictive;
+            view.UseForceMotor = force;
             EditorApplication.EnterPlaymode();
         }
     }

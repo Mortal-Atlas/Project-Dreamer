@@ -29,11 +29,14 @@ namespace DreamMachine.UnityBridge
         }
 
         public ElbowLab.StepSample Step()
+            => Step(null);
+
+        public ElbowLab.StepSample Step(double? replacementCorrection)
         {
             var plan = Motor.Before(Lab.Latest, Lab.RequestedTarget);
             LastProbability = plan.Probability;
-            LastProposal = plan.Correction;
-            ElbowLab.StepSample result = Lab.Step(plan.Correction);
+            LastProposal = replacementCorrection ?? plan.Correction;
+            ElbowLab.StepSample result = Lab.Step(LastProposal);
             LastError = Motor.After(plan.Probability, result);
             HasFeedback = true;
             return result;
@@ -85,7 +88,11 @@ namespace DreamMachine.UnityBridge
         public static PredictiveNativeTrial LoadCheckpoint(string path)
         {
             byte[] data = ReadFile(path);
-            if (data == null) return null;
+            return data == null ? null : RestoreCheckpoint(data);
+        }
+
+        public static PredictiveNativeTrial RestoreCheckpoint(byte[] data)
+        {
             var state = Decode(data);
             NativeElbowLab lab = NativeElbowLab.RestoreCheckpoint(state.Physics);
             if (lab.IndividualId != state.Id)
@@ -99,6 +106,8 @@ namespace DreamMachine.UnityBridge
                 LastError = state.Error, LastProposal = state.Proposal
             };
         }
+
+        public static void ValidateCheckpoint(byte[] data) => Decode(data);
 
         static (string Id, string Model, PredictiveMotor Motor, bool Feedback, double Probability,
             double Error, double Proposal, byte[] Physics) Decode(byte[] data)

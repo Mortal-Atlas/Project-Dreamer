@@ -20,7 +20,9 @@ namespace DreamMachine.UnityBridge
         IElbowFixture _lab;
         public bool UseNativePhysics;
         public bool UsePredictiveMotor;
+        public bool UseForceMotor;
         PredictiveNativeTrial _predictive;
+        ForceAwareTrial _force;
         TrayWorkspace _workspace;
         Transform _arm, _puck;
         Text _telemetry, _statusLabel;
@@ -29,7 +31,7 @@ namespace DreamMachine.UnityBridge
         float _nextRefresh;
         const string Tray = "embodiment.elbow";
         string Checkpoint => Path.Combine(Application.persistentDataPath,
-            UsePredictiveMotor ? "elbow-predictive.checkpoint" :
+            UseForceMotor ? "elbow-force.checkpoint" : UsePredictiveMotor ? "elbow-predictive.checkpoint" :
             UseNativePhysics ? "elbow-native.checkpoint" : "elbow-lab.checkpoint");
 
         void Start()
@@ -75,6 +77,14 @@ namespace DreamMachine.UnityBridge
 
         void InitializeLab()
         {
+            if (UseForceMotor)
+            {
+                _force = ForceAwareTrial.LoadCheckpoint(Checkpoint) ??
+                    throw new InvalidDataException("Supply a development-validated elbow-force.checkpoint in " +
+                        Application.persistentDataPath);
+                _lab = _force.Lab;
+                return;
+            }
             if (UsePredictiveMotor)
             {
                 _predictive = PredictiveNativeTrial.LoadCheckpoint(Checkpoint);
@@ -101,13 +111,14 @@ namespace DreamMachine.UnityBridge
         {
             if (_workspace == null) return;
             if (DreamInput.WasPressed(KeyCode.Tab)) _workspace.Toggle(Tray);
-            if (_lab != null && !(_predictive?.Finished ?? _lab.Finished))
+            if (_lab != null && !Finished())
             {
                 int count = _clock.TakeSingleStep() ? 1 : _clock.Plan(Time.unscaledDeltaTime, WorldSimulation.Dt, 8);
-                for (int i = 0; i < count && !(_predictive?.Finished ?? _lab.Finished); i++)
+                for (int i = 0; i < count && !Finished(); i++)
                 {
-                    if (_predictive == null) _lab.Step();
-                    else _predictive.Step();
+                    if (_force != null) _force.Step();
+                    else if (_predictive != null) _predictive.Step();
+                    else _lab.Step();
                 }
                 if (count > 0) DrawBody();
             }
@@ -117,6 +128,8 @@ namespace DreamMachine.UnityBridge
                 _workspace.RefreshVisible();
             }
         }
+
+        bool Finished() => _force?.Finished ?? _predictive?.Finished ?? _lab.Finished;
 
         Transform Primitive(string label, PrimitiveType shape, Transform parent, Vector3 position, Vector3 scale, Color color)
         {
@@ -156,12 +169,24 @@ namespace DreamMachine.UnityBridge
             });
             AddButton(parent, 3, "Save", () => TryFile(() =>
             {
-                if (_predictive != null) _predictive.SaveCheckpoint(Checkpoint);
+                if (_force != null) _force.SaveCheckpoint(Checkpoint);
+                else if (_predictive != null) _predictive.SaveCheckpoint(Checkpoint);
                 else if (_lab is NativeElbowLab native) native.SaveCheckpoint(Checkpoint);
                 else if (_lab is ElbowLab reference) reference.SaveCheckpoint(Checkpoint);
             }));
             AddButton(parent, 4, "Restore", () => TryFile(() =>
             {
+                if (UseForceMotor)
+                {
+                    var restoredForce = ForceAwareTrial.LoadCheckpoint(Checkpoint) ??
+                        throw new InvalidDataException("No force-aware checkpoint.");
+                    _force?.Dispose();
+                    _force = restoredForce;
+                    _lab = restoredForce.Lab;
+                    _clock.Paused = true;
+                    DrawBody();
+                    return;
+                }
                 if (UsePredictiveMotor)
                 {
                     var restoredTrial = PredictiveNativeTrial.LoadCheckpoint(Checkpoint) ??
@@ -219,6 +244,14 @@ namespace DreamMachine.UnityBridge
                     _readout.AppendLine($"Baseline {native.LastBaselineTorque:F2} · correction {native.LastAppliedCorrection:F2} · final {sensed.Effort:F2} N m");
                     _readout.AppendLine($"Predicted {_predictive.LastProbability:P1} · observed {(_lab.Latest.NormalImpulse > 0 ? 1 : 0)} · error {_predictive.LastError:+0.000;-0.000;0.000}");
                 }
+            }
+            if (_force != null)
+            {
+                var residual = _force.Residual;
+                _readout.AppendLine($"Force-aware {(residual.Gated ? "gated" : "ungated")} · gain {residual.Gain:F3} · updates {residual.Updates}");
+                _readout.AppendLine($"Predicted {_force.Prediction:F3} ± {_force.Uncertainty:F3} N s · signed error {residual.SignedError:+0.000;-0.000;0.000} N s");
+                _readout.AppendLine($"Correction {residual.PreviousCorrection:+0.000;-0.000;0.000} N m · fallback {residual.Fallback}" +
+                    (residual.FallbackTick > 0 ? " at tick " + residual.FallbackTick : ""));
             }
             for (int i = 0; i < ElbowLab.ReceptorCount; i++)
             {

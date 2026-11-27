@@ -86,3 +86,9 @@ The same Unity 6000.3.19f1 Windows DX12 workstation ran 12 configurations × fou
 One 1,596-byte composite checkpoint published in 15.823 ms. A fresh process loaded and reconstructed it in 25.043 ms. Both measurements are single observations and include file validation and reconstruction where applicable. No owner editor session was closed.
 
 At the same paused predictive checkpoint, 200 direct tray refresh calls averaged 19.204 µs open versus 0.071 µs closed. This measures formatting and workspace dispatch and excludes camera rendering, UI layout work in subsequent frames and graphics cost. After twelve same-frame close/open cycles followed by seven frames for deferred destruction, forced-GC managed memory was 2,359,296 bytes above the paused baseline. This one short editor measurement includes UI and editor initialization and cannot distinguish reusable retained caches from a leak.
+
+## Phase B.1 force-aware study
+
+On the same workstation with the owner's Unity editor open, held-out impulse inference averaged 2.384 µs over 192 predictions. Whole study steps averaged 270.6 µs engineered, 270.1 µs frozen, 271.3 µs Phase B adaptive, 281.4 µs force-aware and 279.6 µs uncertainty gated. These are fixed-order exploratory timings with plotting and CSV outside the timed section. The 17,006-byte force-aware checkpoint was saved and restored. Separate I/O timing was not collected for this format.
+
+At tick 7, 200 direct workspace refreshes averaged 20.442 µs open and 0.079 µs closed. The measurement excludes the separate camera render and later Canvas layout. Twelve cycles left 2,387,968 additional managed bytes following forced GC at the final paused sample. The single run cannot isolate a long-term leak or native/GPU allocation.

@@ -1,5 +1,11 @@
 # Implementation progress
 
+## Phase B.1 · independent impulse prediction and force-aware residuals
+
+The development forecast gate passed and held-out impulse RMSE was 0.083652 N s versus persistence 0.132759, engineered 0.106060 and frozen learned 0.100720. The engineered estimate retained a slight MAE advantage. Across 16 final configurations and 80 matched native trials the ungated controller narrowly missed the fixed tracking margin. Uncertainty gating met both tracking and load margins relative to the engineered baseline while underperforming frozen and Phase B control on work and cumulative impulse. No wrist work was started. [Experiment, data and genuine Unity capture](FORCE_AWARE_PHASE_B1.md)
+
+57 .NET tests and 58 Unity Edit Mode tests passed. A fresh DX12 process restored the force-aware checkpoint and continued for 18 matched steps. The actual tray stepped once, then twelve passive close/open cycles preserved the entire checkpoint. No fallback fired in these 80 trials. The dedicated guard test verifies rollback and reason persistence. No temporary Git worktree was created. Section reconciliation awaits the unavailable v239 and §§240–316 texts.
+
 ## Milestone Two Phase B · predictive motor adaptation
 
 The owner reconciled packages, project settings and looks in `adbc5af` and `5b7ebe6`. Phase B started at the synchronized `5b7ebe6`, with a clean worktree. Locally excluded Roslyn plug-ins and recovery files were untouched. [Draft PR #8](https://github.com/Mortal-Atlas/Project-Dreamer/pull/8) remains on the existing #6 → #7 → #8 stack. The audit found zero PR #8 reviews and inline comments. No temporary Git worktree was created.

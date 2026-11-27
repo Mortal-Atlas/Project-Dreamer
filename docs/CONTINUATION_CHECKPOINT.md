@@ -2,6 +2,12 @@
 
 Updated November 26, 2026.
 
+## Active Phase B.1 force-aware study
+
+- Branch `feature/embodiment-contact-lab`, [draft PR #8](https://github.com/Mortal-Atlas/Project-Dreamer/pull/8) against protected main. Started from `4c77bd4ec3b37662d31e452c3a808fca73dec1e3`. The original Phase B result, owner exclusions and PR stack are preserved. One worktree was present at start and finish.
+- Ran 57 .NET tests and 58 isolated Unity Edit Mode tests. Isolated DX12 commands `ForceMotorStudy.Run`, `ForceMotorStudy.Reload` and `PredictiveTraySmoke.ForceAware` completed. Results and an actual Unity screenshot are tracked, and the full timeline and restart probes are archived under the owner's `phase-b1` backup subdirectory. [Reproduction and acceptance](FORCE_AWARE_PHASE_B1.md)
+- Next, redesign the load-aware residual with a separate development set and preregister a comparison against frozen and Phase B adaptive control, not only engineered control. Test an independent final configuration block, retention on earlier configurations, and deliberate fallback scenarios. Do not add wrist coordination. Reconcile v239 and §§240–316 only once the complete authoritative texts are available.
+
 ## Active Phase B predictive motor study
 
 - Branch `feature/embodiment-contact-lab`, [draft PR #8](https://github.com/Mortal-Atlas/Project-Dreamer/pull/8) to protected main. The Phase B implementation checkpoint is `a24ad02526effc2fc910926075a139d6f4509fa5`. Owner reconciliation at `5b7ebe6` is an ancestor. Main checkout began clean. Do not alter excluded Roslyn and recovery assets. No experimental Git worktree was created.
