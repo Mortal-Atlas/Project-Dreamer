@@ -26,24 +26,7 @@ namespace DreamMachine.Sim
 
         public static IReadOnlyList<Trial> Run(int seed)
         {
-            var world = WorldSimulation.Create(PopulationConfig.CreateDefault(), QualityPreset.Phone, seed);
-            var events = new ShapeEpisode[12];
-            var training = new SeededRandom(seed);
-            int written = 0;
-            for (int day = 0; day < 2; day++)
-            {
-                int dayStart = day * (int)(WorldSimulation.DayLength / WorldSimulation.Dt);
-                world.RunTicks(dayStart + 150 - world.TickCount);
-                for (int cue = 0; cue < 3; cue++)
-                {
-                    int first = training.NextInt(3);
-                    for (int visit = 0; visit < 2; visit++)
-                    {
-                        world.RunTicks(45);
-                        events[written++] = new ShapeEpisode(world.DayIndex, cue, 0, (first + visit) % 3);
-                    }
-                }
-            }
+            ShapeEpisode[] events = Acquire(seed, out var world);
             int lastTrainingTick = world.TickCount;
             world.RunTicks(DelayTicks);
             var layoutRng = new SeededRandom(unchecked(seed * 47 + 941));
@@ -80,6 +63,29 @@ namespace DreamMachine.Sim
                 }
             }
             return trials;
+        }
+
+        internal static ShapeEpisode[] Acquire(int seed, out WorldSimulation world)
+        {
+            world = WorldSimulation.Create(PopulationConfig.CreateDefault(), QualityPreset.Phone, seed);
+            var events = new ShapeEpisode[12];
+            var training = new SeededRandom(seed);
+            int written = 0;
+            for (int day = 0; day < 2; day++)
+            {
+                int dayStart = day * (int)(WorldSimulation.DayLength / WorldSimulation.Dt);
+                world.RunTicks(dayStart + 150 - world.TickCount);
+                for (int cue = 0; cue < 3; cue++)
+                {
+                    int first = training.NextInt(3);
+                    for (int visit = 0; visit < 2; visit++)
+                    {
+                        world.RunTicks(45);
+                        events[written++] = new ShapeEpisode(world.DayIndex, cue, 0, (first + visit) % 3);
+                    }
+                }
+            }
+            return events;
         }
     }
 }

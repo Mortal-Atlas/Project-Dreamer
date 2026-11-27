@@ -8,6 +8,50 @@ namespace DreamMachine.Tests
     public sealed class HouseholdRetentionTests
     {
         [Test]
+        public void ContextualPolicyInspectsOnlyWhenTheCurrentCueDefeatsTheStoredPrediction()
+        {
+            int reads = 0;
+            SocketFeatures Observe(int slot)
+            {
+                reads++;
+                return new SocketFeatures(1, slot == 2 ? 6 : 2);
+            }
+            var piece = new SocketFeatures(1, 6);
+            var familiar = SocketInspection.Choose(SocketPolicy.Contextual, piece, 1, 0, 1, -1, 2, Observe);
+            Assert.That(familiar.Choice, Is.Zero);
+            Assert.That(reads, Is.Zero);
+            var changed = SocketInspection.Choose(SocketPolicy.Contextual, piece, 2, 0, 1, -1, 2, Observe);
+            Assert.That(changed.Choice, Is.EqualTo(2));
+            Assert.That(changed.Observations, Is.EqualTo(reads));
+            Assert.That(changed.Contradiction, Is.True);
+            Assert.That(changed.Observed(2).Edge, Is.EqualTo(6));
+            Assert.That(changed.UncertaintyAfter, Is.LessThan(changed.UncertaintyBefore));
+        }
+
+        [Test]
+        public void SaveBetweenInspectionAndActionPreservesThePlanAndItsOutcome()
+        {
+            var world = WorldSimulation.Create(PopulationConfig.CreateDefault(), QualityPreset.Phone, 37);
+            world.EnableHouseholdLife();
+            int decision = -1;
+            for (int i = 0; i < 4700 && decision < 0; i++)
+            {
+                world.Tick();
+                decision = world.Home.ActiveSocketDecision(2);
+            }
+            Assert.That(decision, Is.GreaterThanOrEqualTo(0));
+            var observation = world.Home.Experience(decision);
+            Assert.That(observation.Evidence, Is.EqualTo(HomeEvidence.SocketDecision));
+            Assert.That(observation.Changed, Is.False);
+            var restored = WorldSimulation.RestoreCheckpoint(world.CaptureCheckpoint());
+            Assert.That(restored.Home.ActiveSocketDecision(2), Is.EqualTo(decision));
+            Assert.That(restored.Home.Experience(decision).Details, Is.EqualTo(observation.Details));
+            restored.RunTicks(250);
+            world.RunTicks(250);
+            Assert.That(restored.CaptureCheckpoint(), Is.EqualTo(world.CaptureCheckpoint()));
+        }
+
+        [Test]
         public void RejectedSocketDoesNotChangePersistentBoardAndCorrectChoiceAdvancesIt()
         {
             int state = 3;

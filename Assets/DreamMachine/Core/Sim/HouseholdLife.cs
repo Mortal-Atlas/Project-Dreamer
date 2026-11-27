@@ -7,21 +7,21 @@ using DreamMachine.World;
 namespace DreamMachine.Sim
 {
     public enum HomeActivity { Rest, Inspect, Roll, Stack, Open, Close, Watch, Eat, Drink, Sleep, Sort, Tidy }
-    public enum HomePhase { Resting, Approach, Act, Observe }
-    public enum HomeEvidence { Firsthand, Demonstration, Witnessed, Imitation, Failed, Replay }
+    public enum HomePhase { Resting, Approach, Act, Observe, Scan }
+    public enum HomeEvidence { Firsthand, Demonstration, Witnessed, Imitation, Failed, Replay, SocketDecision }
     public enum HomeReason { Resting, Curiosity, Practice, ObservedExample, Teach, Hunger, Thirst, Night, Blocked }
 
     public readonly struct HomeExperience
     {
-        public readonly int Tick, Actor, Target, Source, Revision;
+        public readonly int Tick, Actor, Target, Source, Revision, Details;
         public readonly HomeActivity Activity;
         public readonly HomeEvidence Evidence;
         public readonly bool Changed;
 
-        internal HomeExperience(int tick, int actor, HomeActivity activity, int target, HomeEvidence evidence, int source, int revision, bool changed)
+        internal HomeExperience(int tick, int actor, HomeActivity activity, int target, HomeEvidence evidence, int source, int revision, bool changed, int details = 0)
         {
             Tick = tick; Actor = actor; Activity = activity; Target = target; Evidence = evidence;
-            Source = source; Revision = revision; Changed = changed;
+            Source = source; Revision = revision; Changed = changed; Details = details;
         }
     }
 
@@ -68,6 +68,8 @@ namespace DreamMachine.Sim
         public int PersonCount => _people.Length;
         public int ExperienceCount => _memory.Count;
         public HomeExperience Experience(int index) => _memory[index];
+        public int LastSocketDecision(int index) => _people[index].LastScan;
+        public int ActiveSocketDecision(int index) => _people[index].ActiveScan;
         public HomePersonView ReadPerson(int index) => new HomePersonView(_people[index]);
         public HomeCompetence ReadCompetence(int actor, int item)
         {
@@ -137,7 +139,8 @@ namespace DreamMachine.Sim
                 p.Eating = false;
                 if (night && p.Activity != HomeActivity.Sleep)
                 {
-                    if (p.Phase == HomePhase.Approach || p.Phase == HomePhase.Act) Record(index, HomeEvidence.Failed, p.Source, false);
+                    if (p.Phase == HomePhase.Approach || p.Phase == HomePhase.Act || p.Phase == HomePhase.Scan)
+                        Record(index, HomeEvidence.Failed, p.Source, false);
                     Assign(p, HomeActivity.Sleep, 8 + index, HomeReason.Night, tick);
                     if (p.LastActual >= 0)
                     {
@@ -151,6 +154,7 @@ namespace DreamMachine.Sim
                 if (!night && (p.Activity == HomeActivity.Sleep || (p.Phase == HomePhase.Resting && tick >= p.Until)))
                     Select(index, tick);
                 if (p.Phase == HomePhase.Approach) Approach(index, tick);
+                if (p.Phase == HomePhase.Scan && tick >= p.Until) ScanSockets(index, tick);
                 if (p.Phase == HomePhase.Act && tick >= p.Until) Execute(index, tick);
                 if (p.Phase == HomePhase.Observe)
                 {
@@ -241,7 +245,7 @@ namespace DreamMachine.Sim
         bool Available(int index, int item)
         {
             for (int i = 0; i < _people.Length; i++)
-                if (i != index && _people[i].Item == item && (_people[i].Phase == HomePhase.Approach || _people[i].Phase == HomePhase.Act)) return false;
+                if (i != index && _people[i].Item == item && _people[i].Phase != HomePhase.Resting) return false;
             return true;
         }
 
@@ -249,12 +253,14 @@ namespace DreamMachine.Sim
         {
             p.Activity = p.Prediction = activity; p.Phase = HomePhase.Approach; p.Reason = reason; p.Item = item;
             p.Watch = p.Source = -1; p.Until = tick + 240; p.Sequence++;
+            p.ActiveScan = -1;
         }
 
         static void Rest(Person p, int until, HomeReason reason)
         {
             p.Activity = HomeActivity.Rest; p.Phase = HomePhase.Resting; p.Reason = reason;
             p.Item = p.Watch = p.Source = -1; p.Until = until;
+            p.ActiveScan = -1;
         }
 
         void Approach(int index, int tick)
@@ -267,7 +273,9 @@ namespace DreamMachine.Sim
             float reach = p.Activity == HomeActivity.Sleep || p.Activity == HomeActivity.Rest ? .10f : p.Child == null ? .54f : .32f;
             if (distance <= reach + .004f)
             {
-                p.Phase = HomePhase.Act; p.Until = tick + (p.Activity == HomeActivity.Sleep ? 2000 : 18);
+                bool inspect = p.Activity == HomeActivity.Sort && p.Child != null;
+                p.Phase = inspect ? HomePhase.Scan : HomePhase.Act;
+                p.Until = tick + (inspect ? 4 : p.Activity == HomeActivity.Sleep ? 2000 : 18);
                 return;
             }
             if (tick >= p.Until)
@@ -292,6 +300,29 @@ namespace DreamMachine.Sim
             p.X += dx * clear; p.Z += dz * clear;
         }
 
+        void ScanSockets(int index, int tick)
+        {
+            Person p = _people[index];
+            Item board = _items[SortingBoard];
+            int cue = ShapeBoard.Cue(board.Value), marker = ShapeBoard.Rotation(board.Value);
+            int previousId = p.SortSources[cue], memorySlot = -1, memoryMarker = 7;
+            if (previousId >= 0)
+            {
+                var previous = _memory[previousId];
+                var observed = new SocketDecision(previous.Details);
+                memorySlot = previous.Details == 0 ? ShapeBoard.Socket(cue, ShapeBoard.Rotation(previous.Revision - 1)) : observed.Choice;
+                if (previous.Details != 0) memoryMarker = observed.Marker;
+            }
+            var failure = new SocketDecision(p.LastSortFailure[cue]);
+            int rejected = failure.Data != 0 && failure.Marker == marker ? failure.Choice : -1;
+            int explore = (int)((uint)(p.Spec.BirthSeed + p.Failed[SortingBoard] + p.SoloSuccesses[SortingBoard]) % 3);
+            var decision = SocketInspection.Choose(SocketPolicy.Contextual, SocketFeatures.Shape(cue), marker,
+                memorySlot, memoryMarker, rejected, explore, slot => SocketInspection.ObserveBoard(marker, slot));
+            p.ActiveScan = Append(index, HomeActivity.Sort, SortingBoard, HomeEvidence.SocketDecision, previousId, board.Revision, false, decision.Data);
+            p.Phase = HomePhase.Act;
+            p.Until = tick + 18 + decision.Observations * SocketInspection.InspectionTicks;
+        }
+
         void Execute(int index, int tick)
         {
             Person p = _people[index];
@@ -300,6 +331,7 @@ namespace DreamMachine.Sim
             if (p.Activity == HomeActivity.Rest) { p.Phase = HomePhase.Resting; p.Until = tick + 40; return; }
             bool changed = false;
             int appliedSource = p.Source;
+            int details = 0;
             bool reached = Distance2(p.X, p.Z, target.X, target.Z) <= (p.Child == null ? .34f : .15f);
             bool success = reached;
             if (reached)
@@ -314,13 +346,11 @@ namespace DreamMachine.Sim
                     case HomeActivity.Sort:
                         int cue = ShapeBoard.Cue(target.Value), rotation = ShapeBoard.Rotation(target.Value);
                         int guess = p.Child == null ? ShapeBoard.Socket(cue, rotation) : (int)((uint)(p.Spec.BirthSeed + p.Failed[p.Item] + p.SoloSuccesses[p.Item]) % 3);
-                        if (p.Child != null && p.Source < 0 && p.SortSources[cue] >= 0)
+                        if (p.ActiveScan >= 0)
                         {
-                            // The board has no other writer. Its revision identifies the successful placement across rotations.
-                            int previous = _memory[p.SortSources[cue]].Revision - 1;
-                            int previousChoice = ShapeBoard.Socket(ShapeBoard.Cue(previous), ShapeBoard.Rotation(previous));
-                            guess = (previousChoice - ShapeBoard.Rotation(previous) + rotation + 3) % 3;
-                            appliedSource = p.SortSources[cue];
+                            details = _memory[p.ActiveScan].Details;
+                            guess = new SocketDecision(details).Choice;
+                            if (p.Source < 0) appliedSource = p.ActiveScan;
                         }
                         success = changed = ShapeBoard.Place(ref target.Value, guess);
                         break;
@@ -350,7 +380,7 @@ namespace DreamMachine.Sim
             p.Attempts++;
             HomeEvidence evidence = !success ? HomeEvidence.Failed : p.Source >= 0 ? HomeEvidence.Imitation :
                 p.Child == null && p.Reason == HomeReason.Teach ? HomeEvidence.Demonstration : HomeEvidence.Firsthand;
-            int eventIndex = Record(index, evidence, success ? appliedSource : p.Source, changed);
+            int eventIndex = Record(index, evidence, success ? appliedSource : p.Source, changed, details);
             if (success)
             {
                 p.Successes++;
@@ -376,21 +406,21 @@ namespace DreamMachine.Sim
             Rest(p, tick + 10, success ? HomeReason.Resting : HomeReason.Blocked);
         }
 
-        int Record(int index, HomeEvidence evidence, int source, bool changed)
+        int Record(int index, HomeEvidence evidence, int source, bool changed, int details = 0)
         {
             Person p = _people[index];
-            return Append(index, p.Activity, p.Item, evidence, source, _items[p.Item].Revision, changed);
+            return Append(index, p.Activity, p.Item, evidence, source, _items[p.Item].Revision, changed, details);
         }
 
         // Library III household evidence. Indexes are immutable references for imitation and replay.
-        int Append(int index, HomeActivity activity, int item, HomeEvidence kind, int source, int revision, bool changed)
+        int Append(int index, HomeActivity activity, int item, HomeEvidence kind, int source, int revision, bool changed, int details = 0)
         {
             int id = _memory.Count;
-            var record = new HomeExperience(_world.TickCount, index, activity, item, kind, source, revision, changed);
+            var record = new HomeExperience(_world.TickCount, index, activity, item, kind, source, revision, changed, details);
             _memory.Add(record);
             IndexEvidence(record, id);
             _people[index].Last = id;
-            if (kind != HomeEvidence.Replay) _people[index].LastActual = id;
+            if (kind != HomeEvidence.Replay && kind != HomeEvidence.SocketDecision) _people[index].LastActual = id;
             return id;
         }
 
@@ -409,8 +439,11 @@ namespace DreamMachine.Sim
                     break;
                 case HomeEvidence.Failed:
                     p.Failed[item]++;
+                    if (item == SortingBoard && record.Details != 0)
+                        p.LastSortFailure[ShapeBoard.Cue(record.Revision)] = record.Details;
                     if (record.Source < 0) p.SoloAttempts[item]++;
                     break;
+                case HomeEvidence.SocketDecision: p.LastScan = id; break;
                 case HomeEvidence.Witnessed: p.Witnesses[item]++; break;
                 case HomeEvidence.Imitation: p.Copies[item]++; break;
                 case HomeEvidence.Demonstration: p.LastDemo[item] = record.Tick; break;
@@ -459,6 +492,8 @@ namespace DreamMachine.Sim
             public readonly int[] SoloAttempts = new int[ItemCount], SoloSuccesses = new int[ItemCount], Witnesses = new int[ItemCount],
                 Copies = new int[ItemCount], Failed = new int[ItemCount], LastSuccess = new int[ItemCount], LastDemo = new int[ItemCount];
             public readonly int[] SortSources = { -1, -1, -1 };
+            public readonly int[] LastSortFailure = new int[3];
+            public int ActiveScan = -1, LastScan = -1;
             public Person(PersonSpec spec, SimChild child, float x)
             {
                 Spec = spec; Child = child; X = child?.X ?? x; Z = child?.Z ?? .13f; Yaw = child?.Yaw ?? 0f;
@@ -487,16 +522,17 @@ namespace DreamMachine.Sim
                     p.Attempts, p.Successes, p.Observed, p.Imitated, p.LastItem, p.ObservedSource, p.LastImitation, p.LastWatched, p.KnowledgeEvidence, p.RestAllowedAfter })
                     writer.Write(value);
                 foreach (int practice in p.Practice) writer.Write(practice);
+                writer.Write(p.ActiveScan);
             }
             writer.Write(_memory.Count);
             foreach (var e in _memory)
-            { writer.Write(e.Tick); writer.Write((byte)e.Actor); writer.Write((byte)e.Activity); writer.Write((byte)e.Target); writer.Write((byte)e.Evidence); writer.Write(e.Source); writer.Write(e.Revision); writer.Write(e.Changed); }
+            { writer.Write(e.Tick); writer.Write((byte)e.Actor); writer.Write((byte)e.Activity); writer.Write((byte)e.Target); writer.Write((byte)e.Evidence); writer.Write(e.Source); writer.Write(e.Revision); writer.Write(e.Changed); writer.Write(e.Details); }
         }
 
-        internal void Read(BinaryReader reader, bool previousLayout)
+        internal void Read(BinaryReader reader, int version)
         {
             _wasNight = reader.ReadBoolean();
-            int itemCount = previousLayout ? PreviousItemCount : ItemCount;
+            int itemCount = version == 2 ? PreviousItemCount : ItemCount;
             for (int i = 0; i < itemCount; i++)
             { Item item = _items[i]; item.X = ReadFinite(reader); item.Z = ReadFinite(reader); item.V = ReadFinite(reader); item.Value = reader.ReadInt32(); item.Revision = reader.ReadInt32(); }
             foreach (Person p in _people)
@@ -510,25 +546,43 @@ namespace DreamMachine.Sim
                 p.LastItem = reader.ReadInt32(); p.ObservedSource = reader.ReadInt32(); p.LastImitation = reader.ReadInt32();
                 p.LastWatched = reader.ReadInt32(); p.KnowledgeEvidence = reader.ReadInt32(); p.RestAllowedAfter = reader.ReadInt32();
                 for (int i = 0; i < itemCount; i++) p.Practice[i] = reader.ReadInt32();
+                if (version >= 4) p.ActiveScan = reader.ReadInt32();
                 if (p.Item < -1 || p.Item >= ItemCount || p.Watch < -1 || p.Watch >= PersonCount ||
                     !Enum.IsDefined(typeof(HomePhase), p.Phase) || !Enum.IsDefined(typeof(HomeActivity), p.Activity) ||
-                    ((p.Phase == HomePhase.Approach || p.Phase == HomePhase.Act) && p.Item < 0) || (p.Phase == HomePhase.Observe && p.Watch < 0))
+                    ((p.Phase == HomePhase.Approach || p.Phase == HomePhase.Act || p.Phase == HomePhase.Scan) && p.Item < 0) ||
+                    (p.Phase == HomePhase.Scan && p.Item != SortingBoard) || (p.Phase == HomePhase.Observe && p.Watch < 0))
                     throw new InvalidDataException("Invalid household activity.");
             }
             int count = reader.ReadInt32();
-            if (count < 0 || count > (reader.BaseStream.Length - reader.BaseStream.Position) / 17) throw new InvalidDataException("Invalid household memory length.");
+            if (count < 0 || count > (reader.BaseStream.Length - reader.BaseStream.Position) / (version >= 4 ? 21 : 17))
+                throw new InvalidDataException("Invalid household memory length.");
             for (int i = 0; i < count; i++)
             {
                 var e = new HomeExperience(reader.ReadInt32(), reader.ReadByte(), (HomeActivity)reader.ReadByte(), reader.ReadByte(),
-                    (HomeEvidence)reader.ReadByte(), reader.ReadInt32(), reader.ReadInt32(), reader.ReadBoolean());
+                    (HomeEvidence)reader.ReadByte(), reader.ReadInt32(), reader.ReadInt32(), reader.ReadBoolean(),
+                    version >= 4 ? reader.ReadInt32() : 0);
                 if (e.Actor >= PersonCount || e.Target >= ItemCount || e.Source < -1 || e.Source >= i || e.Tick < 0 || e.Tick > _world.TickCount)
                     throw new InvalidDataException("Invalid household memory reference.");
+                if (e.Details != 0 && (e.Activity != HomeActivity.Sort || e.Target != SortingBoard || new SocketDecision(e.Details).Choice >= 3))
+                    throw new InvalidDataException("Invalid household socket decision.");
+                if (e.Evidence == HomeEvidence.SocketDecision && (e.Details == 0 || e.Changed))
+                    throw new InvalidDataException("Invalid household observation.");
                 _memory.Add(e);
                 IndexEvidence(e, i);
             }
             foreach (Person p in _people)
-                foreach (int reference in new[] { p.Source, p.Last, p.LastActual, p.Replay, p.ObservedSource, p.LastImitation, p.KnowledgeEvidence })
+            {
+                foreach (int reference in new[] { p.Source, p.Last, p.LastActual, p.Replay, p.ObservedSource, p.LastImitation, p.KnowledgeEvidence, p.ActiveScan })
                     if (reference < -1 || reference >= count) throw new InvalidDataException("Invalid household memory index.");
+                if (p.ActiveScan >= 0)
+                {
+                    var inspection = _memory[p.ActiveScan];
+                    if (inspection.Evidence != HomeEvidence.SocketDecision || _people[inspection.Actor] != p ||
+                        p.Phase != HomePhase.Act || p.Activity != HomeActivity.Sort || p.Item != SortingBoard ||
+                        inspection.Revision != _items[SortingBoard].Revision)
+                        throw new InvalidDataException("Invalid active household observation.");
+                }
+            }
         }
 
         static float ReadFinite(BinaryReader reader)

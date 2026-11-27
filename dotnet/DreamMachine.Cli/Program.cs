@@ -39,6 +39,7 @@ namespace DreamMachine.Cli
                     if (args[i] == "--lower-body") return RunLowerBodyReference();
                     if (args[i] == "--retention" && i + 1 < args.Length) return RunHouseholdRetention(args[i + 1]);
                     if (args[i] == "--delayed-retention" && i + 1 < args.Length) return RunDelayedRetention(args[i + 1]);
+                    if (args[i] == "--active-socket" && i + 1 < args.Length) return RunActiveSocket(args[i + 1]);
                     if (args[i] == "--elbow-lab" && i + 1 < args.Length) return ElbowLabCommand.Run(args[i + 1]);
                     if (args[i] == "--archive-pilots") return ArchivePilotCommand.Run(args, i);
                     if (args[i] == "--benchmark")
@@ -162,6 +163,22 @@ namespace DreamMachine.Cli
                 string cohort = seed < 1209 ? "development" : "heldout";
                 foreach (var trial in HouseholdDelayedRetention.Run(seed))
                     report.WriteLine(FormattableString.Invariant($"{cohort},{seed},{trial.Access},{trial.Cue},{trial.Choice},{trial.ActualSlot},{trial.Source},{trial.Transfer},{trial.Success},{trial.RepeatedError},{trial.LastTrainingTick},{trial.ProbeTick}"));
+            }
+            return 0;
+        }
+
+        static int RunActiveSocket(string path)
+        {
+            using var report = System.IO.File.CreateText(path);
+            report.WriteLine("cohort,seed,policy,cue,choice,answer,changed,success,repeated_error,inspections,retrievals,uncertainty_before,uncertainty_after,contradiction,start_tick,action_tick,data");
+            for (int seed = 1401; seed <= 1424; seed++)
+            {
+                string cohort = seed < 1409 ? "development" : "heldout";
+                foreach (var trial in ActiveSocketStudy.Run(seed))
+                {
+                    var d = trial.Decision;
+                    report.WriteLine(FormattableString.Invariant($"{cohort},{seed},{trial.Policy},{trial.Cue},{d.Choice},{trial.Answer},{trial.Changed},{trial.Success},{trial.RepeatedError},{d.Observations},{trial.Retrievals},{d.UncertaintyBefore},{d.UncertaintyAfter},{d.Contradiction},{trial.StartTick},{trial.ActionTick},{d.Data}"));
+                }
             }
             return 0;
         }
