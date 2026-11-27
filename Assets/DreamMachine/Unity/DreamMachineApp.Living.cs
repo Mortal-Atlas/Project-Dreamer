@@ -14,8 +14,10 @@ namespace DreamMachine.UnityBridge
         readonly Transform[] _livingItems = new Transform[HouseholdLife.ItemCount];
         readonly Actor[] _livingActors = new Actor[4];
         Transform _lid, _revealed, _stackA, _stackB, _food, _water;
+        Transform _shapes, _storedToys;
+        readonly Transform[] _sortPieces = new Transform[3];
         Text _lifeText;
-        int _lifeFocus = 2;
+        int _lifeFocus = 2, _historyDaysBack;
         bool _researchPresentation;
 
         void EnableLivingPresentation()
@@ -63,7 +65,7 @@ namespace DreamMachine.UnityBridge
                 Piece(seat, PrimitiveType.Cube, "Learner seat", new Vector3(0, .05f, 0), new Vector3(.32f, .07f, .31f), "#946451");
                 Piece(seat, PrimitiveType.Cube, "Chair back", new Vector3(0, .16f, -.15f), new Vector3(.32f, .21f, .04f), "#B4805D");
             }
-            for (int i = 8; i < _livingItems.Length; i++)
+            for (int i = 8; i < HouseholdLife.SortingBoard; i++)
             {
                 var bed = _livingItems[i];
                 if (i >= 10) bed.localScale = new Vector3(.84f, 1f, .72f);
@@ -73,6 +75,19 @@ namespace DreamMachine.UnityBridge
             }
             Piece(root, PrimitiveType.Cube, "Supply shelf", new Vector3(-2.45f, .34f, 1.38f), new Vector3(.54f, .69f, .85f), "#8A614D");
             Piece(root, PrimitiveType.Cube, "Supply table", new Vector3(2.40f, .27f, 2.90f), new Vector3(.55f, .54f, .61f), "#A77454");
+            var sort = _livingItems[HouseholdLife.SortingBoard];
+            Piece(sort, PrimitiveType.Cube, "Shape board", new Vector3(0, .05f, 0), new Vector3(.60f, .10f, .35f), "#6A858F");
+            _shapes = new GameObject("Rotating shape sockets").transform;
+            _shapes.SetParent(sort, false);
+            Piece(_shapes, PrimitiveType.Cylinder, "Round socket", new Vector3(-.13f,.102f,-.09f), new Vector3(.12f,.002f,.12f), "#F0D491");
+            Piece(_shapes, PrimitiveType.Cube, "Square socket", new Vector3(.13f,.103f,-.09f), new Vector3(.11f,.004f,.11f), "#D78A74");
+            Piece(_shapes, PrimitiveType.Capsule, "Long socket", new Vector3(0,.109f,.10f), new Vector3(.064f,.008f,.11f), "#B3CCC3");
+            var cuePosition = new Vector3(0, .065f, .24f);
+            _sortPieces[0] = Piece(sort, PrimitiveType.Cylinder, "Round piece", cuePosition, new Vector3(.10f, .054f, .10f), "#F0D491");
+            _sortPieces[1] = Piece(sort, PrimitiveType.Cube, "Square piece", cuePosition, new Vector3(.098f, .11f, .098f), "#D78A74");
+            _sortPieces[2] = Piece(sort, PrimitiveType.Cube, "Long piece", cuePosition, new Vector3(.055f, .11f, .12f), "#B3CCC3");
+            Box(_livingItems[HouseholdLife.ToyBin], .43f, .15f, "#89756A");
+            _storedToys = Piece(_livingItems[HouseholdLife.ToyBin], PrimitiveType.Cube, "Blocks stored in bin", new Vector3(0, .097f, 0), new Vector3(.21f,.12f,.17f), "#BC775B");
             _zoom = 5.5f;
             _orbitYaw = 157f;
             _orbitPitch = 27f;
@@ -112,6 +127,11 @@ namespace DreamMachine.UnityBridge
             _revealed.gameObject.SetActive(open);
             _food.gameObject.SetActive(life.ReadItem(4).Value > 0);
             _water.gameObject.SetActive(life.ReadItem(5).Value > 0);
+            int sortingState = life.ReadItem(HouseholdLife.SortingBoard).Value;
+            _shapes.localRotation = Quaternion.Slerp(_shapes.localRotation, Quaternion.Euler(0f, ShapeBoard.Rotation(sortingState) * 120f, 0f), blend);
+            for (int i = 0; i < _sortPieces.Length; i++)
+                _sortPieces[i].gameObject.SetActive(i == ShapeBoard.Cue(sortingState));
+            _storedToys.gameObject.SetActive(life.ReadItem(HouseholdLife.ToyBin).Value > 0);
             for (int i = 0; i < _livingActors.Length; i++)
             {
                 if (_livingActors[i] == null) _livingActors[i] = _actors[life.PersonId(i)];
@@ -172,8 +192,9 @@ namespace DreamMachine.UnityBridge
                     controls.SetParent(parent, false);
                     controls.anchorMin = new Vector2(.03f, .01f); controls.anchorMax = new Vector2(.97f, .20f);
                     controls.offsetMin = controls.offsetMax = Vector2.zero;
-                    AddTimeButton(controls, "Next person", 0f, .57f, () => { _lifeFocus = (_lifeFocus + 1) % 4; RefreshLife(); });
-                    AddTimeButton(controls, "Close", .57f, 1f, () => _workspace.Toggle(LifeTray));
+                    AddTimeButton(controls, "Next person", 0f, .43f, () => { _lifeFocus = (_lifeFocus + 1) % 4; RefreshLife(); });
+                    AddTimeButton(controls, "History day", .43f, .76f, () => { _historyDaysBack = (_historyDaysBack + 1) % (_sim.DayIndex + 1); RefreshLife(); });
+                    AddTimeButton(controls, "Close", .76f, 1f, () => _workspace.Toggle(LifeTray));
                 }, () => _lifeText = null, RefreshLife);
         }
 
@@ -198,17 +219,22 @@ namespace DreamMachine.UnityBridge
             text.AppendLine($"Thirst {p.Thirst:P0}  ·  Planned {p.Prediction}");
             if (p.KnowledgeEvidence >= 0) text.AppendLine($"Learned affordance  {p.Knowledge}  ·  evidence {p.KnowledgeEvidence}");
             text.AppendLine($"Attempts {p.Attempts}  ·  Outcomes {p.Successes}\nWitnessed {p.Observed}  ·  Imitated {p.Imitated}");
-            if (p.Replay >= 0) text.AppendLine($"Night replay  {home.Experience(p.Replay).Activity}  ·  tick {home.Experience(p.Replay).Tick}");
-            int today = 0, shown = 0, earliest = home.ExperienceCount - 1;
-            int dayStart = Mathf.Max(0, Mathf.FloorToInt(_sim.DayIndex * WorldSimulation.DayLength / WorldSimulation.Dt));
-            for (; earliest >= 0; earliest--)
+            var sort = home.ReadCompetence(_lifeFocus, HouseholdLife.SortingBoard);
+            text.AppendLine($"Shape board  ·  independent {sort.IndependentSuccesses}/{sort.IndependentAttempts}  ·  failed {sort.Failures}");
+            if (sort.LastIndependentSuccess >= 0)
             {
-                var e = home.Experience(earliest);
-                if (e.Tick < dayStart) break;
-                if (e.Actor == _lifeFocus) today++;
+                var evidence = home.Experience(sort.LastIndependentSuccess);
+                text.AppendLine(evidence.Source >= 0 ? $"Last fit reused episode {evidence.Source}" : $"Last fit  ·  tick {evidence.Tick}");
             }
-            text.AppendLine($"Today's records  {today}");
-            for (int i = home.ExperienceCount - 1; i >= 0 && shown < 4 && i > earliest - 24; i--)
+            if (p.Replay >= 0) text.AppendLine($"Night replay  {home.Experience(p.Replay).Activity}  ·  tick {home.Experience(p.Replay).Tick}");
+            int historyDay = Mathf.Max(0, _sim.DayIndex - _historyDaysBack);
+            int dayStart = Mathf.FloorToInt(historyDay * WorldSimulation.DayLength / WorldSimulation.Dt);
+            int dayEnd = Mathf.FloorToInt((historyDay + 1) * WorldSimulation.DayLength / WorldSimulation.Dt);
+            int start = LowerExperienceBound(home, dayStart), end = LowerExperienceBound(home, dayEnd);
+            int count = 0, shown = 0;
+            for (int i = start; i < end; i++) if (home.Experience(i).Actor == _lifeFocus) count++;
+            text.AppendLine($"Tick day {historyDay + 1}  ·  {count} records");
+            for (int i = end - 1; i >= start && shown < 4; i--)
             {
                 var e = home.Experience(i);
                 if (e.Actor != _lifeFocus) continue;
@@ -216,6 +242,18 @@ namespace DreamMachine.UnityBridge
                 shown++;
             }
             _lifeText.text = text.ToString();
+        }
+
+        static int LowerExperienceBound(HouseholdLife home, int tick)
+        {
+            int first = 0, end = home.ExperienceCount;
+            while (first < end)
+            {
+                int middle = first + (end - first) / 2;
+                if (home.Experience(middle).Tick < tick) first = middle + 1;
+                else end = middle;
+            }
+            return first;
         }
     }
 }

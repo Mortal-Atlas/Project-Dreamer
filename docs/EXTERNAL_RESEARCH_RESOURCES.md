@@ -1,4 +1,4 @@
-# External biomechanics research resources
+# External research resources
 
 Reviewed November 27, 2026. Phase C.1.1 uses one force-plate record to check measurement units and interpretation. Other resources remain reference candidates. External data and the local VRMs stay outside project history. Record the source version, file, coordinate system, transformations and license when adding a numerical comparison.
 
@@ -24,6 +24,15 @@ Reviewed November 27, 2026. Phase C.1.1 uses one force-plate record to check mea
 | Curtze, Buurke and McCrum, *Journal of Biomechanics* (2024). [Paper](https://doi.org/10.1016/j.jbiomech.2024.112045) | Treat the margin as an instantaneous model estimate. A negative margin can coexist with recovery by a later action. Articulation, variable COM height and external impulses limit interpretation. |
 
 Use the listed abstracts and publications as references. No external trajectory files or adult movement norms were imported for C.1.2.
+
+## Retention and replay
+
+| Study | Application and limits |
+| --- | --- |
+| Roediger and Karpicke, *Psychological Science* (2006). [Primary study](https://pubmed.ncbi.nlm.nih.gov/16507066/) | Motivates evaluating subsequent retrieval against matched exposure across defined delays. The human verbal recall task does not supply numerical targets for a three-socket puzzle. |
+| Diekelmann and Born, *Nature Reviews Neuroscience* (2010). [Review](https://pubmed.ncbi.nlm.nih.gov/20046194/) | Motivates controlling availability of replay and separating a derived plan from a remembered observation. The L.2 plan compilation is a computational intervention. |
+
+The L.2 study imports no paper data or externally trained model. [Experiment design](ACTIVE_LEARNING_L2.md#fixed-retention-comparison)
 
 ## Selected empirical sample
 

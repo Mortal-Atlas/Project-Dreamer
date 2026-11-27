@@ -1,0 +1,278 @@
+id,tick,actor,target,activity,provenance,source,revision,changed
+0,25,father,Picture cards,Inspect,Demonstration,-1,0,False
+1,25,mother,Shape board,Sort,Demonstration,-1,1,True
+2,47,daughter,Lidded box,Open,Firsthand,-1,1,True
+3,53,mother,Shape board,Sort,Firsthand,-1,2,True
+4,76,son,Wooden blocks,Stack,Firsthand,-1,1,True
+5,80,father,Ball,Roll,Demonstration,-1,1,True
+6,83,daughter,Shape board,Sort,Firsthand,-1,3,True
+7,85,mother,Lidded box,Close,Demonstration,-1,2,True
+8,113,mother,Shape board,Sort,Firsthand,-1,4,True
+9,118,father,Picture cards,Inspect,Firsthand,-1,0,False
+10,119,daughter,Lidded box,Open,Firsthand,-1,3,True
+11,141,mother,Lidded box,Close,Firsthand,-1,4,True
+12,149,son,Toy bin,Tidy,Firsthand,-1,1,True
+13,169,mother,Shape board,Sort,Firsthand,-1,5,True
+14,177,father,Wooden blocks,Stack,Demonstration,-1,3,True
+15,177,son,Wooden blocks,Stack,Witnessed,14,3,False
+16,197,mother,Lidded box,Open,Firsthand,-1,5,True
+17,222,daughter,Food,Eat,Firsthand,-1,1,True
+18,223,father,Toy bin,Tidy,Demonstration,-1,2,True
+19,225,mother,Shape board,Sort,Firsthand,-1,6,True
+20,250,daughter,Food,Eat,Firsthand,-1,2,True
+21,253,mother,Lidded box,Close,Firsthand,-1,6,True
+22,267,father,Picture cards,Inspect,Firsthand,-1,0,False
+23,278,daughter,Food,Eat,Firsthand,-1,3,True
+24,281,mother,Shape board,Sort,Firsthand,-1,7,True
+25,306,daughter,Food,Eat,Firsthand,-1,4,True
+26,309,mother,Lidded box,Open,Firsthand,-1,7,True
+27,326,father,Wooden blocks,Stack,Firsthand,-1,5,True
+28,334,daughter,Food,Eat,Firsthand,-1,5,True
+29,337,mother,Shape board,Sort,Firsthand,-1,8,True
+30,362,daughter,Food,Eat,Firsthand,-1,6,True
+31,378,father,Lidded box,Close,Firsthand,-1,8,True
+32,381,son,Picture cards,Inspect,Firsthand,-1,0,False
+33,395,mother,Ball,Roll,Demonstration,-1,2,True
+34,395,daughter,Ball,Roll,Witnessed,33,2,False
+35,409,father,Shape board,Sort,Firsthand,-1,9,True
+36,412,daughter,Wooden blocks,Stack,Firsthand,-1,6,True
+37,438,son,Toy bin,Tidy,Firsthand,-1,3,True
+38,440,mother,Lidded box,Open,Firsthand,-1,9,True
+39,440,daughter,Ball,Roll,Imitation,34,3,True
+40,446,father,Wooden blocks,Stack,Demonstration,-1,8,True
+41,446,daughter,Wooden blocks,Stack,Witnessed,40,8,False
+42,468,daughter,Wooden blocks,Stack,Imitation,41,9,True
+43,471,mother,Shape board,Sort,Demonstration,-1,10,True
+44,471,daughter,Shape board,Sort,Witnessed,43,10,False
+45,482,father,Lidded box,Close,Firsthand,-1,10,True
+46,516,mother,Ball,Roll,Firsthand,-1,4,True
+47,518,father,Wooden blocks,Stack,Firsthand,-1,10,True
+48,544,mother,Wooden blocks,Stack,Demonstration,-1,11,True
+49,544,daughter,Shape board,Sort,Failed,44,10,False
+50,554,father,Lidded box,Open,Firsthand,-1,11,True
+51,590,father,Wooden blocks,Stack,Firsthand,-1,12,True
+52,599,mother,Water,Drink,Firsthand,-1,1,True
+53,625,son,Picture cards,Inspect,Firsthand,-1,0,False
+54,642,mother,Ball,Roll,Firsthand,-1,5,True
+55,652,father,Water,Drink,Firsthand,-1,2,True
+56,682,son,Toy bin,Tidy,Firsthand,-1,4,True
+57,693,father,Wooden blocks,Stack,Firsthand,-1,14,True
+58,695,mother,Shape board,Sort,Firsthand,-1,11,True
+59,721,father,Lidded box,Close,Failed,-1,11,False
+60,721,father,Lidded box,Close,Replay,59,11,False
+61,721,mother,Ball,Roll,Failed,-1,5,False
+62,721,mother,Ball,Roll,Replay,61,5,False
+63,721,son,Left seat,Rest,Failed,-1,0,False
+64,721,son,Left seat,Rest,Replay,63,0,False
+65,721,daughter,Water,Drink,Failed,-1,2,False
+66,721,daughter,Water,Drink,Replay,65,2,False
+67,1072,mother,Lidded box,Close,Firsthand,-1,12,True
+68,1073,father,Picture cards,Inspect,Firsthand,-1,0,False
+69,1108,mother,Shape board,Sort,Demonstration,-1,12,True
+70,1112,father,Toy bin,Tidy,Firsthand,-1,5,True
+71,1136,mother,Lidded box,Open,Firsthand,-1,13,True
+72,1142,father,Picture cards,Inspect,Firsthand,-1,0,False
+73,1164,mother,Shape board,Sort,Firsthand,-1,13,True
+74,1192,mother,Lidded box,Close,Firsthand,-1,14,True
+75,1207,father,Wooden blocks,Stack,Demonstration,-1,16,True
+76,1210,son,Food,Eat,Firsthand,-1,8,True
+77,1210,daughter,Water,Drink,Firsthand,-1,4,True
+78,1220,mother,Shape board,Sort,Firsthand,-1,14,True
+79,1238,son,Food,Eat,Firsthand,-1,9,True
+80,1258,father,Lidded box,Open,Firsthand,-1,15,True
+81,1266,son,Food,Eat,Firsthand,-1,10,True
+82,1278,mother,Ball,Roll,Demonstration,-1,6,True
+83,1294,father,Wooden blocks,Stack,Firsthand,-1,17,True
+84,1294,son,Food,Eat,Firsthand,-1,11,True
+85,1318,mother,Shape board,Sort,Firsthand,-1,15,True
+86,1322,son,Food,Eat,Firsthand,-1,12,True
+87,1330,father,Lidded box,Close,Firsthand,-1,16,True
+88,1350,son,Food,Eat,Firsthand,-1,13,True
+89,1353,mother,Ball,Roll,Firsthand,-1,7,True
+90,1366,father,Wooden blocks,Stack,Firsthand,-1,18,True
+91,1388,mother,Shape board,Sort,Demonstration,-1,16,True
+92,1399,son,Water,Drink,Firsthand,-1,5,True
+93,1402,father,Lidded box,Open,Firsthand,-1,17,True
+94,1423,mother,Wooden blocks,Stack,Demonstration,-1,19,True
+95,1425,daughter,Ball,Roll,Firsthand,-1,8,True
+96,1436,father,Shape board,Sort,Firsthand,-1,17,True
+97,1453,daughter,Wooden blocks,Stack,Firsthand,-1,20,True
+98,1454,mother,Ball,Roll,Firsthand,-1,9,True
+99,1464,father,Lidded box,Close,Firsthand,-1,18,True
+100,1502,father,Wooden blocks,Stack,Demonstration,-1,21,True
+101,1506,son,Picture cards,Inspect,Firsthand,-1,0,False
+102,1512,mother,Water,Drink,Firsthand,-1,6,True
+103,1538,father,Lidded box,Open,Firsthand,-1,19,True
+104,1545,mother,Ball,Roll,Demonstration,-1,10,True
+105,1582,mother,Wooden blocks,Stack,Firsthand,-1,22,True
+106,1608,father,Water,Drink,Firsthand,-1,7,True
+107,1629,daughter,Ball,Roll,Firsthand,-1,11,True
+108,1636,mother,Shape board,Sort,Firsthand,-1,18,True
+109,1649,father,Wooden blocks,Stack,Firsthand,-1,23,True
+110,1676,mother,Ball,Roll,Firsthand,-1,12,True
+111,1695,son,Toy bin,Tidy,Firsthand,-1,6,True
+112,1706,father,Lidded box,Close,Firsthand,-1,20,True
+113,1708,daughter,Water,Drink,Firsthand,-1,8,True
+114,1716,mother,Shape board,Sort,Firsthand,-1,19,True
+115,1740,son,Picture cards,Inspect,Firsthand,-1,0,False
+116,1742,father,Wooden blocks,Stack,Firsthand,-1,25,True
+117,1752,mother,Ball,Roll,Firsthand,-1,13,True
+118,1760,father,Lidded box,Open,Failed,-1,20,False
+119,1760,father,Lidded box,Open,Replay,118,20,False
+120,1760,mother,Ball,Roll,Replay,117,13,False
+121,1760,son,Water,Drink,Failed,-1,8,False
+122,1760,son,Water,Drink,Replay,121,8,False
+123,1760,daughter,Right seat,Rest,Failed,-1,0,False
+124,1760,daughter,Right seat,Rest,Replay,123,0,False
+125,2111,mother,Lidded box,Open,Firsthand,-1,21,True
+126,2112,father,Picture cards,Inspect,Firsthand,-1,0,False
+127,2147,mother,Shape board,Sort,Demonstration,-1,20,True
+128,2151,father,Toy bin,Tidy,Firsthand,-1,7,True
+129,2175,mother,Lidded box,Close,Firsthand,-1,22,True
+130,2181,father,Picture cards,Inspect,Firsthand,-1,0,False
+131,2203,mother,Shape board,Sort,Firsthand,-1,21,True
+132,2231,mother,Lidded box,Open,Firsthand,-1,23,True
+133,2236,father,Ball,Roll,Demonstration,-1,14,True
+134,2249,son,Food,Eat,Firsthand,-1,15,True
+135,2259,mother,Shape board,Sort,Firsthand,-1,22,True
+136,2277,son,Food,Eat,Firsthand,-1,16,True
+137,2283,father,Picture cards,Inspect,Firsthand,-1,0,False
+138,2287,mother,Lidded box,Close,Firsthand,-1,24,True
+139,2288,daughter,Wooden blocks,Stack,Firsthand,-1,27,True
+140,2305,son,Food,Eat,Firsthand,-1,17,True
+141,2314,father,Toy bin,Tidy,Firsthand,-1,8,True
+142,2315,mother,Shape board,Sort,Firsthand,-1,23,True
+143,2316,daughter,Ball,Roll,Firsthand,-1,15,True
+144,2333,son,Food,Eat,Firsthand,-1,18,True
+145,2343,father,Picture cards,Inspect,Firsthand,-1,0,False
+146,2343,mother,Lidded box,Open,Firsthand,-1,25,True
+147,2361,son,Food,Eat,Firsthand,-1,19,True
+148,2389,son,Food,Eat,Firsthand,-1,20,True
+149,2391,father,Ball,Roll,Firsthand,-1,16,True
+150,2427,mother,Water,Drink,Firsthand,-1,10,True
+151,2439,father,Picture cards,Inspect,Firsthand,-1,0,False
+152,2443,son,Wooden blocks,Stack,Firsthand,-1,29,True
+153,2468,mother,Ball,Roll,Firsthand,-1,17,True
+154,2482,daughter,Lidded box,Close,Firsthand,-1,26,True
+155,2496,mother,Wooden blocks,Stack,Firsthand,-1,30,True
+156,2497,father,Water,Drink,Firsthand,-1,11,True
+157,2519,son,Shape board,Sort,Firsthand,-1,24,True
+158,2552,mother,Toy bin,Tidy,Firsthand,-1,9,True
+159,2553,father,Picture cards,Inspect,Firsthand,-1,0,False
+160,2565,daughter,Ball,Roll,Firsthand,-1,18,True
+161,2595,mother,Picture cards,Inspect,Demonstration,-1,0,False
+162,2615,father,Wooden blocks,Stack,Firsthand,-1,32,True
+163,2630,son,Water,Drink,Firsthand,-1,12,True
+164,2655,mother,Ball,Roll,Firsthand,-1,19,True
+165,2662,father,Toy bin,Tidy,Firsthand,-1,10,True
+166,2683,mother,Wooden blocks,Stack,Firsthand,-1,34,True
+167,2706,father,Picture cards,Inspect,Firsthand,-1,0,False
+168,2711,mother,Ball,Roll,Firsthand,-1,20,True
+169,2735,father,Toy bin,Tidy,Firsthand,-1,11,True
+170,2739,mother,Wooden blocks,Stack,Firsthand,-1,36,True
+171,2763,father,Picture cards,Inspect,Firsthand,-1,0,False
+172,2767,mother,Ball,Roll,Firsthand,-1,21,True
+173,2786,daughter,Water,Drink,Firsthand,-1,13,True
+174,2800,father,Wooden blocks,Stack,Failed,-1,36,False
+175,2800,father,Wooden blocks,Stack,Replay,174,36,False
+176,2800,mother,Shape board,Sort,Failed,-1,24,False
+177,2800,mother,Shape board,Sort,Replay,176,24,False
+178,2800,son,Toy bin,Tidy,Failed,-1,11,False
+179,2800,son,Toy bin,Tidy,Replay,178,11,False
+180,2800,daughter,Right seat,Rest,Failed,-1,0,False
+181,2800,daughter,Right seat,Rest,Replay,180,0,False
+182,3153,mother,Shape board,Sort,Demonstration,-1,25,True
+183,3157,father,Toy bin,Tidy,Firsthand,-1,12,True
+184,3186,mother,Lidded box,Open,Firsthand,-1,27,True
+185,3191,father,Picture cards,Inspect,Firsthand,-1,0,False
+186,3214,mother,Shape board,Sort,Firsthand,-1,26,True
+187,3242,mother,Lidded box,Close,Firsthand,-1,28,True
+188,3247,father,Ball,Roll,Demonstration,-1,22,True
+189,3270,mother,Shape board,Sort,Firsthand,-1,27,True
+190,3287,father,Wooden blocks,Stack,Firsthand,-1,38,True
+191,3289,son,Food,Eat,Firsthand,-1,22,True
+192,3317,son,Food,Eat,Firsthand,-1,23,True
+193,3328,daughter,Ball,Roll,Firsthand,-1,23,True
+194,3333,father,Toy bin,Tidy,Firsthand,-1,13,True
+195,3345,son,Food,Eat,Firsthand,-1,24,True
+196,3355,mother,Water,Drink,Firsthand,-1,15,True
+197,3373,son,Food,Eat,Firsthand,-1,25,True
+198,3377,father,Picture cards,Inspect,Firsthand,-1,0,False
+199,3389,mother,Ball,Roll,Firsthand,-1,24,True
+200,3392,daughter,Lidded box,Open,Firsthand,-1,29,True
+201,3401,son,Food,Eat,Firsthand,-1,26,True
+202,3425,mother,Wooden blocks,Stack,Firsthand,-1,40,True
+203,3438,father,Water,Drink,Firsthand,-1,16,True
+204,3453,son,Ball,Roll,Firsthand,-1,25,True
+205,3479,mother,Shape board,Sort,Demonstration,-1,28,True
+206,3483,daughter,Food,Eat,Firsthand,-1,27,True
+207,3486,father,Wooden blocks,Stack,Firsthand,-1,41,True
+208,3518,son,Water,Drink,Firsthand,-1,17,True
+209,3520,mother,Ball,Roll,Firsthand,-1,26,True
+210,3539,father,Toy bin,Tidy,Firsthand,-1,14,True
+211,3548,mother,Wooden blocks,Stack,Firsthand,-1,43,True
+212,3576,mother,Ball,Roll,Firsthand,-1,27,True
+213,3581,father,Picture cards,Inspect,Firsthand,-1,0,False
+214,3609,father,Toy bin,Tidy,Firsthand,-1,15,True
+215,3617,mother,Shape board,Sort,Firsthand,-1,29,True
+216,3637,father,Picture cards,Inspect,Firsthand,-1,0,False
+217,3652,mother,Wooden blocks,Stack,Firsthand,-1,45,True
+218,3668,daughter,Ball,Roll,Firsthand,-1,28,True
+219,3692,mother,Lidded box,Close,Firsthand,-1,30,True
+220,3700,son,Picture cards,Inspect,Firsthand,-1,0,False
+221,3701,father,Shape board,Sort,Firsthand,-1,30,True
+222,3722,mother,Shape board,Sort,Firsthand,-1,31,True
+223,3732,daughter,Water,Drink,Firsthand,-1,18,True
+224,3744,father,Lidded box,Open,Firsthand,-1,31,True
+225,3757,son,Toy bin,Tidy,Firsthand,-1,16,True
+226,3760,mother,Ball,Roll,Firsthand,-1,29,True
+227,3772,father,Shape board,Sort,Demonstration,-1,32,True
+228,3772,daughter,Shape board,Sort,Witnessed,227,32,False
+229,3788,mother,Wooden blocks,Stack,Firsthand,-1,47,True
+230,3800,father,Lidded box,Close,Firsthand,-1,32,True
+231,3824,mother,Shape board,Sort,Demonstration,-1,33,True
+232,3840,father,Wooden blocks,Stack,Failed,-1,47,False
+233,3840,father,Wooden blocks,Stack,Replay,232,47,False
+234,3840,mother,Lidded box,Open,Failed,-1,32,False
+235,3840,mother,Lidded box,Open,Replay,234,32,False
+236,3840,son,Left seat,Rest,Failed,-1,0,False
+237,3840,son,Left seat,Rest,Replay,236,0,False
+238,3840,daughter,Shape board,Sort,Replay,228,32,False
+239,4191,mother,Lidded box,Open,Firsthand,-1,33,True
+240,4197,father,Toy bin,Tidy,Firsthand,-1,17,True
+241,4231,father,Picture cards,Inspect,Firsthand,-1,0,False
+242,4281,mother,Water,Drink,Firsthand,-1,20,True
+243,4287,father,Ball,Roll,Demonstration,-1,30,True
+244,4317,mother,Ball,Roll,Failed,-1,30,False
+245,4330,son,Food,Eat,Firsthand,-1,29,True
+246,4336,father,Water,Drink,Firsthand,-1,21,True
+247,4351,mother,Wooden blocks,Stack,Firsthand,-1,49,True
+248,4358,son,Food,Eat,Firsthand,-1,30,True
+249,4370,daughter,Lidded box,Close,Firsthand,-1,34,True
+250,4380,father,Ball,Roll,Firsthand,-1,31,True
+251,4386,son,Food,Eat,Firsthand,-1,31,True
+252,4405,mother,Toy bin,Tidy,Firsthand,-1,18,True
+253,4408,father,Wooden blocks,Stack,Firsthand,-1,51,True
+254,4414,son,Food,Eat,Firsthand,-1,32,True
+255,4436,father,Ball,Roll,Firsthand,-1,32,True
+256,4442,son,Food,Eat,Firsthand,-1,33,True
+257,4448,mother,Picture cards,Inspect,Firsthand,-1,0,False
+258,4464,father,Wooden blocks,Stack,Firsthand,-1,52,True
+259,4470,son,Food,Eat,Firsthand,-1,34,True
+260,4477,mother,Toy bin,Tidy,Firsthand,-1,19,True
+261,4492,father,Ball,Roll,Firsthand,-1,33,True
+262,4506,mother,Picture cards,Inspect,Firsthand,-1,0,False
+263,4519,son,Water,Drink,Firsthand,-1,22,True
+264,4536,daughter,Wooden blocks,Stack,Firsthand,-1,54,True
+265,4549,father,Lidded box,Open,Firsthand,-1,35,True
+266,4555,mother,Ball,Roll,Firsthand,-1,34,True
+267,4584,father,Wooden blocks,Stack,Firsthand,-1,55,True
+268,4593,mother,Toy bin,Tidy,Demonstration,-1,20,True
+269,4605,daughter,Shape board,Sort,Failed,-1,33,False
+270,4619,father,Lidded box,Close,Firsthand,-1,36,True
+271,4626,son,Picture cards,Inspect,Firsthand,-1,0,False
+272,4640,mother,Ball,Roll,Firsthand,-1,35,True
+273,4653,father,Shape board,Sort,Firsthand,-1,34,True
+274,4668,mother,Wooden blocks,Stack,Firsthand,-1,57,True
+275,4681,father,Lidded box,Open,Firsthand,-1,37,True
+276,4696,mother,Ball,Roll,Firsthand,-1,36,True

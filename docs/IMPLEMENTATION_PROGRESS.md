@@ -1,8 +1,12 @@
 # Implementation progress
 
+## Phase L.2 · independent play and retention · November 27, 2026
+
+Living mode now has a shape board and toy cleanup. The archive indexes evidence for independent competence, failed attempts, observation and imitation. The matched four-day run reduced demonstrations from 142 to 27 and increased learner firsthand outcomes from 57 to 69. Witnesses fell from 57 to five and imitations from nine to two. The held-out shape study found a replay-only advantage over exploration and a ceiling for direct retrieval. The combined condition equaled direct retrieval. Passed 80 .NET tests, 81 Unity Edit Mode tests and the isolated DX12 household smoke. The owner clarified the exact embedded asset names and origin. Private Merlin preview awaits manual installation of the pinned official UniVRM packages. [L.2 experiment and evidence](ACTIVE_LEARNING_L2.md) · [Asset registry](ASSET_AND_LICENSE_REGISTRY.md#l2-owner-provenance-and-local-use)
+
 ## Playable household · November 27, 2026
 
-Living mode now presents a furnished four-person activity area, target-driven gaze and body posture, an experience tray, and object changes driven by the shared fixed-tick simulation. Four completed days in isolated Unity produced 307 provenance-stamped events. The original household identities and seeded anatomy persist. The provided models await asset permission and package installation verification. [Implementation report](PLAYABLE_HOUSEHOLD.md) · [Benchmarks](PERFORMANCE_BENCHMARKS.md#playable-household)
+Living mode presents a furnished four-person activity area, target-driven gaze and body posture, an experience tray, and object changes driven by the shared fixed-tick simulation. Four completed days in isolated Unity produced 307 provenance-stamped events. The original household identities and seeded anatomy persist. [Implementation report](PLAYABLE_HOUSEHOLD.md) · [Benchmarks](PERFORMANCE_BENCHMARKS.md#playable-household)
 
 ## Phase C.1.2 · dynamic stability and physical lift · November 27, 2026
 

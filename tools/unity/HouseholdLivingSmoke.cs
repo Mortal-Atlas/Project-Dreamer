@@ -106,9 +106,9 @@ internal static class HouseholdLivingSmoke
             if (world.TickCount != 421) throw new Exception("Single-step was not one authoritative boundary.");
             Click("Close", GameObject.Find("Simulation controls"));
             Invoke(app, "RefreshLife");
-            Capture("household-experience");
+            Capture("household-l2-experience");
             Click("Close", GameObject.Find("Life and experience"));
-            Capture("household-living");
+            Capture("household-l2-living");
             var bodies = Object.FindObjectsByType<SegmentedBody>(FindObjectsSortMode.None);
             int moving = 0, planted = 0, gaze = 0;
             for (int i = 0; i < 100; i++)
@@ -128,10 +128,37 @@ internal static class HouseholdLivingSmoke
             if (moving == 0 || planted == 0 || gaze == 0) throw new Exception("No rendered movement, still support or directed gaze was exercised.");
             var control = WorldSimulation.RestoreCheckpoint(world.CaptureCheckpoint());
             int ticks = 4700 - world.TickCount;
+            bool capturedActivity = false;
+            bool lifeOpen = false;
             for (int i = 0; i < ticks; i++)
             {
                 world.Tick();
-                if (i % 530 == 0) Click("Life & experience");
+                if (i % 530 == 0)
+                {
+                    Click("Life & experience");
+                    lifeOpen = !lifeOpen;
+                }
+                int sortingLearner = -1;
+                if (!capturedActivity)
+                    for (int actor = 2; actor < 4; actor++)
+                    {
+                        var person = world.Home.ReadPerson(actor);
+                        if (person.Activity == HomeActivity.Sort && person.Phase == HomePhase.Act)
+                            sortingLearner = actor;
+                    }
+                if (sortingLearner >= 0)
+                {
+                    if (!lifeOpen) Click("Life & experience");
+                    var tray = GameObject.Find("Life and experience");
+                    while (Read<int>(app, "_lifeFocus") != sortingLearner) Click("Next person", tray);
+                    for (int frame = 0; frame < 8; frame++) Invoke(app, "DrawLiving", WorldSimulation.Dt);
+                    Invoke(app, "RefreshLife");
+                    Click("History day", tray);
+                    Click("History day", tray);
+                    Capture("household-l2-sorting");
+                    if (!lifeOpen) Click("Close", tray);
+                    capturedActivity = true;
+                }
                 if (i % 43 == 0)
                 {
                     Invoke(app, "DrawLiving", WorldSimulation.Dt);
@@ -139,11 +166,26 @@ internal static class HouseholdLivingSmoke
                 }
             }
             control.RunTicks(ticks);
+            if (!capturedActivity) throw new Exception("No learner's sorting action was captured.");
             byte[] exact = world.CaptureCheckpoint();
             if (!exact.SequenceEqual(control.CaptureCheckpoint())) throw new Exception("Observed household diverged from accelerated control.");
             var events = Enumerable.Range(0, world.Home.ExperienceCount).Select(world.Home.Experience).ToArray();
             foreach (var e in events.GroupBy(e => e.Evidence)) Debug.Log($"HOUSEHOLD_EVIDENCE {e.Key}={e.Count()}");
             foreach (var e in events.Where(e => e.Changed).GroupBy(e => e.Activity)) Debug.Log($"HOUSEHOLD_CHANGE {e.Key}={e.Count()}");
+            for (int actor = 2; actor < 4; actor++)
+            {
+                var sort = world.Home.ReadCompetence(actor, HouseholdLife.SortingBoard);
+                Debug.Log($"HOUSEHOLD_COMPETENCE {world.Home.PersonId(actor)} solo={sort.IndependentSuccesses}/{sort.IndependentAttempts} source={sort.LastIndependentSuccess} witnessed={sort.Witnesses} imitated={sort.Imitations}");
+            }
+            using (var trace = File.CreateText(Path.Combine(Application.persistentDataPath, "household-l2-experiences.csv")))
+            {
+                trace.WriteLine("id,tick,actor,target,activity,provenance,source,revision,changed");
+                for (int i = 0; i < events.Length; i++)
+                {
+                    var e = events[i];
+                    trace.WriteLine($"{i},{e.Tick},{world.Home.PersonId(e.Actor)},{HouseholdLife.ItemName(e.Target)},{e.Activity},{e.Evidence},{e.Source},{e.Revision},{e.Changed}");
+                }
+            }
             if (world.DayIndex < 4 || !events.Any(e => e.Evidence == HomeEvidence.Replay) || !events.Any(e => e.Evidence == HomeEvidence.Imitation))
                 throw new Exception("Multi-day observation, imitation or replay was not demonstrated.");
             Invoke(app, "SaveAll");

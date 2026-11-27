@@ -130,6 +130,31 @@ Held-out native means at 5 ms were 0.970 ms/tick for legacy, 0.942 for interlock
 
 Five separate Release headless runs per cast gave median household throughput of 48,117 ticks/s for four people (44,845–52,596) and 30,719 for twelve (28,753–32,550). These were concurrent with editor work on the same workstation. The native rig remains an isolated opt-in experiment.
 
+## Phase L.2 independent activity
+
+Five Release CLI processes per configuration, Laptop 16×16 grid, seed 11, 30 warm-up ticks and 2,000 timed ticks. The twelve-person option measures the legacy kernel. The household affordance scene supports the four founding people.
+
+| Fixture | Median ticks/s | Min–max ticks/s |
+| --- | ---: | ---: |
+| Four-person Living | 48,697 | 45,094–49,517 |
+| Four-person legacy | 46,623 | 44,986–47,075 |
+| Twelve-person legacy | 28,582 | 28,360–28,639 |
+
+The previous session reported 49,531 Living ticks/s. The current value is 1.7% lower across separate sessions. The Living benchmark recorded 129 episodes and 387,752 bytes of measured thread allocation in its 2,000 ticks. Its checkpoint was 26,984 bytes. These allocations include the world tick. They do not describe resident heap or process size.
+
+| Nominal day in matched 4,700-tick Phone run, seed 37 | New episodes | Total saved bytes |
+| --- | ---: | ---: |
+| 1 | 67 | 21,850 |
+| 2 | 58 | 23,885 |
+| 3 | 57 | 25,393 |
+| 4 | 57 | 26,900 |
+
+The active history appends 17 serialized bytes per record. Total checkpoint growth from nominal day 1 through 4 was 5,050 bytes including other systems. Longer runs grow with recorded episodes. Those runs need an append-only external archive and bounded recent working set before they can establish a memory bound. At tick 4,700 the headless checkpoint was 27,583 bytes, and 30 restorations averaged 0.660 ms. The Unity fixture checkpoint at the same tick was 27,668 bytes, including its additional existing data. Whole ticks with an event averaged 16.045 μs and other ticks averaged 14.246 μs in the headless audit. Differences include work associated with the interaction, physiological cadence and timing noise.
+
+A scratch Release build timed selection, recording and nighttime replay at their call sites on 40 fresh runs after six warm-ups, using the same Phone workload. Selection averaged 0.197 μs across 276 calls per run. Append and evidence indexing averaged 0.061 μs across 277 calls. Nighttime replay averaged 0.440 μs across 16 calls, including the nested append and the note to Library II. The instrumented build reproduced the 277 records and 27,583-byte checkpoint. Stopwatch overhead is included, so treat these small intervals as estimates.
+
+Isolated Unity DX12 submitted 1280×720 camera renders at a mean 0.786 ms without the tray, 0.935 ms with the tray at the same checkpoint, and 1.141 ms during the Alice sorting capture. This samples 12 camera calls per image. Direct household view updates averaged 0.0219 ms across 160 calls. Full end-to-end frame timing, GPU time, skinned asset overhead, peak working set and Android thermals remain unmeasured. [Native fixture and reproduction](ACTIVE_LEARNING_L2.md#native-verification-and-continuation)
+
 ## Playable household
 
 Five matched-process triples used Release, the Laptop 16×16 grid, seed 11, 30 warm-up ticks and 2,000 measured ticks. The active four-person household gets new event selection, object updates and experience recording in place of the repeated abstract walking exercise and hidden-rule encounters. These numbers measure the whole kernel. They do not isolate each changed operation.

@@ -29,7 +29,7 @@ The view follows measured root travel with the seeded grounded gait and uses the
 
 ## Asset integration status
 
-The audit located four supplied VRMs and two editable `.vroid` files. All supplied VRM exports carry author-only use terms and credit third parties. The owner's permission covers local tests within applicable rights. No supplied file could be cleared for a rendered import on that basis. UniVRM 0.131.4 is the official MIT-licensed candidate, with publisher support for Unity 2022.3 LTS and later. The tool review rejected an isolated UPM install command with `blocked by policy`, so integration with the actual project packages and rendered skinning remain unverified. The tracked manifest and original files stay untouched. [Inventory and local workflow](ASSET_AND_LICENSE_REGISTRY.md#playable-household-inventory-and-local-import)
+The initial household audit found author-only VRM export metadata. The later owner clarification establishes the basis for the private Merlin preview and identifies the three other exports as stock VRoid Studio samples. The automated tool review rejected an isolated UPM install command with `blocked by policy`. The owner workflow now uses the official pinned UniVRM candidate and begins with Merlin. The tracked manifest and original files remain intact. [Updated provenance and local workflow](ASSET_AND_LICENSE_REGISTRY.md#l2-owner-provenance-and-local-use)
 
 ## Verification
 
@@ -46,4 +46,4 @@ Release .NET passed 77 tests and Unity Edit Mode passed 78. In the isolated DX12
 
 ## Continuation
 
-Once an export is cleared for the intended local use, preview one teacher in a private Unity copy with the pinned importer. Verify MToon and textures, semantic bone mapping, bind pose, limb and ground alignment, expression binding, and view-only retargeting from the existing anatomy. Keep infancy on age-appropriate proportions. For the next living slice, instrument full rendered frame costs and compare delayed retention with replay enabled and disabled. Carry the native C.1.3 early-cancellation and controlled-return experiment on its independent fixture.
+Phase L.2 extends this baseline with actor evidence, sorting, cleanup and a controlled retention comparison. The owner-authorized Merlin preview is the first manual dependency. Verify MToon and textures, semantic bone mapping, bind pose, limb and ground alignment, expression binding, and view-only retargeting from the existing anatomy. Keep infancy on age-appropriate proportions. Carry the native C.1.3 early-cancellation and controlled-return experiment on its independent fixture. [L.2 results](ACTIVE_LEARNING_L2.md)
