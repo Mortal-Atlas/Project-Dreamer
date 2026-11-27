@@ -239,7 +239,7 @@ namespace DreamMachine.UnityBridge
             message.AppendLine($"Pelvis {_lab.PelvisPosition.y:F3} m · displacement {Vector3.Distance(_lab.PelvisPosition, _initialPelvis):F4} m · tilt {_lab.PelvisTilt:F1}° · COM {_lab.CenterOfMass:F3}");
             var l = _lab.ReadSole(0);
             var r = _lab.ReadSole(1);
-            message.AppendLine($"Measured load L {_lab.ReadLoad(0):P0} / R {_lab.ReadLoad(1):P0} · stance {_lab.ReadSole(_lab.DynamicStanceSide).Impulse.y:F2} N s · requested {Targets[_targetIndex]:P0} · {_lab.StanceTicks}/{NativeLowerBodyLab.RequiredStanceTicks} ticks");
+            message.AppendLine($"Measured load L {_lab.ReadLoad(0):P0} / R {_lab.ReadLoad(1):P0} · stance {_lab.ReadSole(_lab.DynamicStanceSide).Impulse.y:F2} N s · requested {_lab.TargetShare:P0} · {_lab.StanceTicks}/{NativeLowerBodyLab.RequiredStanceTicks} ticks");
             message.AppendLine($"CoP L {PressureLabel(l)} / R {PressureLabel(r)} · clearance {l.Clearance:F3} / {r.Clearance:F3} m · caps {(_lab.Saturated ? "hit" : "clear")}");
             message.AppendLine($"Estimated XCoM {_lab.XCom:F3} m · margins lateral {Margin(_lab.FrontalMargin)} / forward {Margin(_lab.SagittalMargin)} · lateral momentum {_lab.Momentum.x:F3} N s");
             message.AppendLine($"{_lab.MotionPhase} · {_lab.TransitionReason} · prelift {_lab.PreliftTicks}/{DreamMachine.Body.DynamicSupport.PreliftTicks} · {_lab.PreliftFailures}");
@@ -253,7 +253,7 @@ namespace DreamMachine.UnityBridge
                 message.AppendLine($"{j.Name} · pitch {j.Angle:F3}/{j.Target:F3} rad, {j.Torque:F2} N m{frontal}");
             }
             string fall = _lab.FirstFallTick < 0 ? "" : $" · fall {_lab.FirstFallTick}, peak impact {_lab.PeakBodyImpact:F1} N s";
-            message.Append($"Slip {_lab.FootDrift:F4} m · work {_lab.AbsoluteWork:F3} J · body contacts {_lab.NonFootContacts} · swing {_lab.SwingClearance:F3}/{_lab.SwingTravel:F3} m · {_lab.ActionReason}{fall} · {_status}");
+            message.Append($"Stance foot offset {_lab.ReadSole(_lab.DynamicStanceSide).Drift:F4} m · work {_lab.AbsoluteWork:F3} J · body contacts {_lab.NonFootContacts} · swing {_lab.SwingClearance:F3}/{_lab.SwingTravel:F3} m · {_lab.ActionReason}{fall} · {_status}");
             _telemetry.text = message.ToString();
         }
 

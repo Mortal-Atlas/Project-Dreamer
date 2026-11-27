@@ -92,6 +92,7 @@ namespace DreamMachine.UnityBridge
         void PrepareDynamicLoad()
         {
             if (!_staged) return;
+            if (MotorRecovery) { UpdateRecoveryLoad(); return; }
             float target = _requestedLoad;
             if (MotionPhase == StepPhase.Anticipation) target = .18f * _pressureDirection;
             if (MotionPhase == StepPhase.Transfer || MotionPhase == StepPhase.Prelift) target = -.875f * _pressureDirection;
@@ -113,6 +114,7 @@ namespace DreamMachine.UnityBridge
 
         float StanceAnkleReflex(int joint)
         {
+            if (MotorRecovery && joint % 3 == 2) return RecoveryAnkleReflex(joint / 3);
             if (!_staged || (StepProtocol != LowerBodyStepProtocol.Prepared && StepProtocol != LowerBodyStepProtocol.LiftOnly) ||
                 joint % 3 != 2 || SwingStartedTick < 0 ||
                 (MotionPhase != StepPhase.Return && (MotionPhase < StepPhase.Lift || MotionPhase > StepPhase.FinalSupport)))
@@ -140,6 +142,7 @@ namespace DreamMachine.UnityBridge
             _swingOrigin = _sole[_swingSide].Position;
             var region = FootRegion(1 - _swingSide);
             _stanceXComReference = region.Valid ? Mathf.Lerp(XCom.x, (region.MinX + region.MaxX) * .5f, .65f) : XCom.x;
+            _previousSwingHeight = _sole[_swingSide].Clearance;
             SwingStartedTick = Tick;
             DynamicGatePassed = _preliftTicks >= DynamicSupport.PreliftTicks;
             Action = SwingOutcome.Swing;
@@ -172,7 +175,9 @@ namespace DreamMachine.UnityBridge
             var swing = _sole[_swingSide];
             if (PreparationRunning)
             {
-                if (MotionPhase == StepPhase.Anticipation && elapsed >= 8 && FootContactMask == 3 && NetPressureValid &&
+                if (WarnBeforeLift(1 - _swingSide))
+                    AbortStaged("prelift-outward-warning");
+                else if (MotionPhase == StepPhase.Anticipation && elapsed >= 8 && FootContactMask == 3 && NetPressureValid &&
                     _pressureDirection * (NetPressure.x - _initialPressureX) >= .008f)
                     EnterPhase(StepPhase.Transfer, "pressure-shift-measured");
                 else if (MotionPhase == StepPhase.Transfer && Mathf.Abs(_requestedLoad) >= .874f && ReadLoad(1 - _swingSide) >= .70f)
@@ -208,7 +213,14 @@ namespace DreamMachine.UnityBridge
                     AbortStaged("lateral-margin-lost");
                     return;
                 }
+                string warning = SwingWarning(1 - _swingSide, swing);
+                if (warning != null)
+                {
+                    AbortStaged(warning);
+                    return;
+                }
             }
+            if (MotionPhase == StepPhase.Return) ReadRecoveryTouchdown();
             switch (MotionPhase)
             {
                 case StepPhase.Lift:
@@ -276,13 +288,20 @@ namespace DreamMachine.UnityBridge
             ActionReason = reason;
             AbortReason = reason;
             _abortReturn = true;
+            CancellationTick = Tick;
+            CancelledBeforeLift = SwingStartedTick < 0;
+            int stance = 1 - _swingSide;
+            CancelledWhileSupported = DynamicSupport.HoldsStance(_sole[stance].Contact, _sole[stance].Impulse.y,
+                StaticWeightImpulse, _sole[stance].Drift);
             _finalTicks = 0;
             EnterPhase(StepPhase.Return, reason);
+            BeginRecovery();
         }
 
         void PlanStagedFeet()
         {
             if (!_staged) return;
+            if (MotorRecovery) { PlanRecoveryFeet(); return; }
             float elapsed = Tick - _phaseTick + 1;
             switch (MotionPhase)
             {

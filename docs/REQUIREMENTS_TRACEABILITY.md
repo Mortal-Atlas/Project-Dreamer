@@ -405,6 +405,14 @@ The clock checkpoint extends K evidence for §§5–7, 116, 124, 133 and 169. Pa
 | L.5 section 22. Cost | Release Laptop benchmark and native scratch camera | Partial | Numerical throughput, allocations, checkpoint and CPU view measured. Isolated decision, GPU and Android are open. [Costs](SPATIAL_LEARNING_L5.md#native-verification-and-cost) |
 | Grounded words, precision manipulation and additional developmental meshes | Live conversation, native hand fixture, age-calibrated visual assets | Open | Kinematic reach verified. [Continuation](CONTINUATION_CHECKPOINT.md) |
 
+## Phase C.1.3 physical recovery
+
+| Requirement | Implementation and dependency | Status | Verification |
+| --- | --- | --- | --- |
+| C.1.3 sections 10-12. Preserve gates, audit deterioration and cancel early | Archived C.1.2 traces, 5 ms PhysX, support-edge and descending-clearance warnings | Verified signals and early cancellation | Both prelift cases remained unrecovered. A separate warning advanced short-swing cancellation before touchdown. [Trace audit](LOWER_BODY_C13.md#preserved-baseline-and-trace-audit) |
+| C.1.3 sections 13-14, 22-23. Recovery, comparison, visual verification and cost | Bounded joint commands, plant-relative target, actual pressure continuity and bilateral gate | Verified for eight fresh swing attempts per motor policy | Native console, capture and observer control. Zero complete steps through the unchanged 80 mm gate. [Native results](LOWER_BODY_C13.md) |
+| Sections 15-18. Body integrity, articulated hand, acquisition and motor vocabulary | Collider-pair audit, calibration and acquisition protocol | Design ready | No hand acquisition or body-fit fixes measured. [Body audit](BODY_INTEGRITY_AUDIT.md) [Hand plan](ARTICULATED_HAND_FIXTURE_PLAN.md) |
+
 ## Physical development and motor vocabulary addendum
 
 The [nervous-system audit](PHYSICAL_NERVOUS_SYSTEM_SPECIFICATION.md#existing-system-audit) identifies existing fixture evidence and integration gaps. The [acceptance plan](PHYSICAL_NERVOUS_SYSTEM_SPECIFICATION.md#experimental-acceptance) records matched tests and scope for the related master requirements §§5–6, 12–21, 46–49, 56–57, 62–64, 92, 128–132, 137, 156–158, 170, 172 and 175.

@@ -60,6 +60,19 @@ namespace DreamMachine.Body
         public static bool HoldsStance(bool contact, float impulse, float weightImpulse, float drift) =>
             contact && weightImpulse > 0f && impulse >= .55f * weightImpulse && drift <= Slip;
 
+        public static bool WarnOutward(LoadedFootRegion region, bool contact, float xCom, float lateralSpeed, int direction)
+        {
+            if (!contact || !region.Valid || !(direction * lateralSpeed > .067f)) return false;
+            float distance = direction < 0 ? xCom - region.MinX : region.MaxX - xCom;
+            // Restrict the warning to the outward edge and a still-reachable neighborhood.
+            return distance >= -.008f && distance < .018f && distance < region.Width * .5f;
+        }
+
+        public static bool WarnPrematureTouchdown(float previousHeight, float height) =>
+            height > 0f && height < Clearance && previousHeight - height > .00025f;
+
+        public static float RecoveryForward(float offset) => Math.Max(-.045f, Math.Min(.065f, offset));
+
         // Quintic endpoint velocity and acceleration are zero, even at the join of two stages.
         public static float Smooth(float t)
         {

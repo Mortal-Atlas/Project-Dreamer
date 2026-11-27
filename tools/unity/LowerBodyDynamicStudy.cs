@@ -1,6 +1,8 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Reflection;
 using DreamMachine.Body;
 using DreamMachine.Sim;
 using DreamMachine.UnityBridge;
@@ -21,6 +23,9 @@ internal static class LowerBodyDynamicStudy
 
     public static void Development() => Start("development");
     public static void Final() => Start("heldout");
+    public static void RecoveryDevelopment() => Start("recovery-development");
+    public static void RecoveryHeldOut() => Start("recovery-heldout");
+    public static void RecoveryVisual() => Start("recovery-visual");
 
     static void Start(string study)
     {
@@ -44,6 +49,16 @@ internal static class LowerBodyDynamicStudy
 
     static void Run(string cohort)
     {
+        if (cohort == "recovery-visual")
+        {
+            RenderRecovery();
+            return;
+        }
+        if (cohort.StartsWith("recovery-", StringComparison.Ordinal))
+        {
+            RunRecovery(cohort);
+            return;
+        }
         VerifyIsolation();
         string directory = Application.persistentDataPath;
         using var summary = File.CreateText(Path.Combine(directory, $"phase-c12-{cohort}-summary.csv"));
@@ -78,6 +93,138 @@ internal static class LowerBodyDynamicStudy
             }
         }
         Debug.Log("C12_COMPLETE " + cohort);
+    }
+
+    static void RunRecovery(string cohort)
+    {
+        bool heldOut = cohort == "recovery-heldout";
+        int[] seeds = heldOut ? new[] { 1771, 2113, 2591, 2677 } : new[] { 101, 303, 1010 };
+        string directory = Application.persistentDataPath;
+        using var summary = File.CreateText(Path.Combine(directory, $"phase-c13-{cohort}-summary.csv"));
+        using var trace = File.CreateText(Path.Combine(directory, $"phase-c13-{cohort}-trace.csv"));
+        summary.WriteLine("seed,age,side,policy,step_ms,eligible,rejected_before_lift,swing_started,held_clearance,cancelled,cancelled_supported,cancel_tick,touchdown_tick,controlled_return,complete,fall_tick,body_contacts,peak_clearance_m,advance_m,peak_effort,saturation_ticks,work_j,min_frontal_m,min_stance_contact_fraction,final_bilateral,mean_native_us,reason");
+        LowerBodyTrace.WriteHeader(trace, dynamics: true, recovery: true);
+        for (int index = 0; index < seeds.Length; index++)
+        for (int side = 0; side < 2; side++)
+        foreach (LowerBodyRecovery policy in Enum.GetValues(typeof(LowerBodyRecovery)))
+            RecoveryTrial(seeds[index], index % 2 == 0 ? 6f : 3f, side, policy, summary, trace);
+        Debug.Log("C13_COMPLETE " + cohort);
+    }
+
+    static void RenderRecovery()
+    {
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        var root = new GameObject("C.1.3 measured lower body", typeof(LowerBodyLabView));
+        var view = root.GetComponent<LowerBodyLabView>();
+        var type = typeof(LowerBodyLabView);
+        type.GetMethod("Start", flags).Invoke(view, null);
+        var field = type.GetField("_lab", flags);
+        ((NativeLowerBodyLab)field.GetValue(view)).Dispose();
+        var lab = new NativeLowerBodyLab(2113, 3f, controller: LowerBodyController.FrontalPose,
+            stepProtocol: LowerBodyStepProtocol.Prepared, recoveryPolicy: LowerBodyRecovery.Combined);
+        field.SetValue(view, lab);
+        using var control = new NativeLowerBodyLab(2113, 3f, controller: LowerBodyController.FrontalPose,
+            stepProtocol: LowerBodyStepProtocol.Prepared, recoveryPolicy: LowerBodyRecovery.Combined);
+        type.GetField("_status", flags).SetValue(view, "Combined recovery");
+        type.GetField("_initialPelvis", flags).SetValue(view, lab.PelvisPosition);
+        var camera = root.GetComponentInChildren<Camera>();
+        var target = new RenderTexture(1280, 720, 24);
+        var texture = new Texture2D(1280, 720, TextureFormat.RGB24, false);
+        var previous = RenderTexture.active;
+        camera.targetTexture = target;
+        foreach (var canvas in UnityEngine.Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None)
+            .Where(c => c.isRootCanvas && c.renderMode == RenderMode.ScreenSpaceOverlay))
+        { canvas.renderMode = RenderMode.ScreenSpaceCamera; canvas.worldCamera = camera; canvas.planeDistance = .4f; }
+        void Capture(string state)
+        {
+            type.GetMethod("Draw", flags).Invoke(view, null);
+            type.GetMethod("Refresh", flags).Invoke(view, null);
+            Canvas.ForceUpdateCanvases();
+            camera.Render();
+            RenderTexture.active = target;
+            texture.ReadPixels(new Rect(0, 0, 1280, 720), 0, 0);
+            texture.Apply();
+            File.WriteAllBytes(Path.Combine(Application.persistentDataPath, $"phase-c13-{state}.png"), texture.EncodeToPNG());
+            Debug.Log($"C13_VISUAL {state} tick={lab.Tick} phase={lab.MotionPhase} contact={lab.FootContactMask}");
+        }
+        try
+        {
+            for (int i = 0; i < 180; i++) { lab.Step(); control.Step(); }
+            if (!lab.RequestPreparedStep(0) || !control.RequestPreparedStep(0))
+                throw new Exception("Representative recovery was ineligible.");
+            bool cancelled = false, touched = false, returned = false;
+            float difference = 0;
+            while (lab.Tick < 480)
+            {
+                lab.Step();
+                control.Step();
+                if (lab.MotionPhase != control.MotionPhase || lab.FootContactMask != control.FootContactMask ||
+                    lab.CancellationTick != control.CancellationTick || lab.RecoveryTouchdownTick != control.RecoveryTouchdownTick)
+                    throw new Exception("Observed recovery diverged from its control.");
+                difference = Mathf.Max(difference, Vector3.Distance(lab.PelvisPosition, control.PelvisPosition),
+                    Vector3.Distance(lab.LeftImpulse, control.LeftImpulse), Vector3.Distance(lab.RightImpulse, control.RightImpulse));
+                if (!cancelled && lab.CancellationTick == lab.Tick)
+                { Capture("cancel"); cancelled = true; }
+                if (!touched && lab.RecoveryTouchdownTick == lab.Tick)
+                { Capture("touchdown"); touched = true; }
+                if (!returned && lab.ControlledReturn)
+                { Capture("double-support"); returned = true; }
+            }
+            if (!cancelled || !touched || !returned || lab.FirstFallTick >= 0) throw new Exception("Recovery visual sequence incomplete.");
+            if (difference > .00001f) throw new Exception("Observed recovery measurements diverged.");
+            Debug.Log(FormattableString.Invariant($"C13_VISUAL observer_ticks={lab.Tick} observed_max_delta={difference:R}"));
+        }
+        finally
+        {
+            RenderTexture.active = previous;
+            UnityEngine.Object.DestroyImmediate(texture);
+            UnityEngine.Object.DestroyImmediate(target);
+            UnityEngine.Object.DestroyImmediate(root);
+        }
+    }
+
+    static void RecoveryTrial(int seed, float age, int side, LowerBodyRecovery policy, TextWriter summary, TextWriter trace)
+    {
+        using var lab = new NativeLowerBodyLab(seed, age, controller: LowerBodyController.FrontalPose,
+            stepProtocol: LowerBodyStepProtocol.Prepared, physicsSubsteps: 10, recoveryPolicy: policy);
+        for (int i = 0; i < 180; i++) lab.Step();
+        bool eligible = lab.RequestPreparedStep(side);
+        int baseline = lab.Tick, stop = lab.Tick + 360, saturationTicks = 0, bodyContacts = 0;
+        float peakEffort = 0, work = 0, minimumMargin = float.PositiveInfinity, minimumContact = 1f;
+        long elapsed = 0;
+        while (eligible && lab.Tick < stop)
+        {
+            StepPhase previous = lab.MotionPhase;
+            long start = Stopwatch.GetTimestamp();
+            lab.Step();
+            elapsed += Stopwatch.GetTimestamp() - start;
+            VerifyPhase(previous, lab.MotionPhase, lab.DynamicGatePassed);
+            LowerBodyTrace.WriteRow(trace, lab, "recovery", dynamics: true, recovery: true);
+            bodyContacts += lab.NonFootContacts > 0 ? 1 : 0;
+            saturationTicks += lab.Saturated ? 1 : 0;
+            peakEffort = Mathf.Max(peakEffort, lab.PeakEffortFraction);
+            work += lab.AbsoluteWork;
+            if (lab.MotionPhase >= StepPhase.Prelift && lab.MotionPhase <= StepPhase.Return)
+            {
+                if (!float.IsNaN(lab.FrontalMargin)) minimumMargin = Mathf.Min(minimumMargin, lab.FrontalMargin);
+                minimumContact = Mathf.Min(minimumContact, lab.ContactFraction(side));
+            }
+            if (previous != lab.MotionPhase && (lab.MotionPhase == StepPhase.Returned || lab.MotionPhase == StepPhase.Complete ||
+                lab.MotionPhase == StepPhase.Fell || lab.MotionPhase == StepPhase.Rejected))
+                stop = Math.Min(stop, lab.Tick + 50);
+        }
+        bool complete = lab.MotionPhase == StepPhase.Complete;
+        if (complete && (!lab.DynamicGatePassed || !lab.LiftPassed || !lab.ForwardPassed || lab.FirstFallTick >= 0 || lab.StanceLossTicks != 0))
+            throw new Exception("Completed step bypassed physical admission.");
+        if (lab.ControlledReturn && lab.FootContactMask != 3) throw new Exception("Return lost double support during follow-up.");
+        bool started = lab.SwingStartedTick >= 0;
+        if (started && !lab.DynamicGatePassed) throw new Exception("Lift bypassed physical admission.");
+        bool cancelled = lab.CancellationTick >= 0;
+        double us = elapsed * 1e6 / Stopwatch.Frequency / Math.Max(1, lab.Tick - baseline);
+        string row = FormattableString.Invariant($"{seed},{age},{side},{policy},{lab.PhysicsStepSeconds * 1000f:F2},{eligible},{eligible && !started},{started},{lab.LiftPassed},{cancelled},{lab.CancelledWhileSupported},{lab.CancellationTick},{lab.RecoveryTouchdownTick},{lab.ControlledReturn},{complete},{lab.FirstFallTick},{bodyContacts},{lab.SwingClearance:F6},{lab.SwingTravel:F6},{peakEffort:F6},{saturationTicks},{work:F6},{minimumMargin:F6},{minimumContact:F3},{lab.FootContactMask == 3},{us:F2},{lab.AbortReason}");
+        summary.WriteLine(row);
+        summary.Flush();
+        Debug.Log("C13_TRIAL " + row);
     }
 
     static void Trial(int seed, int side, LowerBodyStepProtocol protocol, LowerBodyController controller,

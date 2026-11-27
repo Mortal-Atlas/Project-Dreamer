@@ -52,6 +52,27 @@ namespace DreamMachine.Tests
             }
         }
 
+        [TestCase(-1)]
+        [TestCase(1)]
+        public void OutwardWarningRequiresReachableEdgeContactAndDirectionalVelocity(int direction)
+        {
+            Assert.That(DynamicSupport.WarnOutward(Sole, true, direction * .029f, direction * .105f, direction), Is.True);
+            Assert.That(DynamicSupport.WarnOutward(Sole, true, direction * .029f, -direction * .105f, direction), Is.False);
+            Assert.That(DynamicSupport.WarnOutward(Sole, false, direction * .029f, direction * .105f, direction), Is.False);
+            Assert.That(DynamicSupport.WarnOutward(Sole, true, direction * .090f, direction * .105f, direction), Is.False);
+            Assert.That(DynamicSupport.WarnOutward(Sole, true, 0f, direction * .105f, direction), Is.False);
+        }
+
+        [Test]
+        public void ShortTouchdownWarningRequiresDescendingAirborneFoot()
+        {
+            Assert.That(DynamicSupport.WarnPrematureTouchdown(.011f, .008f), Is.True);
+            Assert.That(DynamicSupport.WarnPrematureTouchdown(.006f, .008f), Is.False);
+            Assert.That(DynamicSupport.WarnPrematureTouchdown(.013f, 0f), Is.False);
+            Assert.That(DynamicSupport.RecoveryForward(.15f), Is.EqualTo(.065f));
+            Assert.That(DynamicSupport.RecoveryForward(-.15f), Is.EqualTo(-.045f));
+        }
+
         static PreliftFailure Gate(LoadedFootRegion region, float stance, float swing, bool pressure) =>
             DynamicSupport.Evaluate(region, true, 1f, stance, swing, 4.905f, pressure, 0f, 0f, 0f, 0f, .02f, 1f, .6f, .001f);
     }

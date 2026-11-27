@@ -53,7 +53,8 @@ namespace DreamMachine.UnityBridge
 
         public NativeLowerBodyLab(int seed, float stage, float friction = 0.85f,
             LowerBodyController controller = LowerBodyController.Sagittal, float vestibularNoise = 0f,
-            LowerBodyStepProtocol stepProtocol = LowerBodyStepProtocol.Legacy, int physicsSubsteps = Substeps)
+            LowerBodyStepProtocol stepProtocol = LowerBodyStepProtocol.Legacy, int physicsSubsteps = Substeps,
+            LowerBodyRecovery recoveryPolicy = LowerBodyRecovery.ExistingAbort)
         {
             if (!Application.isPlaying) throw new InvalidOperationException("Native contact callbacks require Play Mode.");
             if (!(stage >= 0f && stage <= HumanoidAnatomy.AdultAgeDays && friction >= 0f && friction <= 1f))
@@ -65,6 +66,11 @@ namespace DreamMachine.UnityBridge
             if (physicsSubsteps < 1 || physicsSubsteps > 40) throw new ArgumentOutOfRangeException(nameof(physicsSubsteps));
             PhysicsSubsteps = physicsSubsteps;
             StepProtocol = stepProtocol;
+            if (!Enum.IsDefined(typeof(LowerBodyRecovery), recoveryPolicy) ||
+                (recoveryPolicy != LowerBodyRecovery.ExistingAbort && (physicsSubsteps != 10 ||
+                    stepProtocol != LowerBodyStepProtocol.Prepared && stepProtocol != LowerBodyStepProtocol.LiftOnly)))
+                throw new ArgumentException("Experimental recovery requires a prepared 5 ms fixture.", nameof(recoveryPolicy));
+            RecoveryPolicy = recoveryPolicy;
             _vestibularNoise = Mathf.Clamp01(vestibularNoise);
             Dimensions = new HumanoidAnatomy(seed).AtAge(stage);
             _travel = Dimensions.HipWidth * 0.78f;
