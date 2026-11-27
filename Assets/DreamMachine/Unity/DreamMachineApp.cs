@@ -43,6 +43,7 @@ namespace DreamMachine.UnityBridge
             public float[] Smoothed;
             public Vector3 Pos;
             public float Yaw;
+            public float GaitDistance;
             public float NextPractice;
             public float NextEncounter;
             public readonly List<PoseFrame> Seen = new List<PoseFrame>();
@@ -140,10 +141,10 @@ namespace DreamMachine.UnityBridge
             if (_font == null) _font = Resources.GetBuiltinResource<Font>("Arial.ttf");
             EnsureEventSystem();
             EnsureSun();
-            BuildGround();
             Shader visible = Shader.Find("DreamMachine/ColorUnlit");
             if (visible == null) visible = Shader.Find("Unlit/Color");
             _unlit = new Material(visible);
+            BuildGround();
             _idShader = Shader.Find("DreamMachine/IdColor");
             _groups = new GroupMind();
             _groups.Step(0, 0, 7);
@@ -168,7 +169,7 @@ namespace DreamMachine.UnityBridge
             SelectBaby(0);
             _workspace = new TrayWorkspace("DreamMachine.Workspace.v1.");
             _workspace.Register(SimulationTrayId, "Simulation controls", new Vector2(480, 105),
-                new TrayWorkspace.Layout { AnchorMin = new Vector2(0.02f, 0.86f), AnchorMax = new Vector2(0.98f, 0.99f) },
+                DefaultSimulationTray(),
                 BuildSimulationControls, () => _timeLabel = null, RefreshSimulationControls);
             _workspace.RestoreVisibility();
         }
@@ -278,29 +279,25 @@ namespace DreamMachine.UnityBridge
             }
             foreach (Actor actor in _actors.Values)
             {
+                Vector3 before = actor.Pos;
                 if (actor.Spec.Role == MemberRole.Baby) StepBaby(actor, dt);
                 else StepMentor(actor, dt);
+                Vector3 change = actor.Pos - before;
+                float moved = change.magnitude;
+                actor.GaitDistance += moved;
+                float yaw = moved > 0.0001f ? Mathf.Atan2(change.x, change.z) * Mathf.Rad2Deg : actor.Yaw;
+                actor.Body.ApplyGroundedGait(actor.GaitDistance, moved, yaw);
                 actor.Body.transform.position = actor.Pos;
-                var label = actor.Body.transform.Find("Label");
-                if (label != null) label.rotation = Quaternion.identity;
+                if (actor.Spec.Role != MemberRole.Baby) RememberPose(actor);
             }
         }
 
         void MoveAnchor(int groupIndex, float dt)
         {
-            GroupId group = groupIndex == 0 ? GroupId.Boys : GroupId.Girls;
             Vector3 home = groupIndex == 0 ? new Vector3(-4.2f, 0f, 0f) : new Vector3(4.2f, 0f, 0f);
-            float lag = 0f;
-            int n = 0;
-            for (int i = 0; i < _babies.Count; i++)
-            {
-                if (_babies[i].Spec.Group != group) continue;
-                lag += Vector3.Distance(_babies[i].Pos, _anchors[groupIndex]);
-                n++;
-            }
-            if (n > 0) lag /= n;
-            GroupGoal goal = group == GroupId.Boys ? _groups.BoysGoal : _groups.GirlsGoal;
-            float speed = (_night || goal == GroupGoal.Rest || lag > 2.8f) ? 0f : 0.4f;
+            if (PopulationConfig.RoutineAt(_sim.SimSeconds, WorldSimulation.DayLength, WorldSimulation.AwakeLength)
+                != FamilyRoutine.Play) return;
+            const float speed = 0.4f;
             float ang = _sim.SimSeconds * 0.18f + groupIndex;
             Vector3 desired = home + new Vector3(Mathf.Sin(ang) * 2.4f, 0f, Mathf.Cos(ang) * 2.4f);
             Vector3 dir = desired - _anchors[groupIndex];
@@ -326,25 +323,27 @@ namespace DreamMachine.UnityBridge
             goal.y = 0f;
             Vector3 delta = goal - actor.Pos;
             delta.y = 0f;
-            actor.Pos = Vector3.Lerp(actor.Pos, goal, 1f - Mathf.Exp(-dt * 1.6f));
-            if (delta.sqrMagnitude > 0.04f)
+            if (PopulationConfig.RoutineAt(_sim.SimSeconds, WorldSimulation.DayLength, WorldSimulation.AwakeLength)
+                == FamilyRoutine.Play && delta.sqrMagnitude > 0.0025f)
             {
-                actor.Yaw = Mathf.LerpAngle(actor.Yaw, Mathf.Atan2(delta.x, delta.z) * Mathf.Rad2Deg, 1f - Mathf.Exp(-dt * 4f));
+                Vector3 change = Vector3.ClampMagnitude(delta, dt * 0.48f);
+                float clear = YardClearance.MotionFraction(actor.Pos.x, actor.Pos.z, change.x, change.z, 0.18f);
+                if (clear < 0.01f)
+                {
+                    // Retain a tangential component when the direct follow route hits a fixed obstacle.
+                    var x = new Vector3(change.x, 0f, 0f);
+                    var z = new Vector3(0f, 0f, change.z);
+                    Vector3 stepX = x * YardClearance.MotionFraction(actor.Pos.x, actor.Pos.z, x.x, 0f, 0.18f);
+                    Vector3 stepZ = z * YardClearance.MotionFraction(actor.Pos.x, actor.Pos.z, 0f, z.z, 0.18f);
+                    change = stepX.sqrMagnitude >= stepZ.sqrMagnitude ? stepX : stepZ;
+                }
+                else change *= clear;
+                actor.Pos += change;
+                if (change.sqrMagnitude > 0.00000001f)
+                    actor.Yaw = Mathf.Atan2(change.x, change.z) * Mathf.Rad2Deg;
             }
-            GroupGoal groupGoal = _groups.GoalFor(actor.Spec);
-            string clip = delta.magnitude > 0.35f ? "walk" : NurserySimulator.ClipFor(groupGoal);
-            if (_night) clip = "sit";
-            float motionTime = _sim != null ? _sim.SimSeconds : Time.time;
-            if (_sim != null)
-            {
-                FamilyRoutine routine = PopulationConfig.RoutineAt(_sim.SimSeconds, WorldSimulation.DayLength, WorldSimulation.AwakeLength);
-                if (_sim.IsNight || routine == FamilyRoutine.Bedtime || routine == FamilyRoutine.MorningMeal || routine == FamilyRoutine.EveningMeal) clip = "sit";
-                else if (routine == FamilyRoutine.Play) clip = "walk";
-                else clip = "idle";
-            }
-            float[] target = MentorMotion.PoseAngles(clip, motionTime, actor.Spec.BirthSeed);
-            SmoothAndApply(actor, target, dt);
-            RememberPose(actor);
+            MentorMotion.WriteAngles("idle", _sim.SimSeconds, actor.Spec.BirthSeed, _poseBuf);
+            SmoothAndApply(actor, _poseBuf, dt);
         }
 
         void StepBaby(Actor actor, float dt)
@@ -357,13 +356,8 @@ namespace DreamMachine.UnityBridge
                 {
                     actor.Pos = new Vector3(child.X, 0f, child.Z);
                     actor.Yaw = child.Yaw;
-                    actor.State.Walker.WritePose(_sim.SimSeconds, _poseBuf);
-                    if (_sim.IsNight)
-                    {
-                        float[] rest = MentorMotion.PoseAngles("sit", 0f, 0);
-                        SmoothAndApply(actor, rest, dt);
-                    }
-                    else SmoothAndApply(actor, _poseBuf, dt);
+                    MentorMotion.WriteAngles("idle", _sim.SimSeconds, actor.Spec.BirthSeed, _poseBuf);
+                    SmoothAndApply(actor, _poseBuf, dt);
                     return;
                 }
             }
@@ -630,11 +624,14 @@ namespace DreamMachine.UnityBridge
                 if (child != null)
                 {
                     BindChild(actor, child);
+                    actor.Pos = new Vector3(child.X, 0f, child.Z);
+                    actor.Yaw = child.Yaw;
                     actor.NextPractice = 0.4f * _babies.Count;
                     actor.NextEncounter = 1.5f + _babies.Count;
                     _babies.Add(actor);
                 }
                 body.transform.position = actor.Pos;
+                body.ApplyGroundedGait(0f, 0f, actor.Yaw);
                 _actors[spec.Id] = actor;
             }
         }
@@ -659,8 +656,10 @@ namespace DreamMachine.UnityBridge
                 var go = GameObject.CreatePrimitive(type);
                 go.name = obj.Id + " " + obj.CategoryLabel;
                 go.transform.SetParent(parent, false);
-                go.transform.position = new Vector3(obj.WorldX, 0.35f, obj.WorldZ);
-                go.transform.localScale = Vector3.one * (obj.Shape == "Capsule" ? 0.55f : 0.42f);
+                float scale = type == PrimitiveType.Capsule ? 0.55f : 0.42f;
+                float supportHeight = type == PrimitiveType.Capsule || type == PrimitiveType.Cylinder ? scale : scale * 0.5f;
+                go.transform.position = new Vector3(obj.WorldX, supportHeight, obj.WorldZ);
+                go.transform.localScale = Vector3.one * scale;
                 int numeric = i + 1;
                 var renderer = go.GetComponent<Renderer>();
                 renderer.sharedMaterial = CharacterFactory.MakeMaterial(_unlit, CharacterFactory.Hex(ColorHex(obj.Color)), numeric);
@@ -682,12 +681,7 @@ namespace DreamMachine.UnityBridge
             ground.name = "Ground";
             ground.transform.localScale = new Vector3(3.2f, 1f, 3.2f);
             var renderer = ground.GetComponent<Renderer>();
-            Shader shader = Shader.Find("DreamMachine/ColorUnlit");
-            if (shader == null) shader = Shader.Find("Unlit/Color");
-            var mat = new Material(shader);
-            mat.SetColor("_Color", new Color(0.36f, 0.48f, 0.33f));
-            mat.SetColor("_IdColor", Color.black);
-            renderer.sharedMaterial = mat;
+            renderer.sharedMaterial = CharacterFactory.MakeMaterial(_unlit, new Color(0.36f, 0.48f, 0.33f), 0);
         }
 
         void BuildCameras()
@@ -730,7 +724,7 @@ namespace DreamMachine.UnityBridge
                 _hud.AddPersonButton(_babies[i].Spec.DisplayName, delegate { SelectBaby(index); });
             }
             _hud.AddActionButton("Experiment", RunShortExperiment);
-            _hud.AddActionButton("Simulation", ToggleSimulationTray);
+            _hud.AddSimulationEntryPoints(ToggleSimulationTray, ResetSimulationLayout);
             _hud.AddActionButton(_performance ? "Detail" : "Fast", TogglePerformance);
             _hud.AddActionButton("Reset", ResetBabies);
             _hud.AddActionButton("Quality", CyclePreset);
@@ -828,7 +822,13 @@ namespace DreamMachine.UnityBridge
                 {
                     actor.Spec = _pop.Find(actor.Spec.Id);
                     SimChild child = _sim.Find(actor.Spec.Id);
-                    if (child != null) BindChild(actor, child);
+                    if (child != null)
+                    {
+                        BindChild(actor, child);
+                        actor.Pos = new Vector3(child.X, 0f, child.Z);
+                        actor.Yaw = child.Yaw;
+                        actor.GaitDistance = 0f;
+                    }
                 }
                 foreach (GameObject dream in _dreams) Destroy(dream);
                 _dreams.Clear();
@@ -1022,12 +1022,14 @@ namespace DreamMachine.UnityBridge
 
         void BillboardLabels()
         {
-            if (Camera.main == null) return;
+            Camera camera = Camera.main;
+            if (camera == null) return;
+            if (_banner != null) _banner.transform.rotation = camera.transform.rotation;
             foreach (Actor actor in _actors.Values)
             {
                 Transform label = actor.Body.transform.Find("Label");
                 if (label == null) continue;
-                label.rotation = Quaternion.LookRotation(label.position - Camera.main.transform.position);
+                label.rotation = camera.transform.rotation;
             }
         }
 
@@ -1181,8 +1183,8 @@ namespace DreamMachine.UnityBridge
         {
             var home = GameObject.CreatePrimitive(PrimitiveType.Cube);
             home.name = "Home";
-            home.transform.position = new Vector3(0f, 0.7f, -1.4f);
-            home.transform.localScale = new Vector3(2.4f, 1.4f, 1.6f);
+            home.transform.position = new Vector3(0f, 0.7f, YardClearance.HouseZ);
+            home.transform.localScale = new Vector3(2f * YardClearance.HouseHalfX, 1.4f, 2f * YardClearance.HouseHalfZ);
             home.GetComponent<Renderer>().sharedMaterial = CharacterFactory.MakeMaterial(_unlit, new Color(0.55f, 0.42f, 0.32f), 0);
             var roof = GameObject.CreatePrimitive(PrimitiveType.Cube);
             roof.name = "Roof";
@@ -1217,12 +1219,22 @@ namespace DreamMachine.UnityBridge
 
         void ToggleSimulationTray() => _workspace?.Toggle(SimulationTrayId);
 
+        static TrayWorkspace.Layout DefaultSimulationTray() => new TrayWorkspace.Layout
+        {
+            AnchorMin = new Vector2(0.02f, 0.74f),
+            AnchorMax = new Vector2(Screen.width >= Screen.height ? 0.56f : 0.98f, 0.89f),
+            Visible = true
+        };
+
+        void ResetSimulationLayout() => _workspace?.SetLayout(SimulationTrayId, DefaultSimulationTray());
+
         void BuildSimulationControls(RectTransform bar)
         {
             _timeLabel = NewLabel(bar, "Clock", 20);
             var clock = _timeLabel.rectTransform;
             clock.anchorMin = new Vector2(0.02f, 0.49f);
             clock.anchorMax = new Vector2(0.98f, 0.98f);
+            clock.offsetMin = clock.offsetMax = Vector2.zero;
             AddTimeButton(bar, "Pause", 0f, 0.14f, () => _governor.Paused = true);
             AddTimeButton(bar, "Resume", 0.14f, 0.28f, () => _governor.Paused = false);
             AddTimeButton(bar, "Step", 0.28f, 0.40f, RequestLocalStep);
@@ -1290,6 +1302,8 @@ namespace DreamMachine.UnityBridge
         void HandleTimeKeys()
         {
             if (DreamInput.WasPressed(KeyCode.N)) RequestLocalStep();
+            if (DreamInput.WasPressed(KeyCode.F6)) ToggleSimulationTray();
+            if (DreamInput.WasPressed(KeyCode.F7)) ResetSimulationLayout();
             if (DreamInput.WasPressed(KeyCode.Space)) _governor.Paused = !_governor.Paused;
             if (DreamInput.WasPressed(KeyCode.Comma)) SetScale(Mathf.Max(0.1f, _governor.TargetScale * 0.1f));
             if (DreamInput.WasPressed(KeyCode.Period)) SetScale(Mathf.Min(1000f, Mathf.Max(0.1f, _governor.TargetScale) * 10f));
@@ -1382,14 +1396,14 @@ namespace DreamMachine.UnityBridge
         TextMesh CreateBanner()
         {
             var go = new GameObject("Banner");
-            go.transform.position = new Vector3(0f, 2.4f, 0f);
+            go.transform.position = new Vector3(0f, 2.05f, YardClearance.HouseZ);
             var text = go.AddComponent<TextMesh>();
-            text.characterSize = 0.12f;
+            text.characterSize = 0.025f;
             text.fontSize = 48;
             text.anchor = TextAnchor.MiddleCenter;
             text.alignment = TextAlignment.Center;
             text.color = new Color(1f, 0.96f, 0.86f);
-            text.text = "Day 1. Six babies, each with a mentor. They only learn what they live and what they see.";
+            text.text = "Day " + (_day + 1) + " · " + (_night ? "Night" : "Awake");
             return text;
         }
 

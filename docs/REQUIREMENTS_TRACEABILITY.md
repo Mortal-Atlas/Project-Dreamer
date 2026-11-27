@@ -264,6 +264,8 @@ The source is the [consolidated specification](MASTER_IMPLEMENTATION_SPECIFICATI
 
 ## Evidence register
 
+Phase C.0 adds evidence for §§6, 12–15, 116, 124–125, 128, 148, 150–151, 153 and 170. Isolated native family runs verify grounded pose and movement-coupled display, scene startup, layout recovery without checkpoint changes and the stable geometry anchors. A separate static C.1 support reference checks analytical bilateral load redistribution. Native lower-body contact forces, physical walking, falling and developmental ground locomotion remain open. [Audit and screenshots](FUNCTIONAL_EMBODIMENT_C0.md)
+
 Phase B.1 extends §§14, 16–21, 57, 124, 128–129, 148, 157 and 170 with a separately scored impulse predictor, bounded and uncertainty-gated corrections, a persisted fallback record, and predeclared matched control gates. Passing a baseline margin does not establish a competitive force-aware advantage. Proposed §§240–316 and their v239 base remain programmatically untraceable until the authoritative texts are supplied. Existing Appendix A is unchanged. [B.1 evidence and source gap](FORCE_AWARE_PHASE_B1.md)
 
 Phase B adds evidence for §§14, 16–21, 57, 124, 128–129, 148, 157 and 170. Actual signed contact prediction error changes a bounded corrective torque. Native comparisons cover engineered, frozen, adaptive, and numerically pretrained/calibrated controllers on complete held-out configurations. A separate Unity process continued learning from a joint physics/model checkpoint. Motor outcomes include lower work and cumulative impulse alongside higher mean tracking error and peak impulse. Receptor-valued prediction, multi-joint transfer and developmental growth calibration remain open. [Phase B experimental evidence](PREDICTIVE_MOTOR_PHASE_B.md)

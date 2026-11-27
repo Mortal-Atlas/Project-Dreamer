@@ -1,5 +1,11 @@
 # Implementation progress
 
+## Phase C.0 · family standing, movement and controls · November 27, 2026
+
+Native DX12 family startup reproduced the hovering teacher rest poses and movement cycles at a stopped root. Neutral knee flexion now measures 5.1° instead of 65.9° for the teachers in the matched rest sample. Seeded crown height is within 1.1 mm and the sampled stance soles remain at ground height. Both teachers moved more than 0.55 m in the matched Play interval. The idle learner that moved zero metres kept a constant knee angle. The stable Simulation and Reset layout buttons preserved the paused checkpoint. An isolated static bilateral support reference begins C.1 without altering the household.
+
+The current regressions passed 70 .NET and 71 Unity Edit Mode tests. The isolated Play Mode harness verified the actual scene and produced before-and-after screenshots. The household remains kinematic. Genuine physical balance, falls, crawling and recovery are pending. [Audit, measured outcomes and screenshots](FUNCTIONAL_EMBODIMENT_C0.md)
+
 ## Phase B.1 · independent impulse prediction and force-aware residuals
 
 The development forecast gate passed and held-out impulse RMSE was 0.083652 N s versus persistence 0.132759, engineered 0.106060 and frozen learned 0.100720. The engineered estimate retained a slight MAE advantage. Across 16 final configurations and 80 matched native trials the ungated controller narrowly missed the fixed tracking margin. Uncertainty gating met both tracking and load margins relative to the engineered baseline while underperforming frozen and Phase B control on work and cumulative impulse. No wrist work was started. [Experiment, data and genuine Unity capture](FORCE_AWARE_PHASE_B1.md)

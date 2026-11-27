@@ -1,6 +1,12 @@
 # Continuation checkpoint
 
-Updated November 26, 2026.
+Updated November 27, 2026.
+
+## Active Phase C.0 household audit
+
+- Branch `feature/embodiment-contact-lab`, [draft PR #8](https://github.com/Mortal-Atlas/Project-Dreamer/pull/8) against protected main. Started from `4f03b84a842eed4db1a447806b6629273262641b`. The owner's pre-existing `ProjectSettings/Packages/com.unity.probuilder/Settings.json` edit remains outside the branch commits. No temporary Git worktree was created.
+- Baseline passed 67 .NET and 68 Unity Edit Mode tests. Corrected core passed 70 tests, including the B.2 regression, and the isolated Unity Edit Mode suite passed 71. Run the family startup and posture verification from [tools/unity](../tools/unity/README.md). Actual native screenshots and witness measurements are in the [Phase C.0 audit](FUNCTIONAL_EMBODIMENT_C0.md). Run `dotnet run --project dotnet/DreamMachine.Cli -c Release -- --lower-body` for the first isolated support reference.
+- Next, construct a separate local PhysX lower-body fixture with a supported pelvis and bilateral hip, knee and ankle joints. Measure vertical contact impulse and support region at a fixed boundary against the analytical load test. Add measured weight transfer and one controlled step before destabilization or a fall. Avoid replacing the production kinematic controller until the isolated test passes.
 
 ## Active Phase B.1 force-aware study
 

@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using DreamMachine.Body;
 using DreamMachine.Development;
 using DreamMachine.Experiment;
 using DreamMachine.Sim;
@@ -35,6 +36,7 @@ namespace DreamMachine.Cli
                 {
                     if (args[i] == "--room") return RoomExperimentCommand.Run(args);
                     if (args[i] == "--discover") return DiscoveryCommand.Run(args);
+                    if (args[i] == "--lower-body") return RunLowerBodyReference();
                     if (args[i] == "--elbow-lab" && i + 1 < args.Length) return ElbowLabCommand.Run(args[i + 1]);
                     if (args[i] == "--archive-pilots") return ArchivePilotCommand.Run(args, i);
                     if (args[i] == "--benchmark")
@@ -118,6 +120,28 @@ namespace DreamMachine.Cli
             household.WritePhysiologyCsv(physio);
             Console.WriteLine("Physiology:" + System.IO.Path.GetFullPath(physio));
             Console.WriteLine("Days simulated: " + nursery.Day + ", babies: " + nursery.Babies.Count);
+            return 0;
+        }
+
+        static int RunLowerBodyReference()
+        {
+            Console.WriteLine("age,condition,pelvis_m,left_knee_rad,right_knee_rad,left_support,right_support,load_supported,left_N,right_N");
+            var anatomy = new HumanoidAnatomy(101);
+            foreach (float age in new[] { 0f, 3f, 6f })
+            {
+                var d = anatomy.AtAge(age);
+                foreach (var trial in new[]
+                {
+                    (Name: "centred", Distance: 0f, Stepping: false, X: 0f),
+                    (Name: "shift-left", Distance: 0f, Stepping: false, X: -d.HipWidth / 4f),
+                    (Name: "supported-step", Distance: GroundedGait.Stride(d) * 0.125f, Stepping: true, X: d.HipWidth / 2f),
+                    (Name: "unsupported-step", Distance: GroundedGait.Stride(d) * 0.125f, Stepping: true, X: -d.HipWidth / 2f)
+                })
+                {
+                    var sample = LowerBodyReference.Evaluate(d, trial.Distance, trial.Stepping, trial.X, 0f, 10f);
+                    Console.WriteLine(FormattableString.Invariant($"{age},{trial.Name},{GroundedGait.PelvisHeight(d, trial.Stepping):F5},{sample.Left.Knee:F5},{sample.Right.Knee:F5},{sample.Left.Supports},{sample.Right.Supports},{sample.LoadInsideSupport},{sample.LeftVerticalNewtons:F4},{sample.RightVerticalNewtons:F4}"));
+                }
+            }
             return 0;
         }
 

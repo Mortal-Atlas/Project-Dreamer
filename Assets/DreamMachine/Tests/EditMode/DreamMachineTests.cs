@@ -19,6 +19,78 @@ using NUnit.Framework;
 
 namespace DreamMachine.Tests
 {
+    public class GroundedGaitTests
+    {
+        [Test]
+        public void IsolatedSupportReferenceRedistributesWeightAndRejectsTheSwingFoot()
+        {
+            var d = new HumanoidAnatomy(101).AtAge(6f);
+            const float mass = 10f, weight = mass * 9.80665f;
+            var centered = LowerBodyReference.Evaluate(d, 0, false, 0, 0, mass);
+            Assert.IsTrue(centered.LoadInsideSupport);
+            Assert.AreEqual(weight / 2f, centered.LeftVerticalNewtons, 0.0001f);
+            var shifted = LowerBodyReference.Evaluate(d, 0, false, -d.HipWidth / 4f, 0, mass);
+            Assert.AreEqual(weight * 0.75f, shifted.LeftVerticalNewtons, 0.0001f);
+            float distance = GroundedGait.Stride(d) * 0.125f;
+            var stance = LowerBodyReference.Evaluate(d, distance, true, d.HipWidth / 2f, 0, mass);
+            Assert.IsTrue(stance.LoadInsideSupport);
+            Assert.AreEqual(weight, stance.RightVerticalNewtons, 0.0001f);
+            var swing = LowerBodyReference.Evaluate(d, distance, true, -d.HipWidth / 2f, 0, mass);
+            Assert.IsFalse(swing.LoadInsideSupport);
+            Assert.AreEqual(0, swing.LeftVerticalNewtons + swing.RightVerticalNewtons);
+        }
+
+        [Test]
+        public void StandingGeometryKeepsBothFeetLevelAcrossSeedsAndGrowth()
+        {
+            for (int seed = 0; seed < 64; seed++)
+            foreach (float stage in new[] { 0f, 1f, 3f, 6f })
+            {
+                var d = new HumanoidAnatomy(seed).AtAge(stage);
+                var atRest = GroundedGait.Sample(d, 0f, false, true);
+                var later = GroundedGait.Sample(d, 33f, false, false);
+                Assert.AreEqual(atRest.Hip, later.Hip);
+                Assert.That(atRest.Knee, Is.InRange(0f, 0.1222f), "neutral knee must stay below 7 degrees");
+                Assert.That(d.PelvisHeight - GroundedGait.PelvisHeight(d, false), Is.InRange(0f, 0.002f));
+                AssertGeometry(d, atRest, false);
+                for (int i = 0; i < 16; i++)
+                {
+                    float distance = GroundedGait.Stride(d) * i / 16f;
+                    var left = GroundedGait.Sample(d, distance, true, true);
+                    var right = GroundedGait.Sample(d, distance, true, false);
+                    Assert.AreNotEqual(left.Supports, right.Supports);
+                    AssertGeometry(d, left, true);
+                    AssertGeometry(d, right, true);
+                }
+            }
+        }
+
+        [Test]
+        public void StraightGaitPlantsTheSupportFootAndClampsObstructedRootTravel()
+        {
+            var d = new HumanoidAnatomy(101).AtAge(6f);
+            float stride = GroundedGait.Stride(d);
+            var first = GroundedGait.Sample(d, stride * 0.1f, true, false);
+            var later = GroundedGait.Sample(d, stride * 0.3f, true, false);
+            Assert.That(first.Forward + stride * 0.1f, Is.EqualTo(later.Forward + stride * 0.3f).Within(0.00001f));
+            Assert.That(YardClearance.MotionFraction(0, 1, 0, -4, 0.12f), Is.InRange(0.36f, 0.38f), "house collision");
+            Assert.That(YardClearance.MotionFraction(-4.25f, -3f, 0, 3, 0.12f), Is.InRange(0.35f, 0.37f), "prop collision");
+            Assert.AreEqual(1f, YardClearance.MotionFraction(7, 6, 0.2f, 0.2f, 0.12f));
+            Assert.AreEqual(1f, YardClearance.MotionFraction(-4.25f, -1.3f, 0f, 0.1f, 0.12f), "legacy overlap can retreat");
+        }
+
+        static void AssertGeometry(HumanoidDimensions d, GroundedGait.Leg leg, bool moving)
+        {
+            double down = d.Thigh * Math.Cos(leg.Hip) + d.Shin * Math.Cos(leg.Hip + leg.Knee);
+            double front = -d.Thigh * Math.Sin(leg.Hip) - d.Shin * Math.Sin(leg.Hip + leg.Knee);
+            Assert.That(GroundedGait.PelvisHeight(d, moving) - down - d.AnkleHeight,
+                Is.EqualTo(leg.Lift).Within(0.00001f));
+            Assert.That(front, Is.EqualTo(leg.Forward).Within(0.00001f));
+            Assert.That(leg.Hip + leg.Knee + leg.Ankle, Is.EqualTo(0f).Within(0.00001f));
+            Assert.That(leg.Knee, Is.InRange(0f, 1.0f));
+        }
+    }
+
     public class ElbowLabTests
     {
         [Test]

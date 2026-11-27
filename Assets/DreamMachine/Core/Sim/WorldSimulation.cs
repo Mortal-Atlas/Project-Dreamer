@@ -363,8 +363,10 @@ namespace DreamMachine.Sim
                 speed *= child.Body.WalkForceScale;
                 child.Yaw = child.Spec.Id == "daughter" ? 40f : -30f;
                 float rad = child.Yaw * 0.0174533f;
-                child.X += (float)Math.Sin(rad) * speed * Dt;
-                child.Z += (float)Math.Cos(rad) * speed * Dt;
+                float dx = (float)Math.Sin(rad) * speed * Dt, dz = (float)Math.Cos(rad) * speed * Dt;
+                float clear = YardClearance.MotionFraction(child.X, child.Z, dx, dz, 0.12f);
+                child.X += dx * clear;
+                child.Z += dz * clear;
             }
             if (child.X > 7.5f) child.X = 7.5f;
             if (child.X < -7.5f) child.X = -7.5f;

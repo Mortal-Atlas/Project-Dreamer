@@ -22,6 +22,7 @@ namespace DreamMachine.UnityBridge
         Slider _fatigue;
         Text _affectReadout;
         RectTransform _board;
+        RectTransform _persistentActions;
         Font _font;
         bool _portrait;
 
@@ -41,6 +42,16 @@ namespace DreamMachine.UnityBridge
             scaler.referenceResolution = new Vector2(1080f, 1920f);
             scaler.matchWidthOrHeight = 0.35f;
             canvasGo.AddComponent<GraphicRaycaster>();
+            _persistentActions = new GameObject("Simulation entry points", typeof(RectTransform), typeof(Canvas),
+                typeof(GraphicRaycaster)).GetComponent<RectTransform>();
+            _persistentActions.SetParent(canvasGo.transform, false);
+            _persistentActions.anchorMin = _persistentActions.anchorMax = new Vector2(0f, 1f);
+            _persistentActions.pivot = new Vector2(0f, 1f);
+            _persistentActions.anchoredPosition = new Vector2(14f, -14f);
+            _persistentActions.sizeDelta = new Vector2(410f, 55f);
+            Canvas actionCanvas = _persistentActions.GetComponent<Canvas>();
+            actionCanvas.overrideSorting = true;
+            actionCanvas.sortingOrder = 30;
 
             _board = Panel(canvasGo.transform, "Board", new Color(0.07f, 0.08f, 0.10f, 0.88f));
             _title = Label(_board, "Title", 34, FontStyle.Bold, TextAnchor.MiddleLeft);
@@ -83,6 +94,21 @@ namespace DreamMachine.UnityBridge
             PersonButtons.Add(button);
             LayoutPersonButtons();
             return button;
+        }
+
+        public void AddSimulationEntryPoints(UnityEngine.Events.UnityAction toggle, UnityEngine.Events.UnityAction reset)
+        {
+            PlaceButton(MakeButton(_persistentActions, "Simulation", toggle), 0f, 0.53f);
+            PlaceButton(MakeButton(_persistentActions, "Reset layout", reset), 0.53f, 1f);
+
+            void PlaceButton(Button button, float from, float to)
+            {
+                var rect = (RectTransform)button.transform;
+                rect.anchorMin = new Vector2(from, 0f);
+                rect.anchorMax = new Vector2(to, 1f);
+                rect.offsetMin = new Vector2(2f, 0f);
+                rect.offsetMax = new Vector2(-2f, 0f);
+            }
         }
 
         public Button AddActionButton(string name, UnityEngine.Events.UnityAction onClick)
@@ -171,6 +197,7 @@ namespace DreamMachine.UnityBridge
             Place("Beliefs", 0.14f, 0.26f);
             Place("Actions", 0.07f, 0.14f);
             Place("Result", 0.01f, 0.07f);
+            LayoutActionButtons();
         }
 
         void Place(string name, float minY, float maxY)
@@ -239,6 +266,9 @@ namespace DreamMachine.UnityBridge
             var text = Label(go.transform, "Caption", 26, FontStyle.Bold, TextAnchor.MiddleCenter);
             text.text = name;
             text.color = Color.white;
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = 12;
+            text.resizeTextMaxSize = 24;
             var rect = text.rectTransform;
             rect.anchorMin = Vector2.zero;
             rect.anchorMax = Vector2.one;

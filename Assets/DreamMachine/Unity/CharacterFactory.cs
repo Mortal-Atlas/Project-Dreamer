@@ -20,16 +20,23 @@ namespace DreamMachine.UnityBridge
         readonly List<Limb> _limbs = new List<Limb>(4);
         HumanoidAnatomy _anatomy;
         float _sampledAge = -1f;
+        Transform _leftHip, _leftKnee, _leftAnkle, _rightHip, _rightKnee, _rightAnkle;
 
         public HumanoidDimensions Dimensions { get; private set; }
         public int AnatomySeed => _anatomy.BirthSeed;
         public float SampledDevelopmentDays => _sampledAge;
+        public bool Walking { get; private set; }
+        public bool LeftSupport { get; private set; }
+        public bool RightSupport { get; private set; }
+        public float LastDisplacementMetres { get; private set; }
 
         internal sealed class Limb
         {
             public bool Arm;
             public float Side;
             public Transform Root, Hinge, End, Grip, FirstMesh, SecondMesh, EndMesh;
+            public Transform[] Digits;
+            public Transform Sole;
         }
 
         internal void BindAnatomy(HumanoidAnatomy anatomy, Transform pelvis, Transform chest, Transform neck,
@@ -77,11 +84,17 @@ namespace DreamMachine.UnityBridge
                     limb.EndMesh.localPosition = Vector3.down * (d.Hand * 0.5f);
                     limb.EndMesh.localScale = new Vector3(d.Hand * 0.58f, d.Hand, d.Hand * 0.44f);
                     limb.Grip.localPosition = limb.EndMesh.localPosition;
+                    for (int i = 0; i < limb.Digits.Length; i++)
+                    {
+                        float x = limb.Side * (i - 2) * d.Hand * 0.11f;
+                        limb.Digits[i].localPosition = new Vector3(x, -d.Hand * (i == 0 ? 0.48f : 0.86f), 0f);
+                    }
                 }
                 else
                 {
                     limb.EndMesh.localPosition = new Vector3(0f, -d.AnkleHeight * 0.5f, d.Foot * 0.24f);
                     limb.EndMesh.localScale = new Vector3(d.Foot * 0.47f, d.AnkleHeight, d.Foot);
+                    limb.Sole.localPosition = new Vector3(0f, -d.AnkleHeight, d.Foot * 0.24f);
                 }
             }
         }
@@ -116,6 +129,38 @@ namespace DreamMachine.UnityBridge
             {
                 SetJoint(JointNames.All[i], radians[i]);
             }
+        }
+
+        public void ApplyGroundedGait(float distance, float displacement, float yaw)
+        {
+            if (_leftHip == null)
+            {
+                _leftHip = RigPivot("leftHip"); _leftKnee = RigPivot("leftKnee"); _leftAnkle = RigPivot("leftAnkle");
+                _rightHip = RigPivot("rightHip"); _rightKnee = RigPivot("rightKnee"); _rightAnkle = RigPivot("rightAnkle");
+            }
+            LastDisplacementMetres = displacement;
+            Walking = displacement > 0.0001f;
+            _rootSpin.localRotation = Quaternion.Euler(0f, yaw, 0f);
+            _pelvis.localPosition = Vector3.up * GroundedGait.PelvisHeight(Dimensions, Walking);
+            var left = GroundedGait.Sample(Dimensions, distance, Walking, true);
+            var right = GroundedGait.Sample(Dimensions, distance, Walking, false);
+            LeftSupport = left.Supports;
+            RightSupport = right.Supports;
+            SetLeg(_leftHip, _leftKnee, _leftAnkle, left);
+            SetLeg(_rightHip, _rightKnee, _rightAnkle, right);
+            if (Walking)
+            {
+                float stride = GroundedGait.Stride(Dimensions);
+                SetJoint("leftShoulder", left.Forward / stride * 1.1f);
+                SetJoint("rightShoulder", right.Forward / stride * 1.1f);
+            }
+        }
+
+        static void SetLeg(Transform hip, Transform knee, Transform ankle, GroundedGait.Leg pose)
+        {
+            hip.localRotation = Quaternion.Euler(pose.Hip * Mathf.Rad2Deg, 0f, 0f);
+            knee.localRotation = Quaternion.Euler(pose.Knee * Mathf.Rad2Deg, 0f, 0f);
+            ankle.localRotation = Quaternion.Euler(pose.Ankle * Mathf.Rad2Deg, 0f, 0f);
         }
 
         public void SetJoint(string joint, float radians)
@@ -206,7 +251,7 @@ namespace DreamMachine.UnityBridge
             labelGo.transform.localPosition = Vector3.up * 2.15f;
             var label = labelGo.AddComponent<TextMesh>();
             label.text = look.IsLeader ? look.DisplayName + "  ★" : look.DisplayName;
-            label.characterSize = 0.08f;
+            label.characterSize = 0.025f;
             label.fontSize = 64;
             label.anchor = TextAnchor.MiddleCenter;
             label.alignment = TextAlignment.Center;
@@ -226,9 +271,19 @@ namespace DreamMachine.UnityBridge
             Transform hinge = Pivot(body, root, side + (arm ? "Elbow" : "Knee"), Vector3.zero);
             Transform end = Pivot(body, hinge, side + (arm ? "Wrist" : "Ankle"), Vector3.zero);
             Transform tip = Pivot(body, end, side + (arm ? "Hand" : "Foot"), Vector3.zero);
+            Transform[] palms = null;
+            if (arm)
+            {
+                string[] digitNames = { "Thumb", "Index", "Middle", "Ring", "Little" };
+                palms = new Transform[digitNames.Length];
+                for (int i = 0; i < palms.Length; i++)
+                    palms[i] = Pivot(body, tip, side + digitNames[i], Vector3.zero);
+            }
             body.AddLimb(new SegmentedBody.Limb
             {
                 Arm = arm, Side = sign, Root = root, Hinge = hinge, End = end,
+                Digits = palms,
+                Sole = arm ? null : Pivot(body, tip, side + "Sole", Vector3.zero),
                 Grip = arm ? Pivot(body, tip, side + "Grip", Vector3.zero) : null,
                 FirstMesh = Primitive(root, PrimitiveType.Capsule, source, cloth, Vector3.zero, Vector3.one, 0, true),
                 SecondMesh = Primitive(hinge, PrimitiveType.Capsule, source, skin, Vector3.zero, Vector3.one, 0, true),

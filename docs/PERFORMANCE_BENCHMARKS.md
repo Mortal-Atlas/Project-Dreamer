@@ -92,3 +92,14 @@ At the same paused predictive checkpoint, 200 direct tray refresh calls averaged
 On the same workstation with the owner's Unity editor open, held-out impulse inference averaged 2.384 µs over 192 predictions. Whole study steps averaged 270.6 µs engineered, 270.1 µs frozen, 271.3 µs Phase B adaptive, 281.4 µs force-aware and 279.6 µs uncertainty gated. These are fixed-order exploratory timings with plotting and CSV outside the timed section. The 17,006-byte force-aware checkpoint was saved and restored. Separate I/O timing was not collected for this format.
 
 At tick 7, 200 direct workspace refreshes averaged 20.442 µs open and 0.079 µs closed. The measurement excludes the separate camera render and later Canvas layout. Twelve cycles left 2,387,968 additional managed bytes following forced GC at the final paused sample. The single run cannot isolate a long-term leak or native/GPU allocation.
+
+## Phase C.0 family stepping
+
+Seven alternating Windows Release pairs used seed 11, Laptop preset, the 16×16 grid, 30 warm-up ticks and 2,000 measured ticks. The owner editor remained open and isolated validation activity overlapped part of the benchmark. No Unity rendering or C.1 support experiment entered the timed core loop.
+
+| Cast | Baseline `4f03b84` median ticks/s | Corrected median ticks/s | Difference |
+| --- | ---: | ---: | ---: |
+| Four | 45,452 | 45,224 | −0.5% |
+| Twelve | 29,621 | 29,094 | −1.8% |
+
+These measured deltas are smaller than the between-run variation and do not replace the historical environment-specific baseline. Exact tick progression is unchanged. The yard sweep runs only when a learner requests movement.
