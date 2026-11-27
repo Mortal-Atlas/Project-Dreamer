@@ -163,14 +163,40 @@ namespace DreamMachine.UnityBridge
                 }
                 bool acting = state.Phase == HomePhase.Act && state.Activity != HomeActivity.Sleep && state.Activity != HomeActivity.Rest &&
                     state.Activity != HomeActivity.Inspect;
-                actor.Body.ApplyHouseholdPose(attention, acting, state.Activity == HomeActivity.Rest && state.Item >= 0 && moved < .002f,
-                    state.Activity == HomeActivity.Sleep && state.Phase == HomePhase.Act, dt, _sim.SimSeconds);
+                bool seated = state.Activity == HomeActivity.Rest && state.Item >= 0 && moved < .002f;
+                bool sleeping = state.Activity == HomeActivity.Sleep && state.Phase == HomePhase.Act;
+                actor.Body.ApplyHouseholdPose(attention, acting, seated, sleeping, dt, _sim.SimSeconds);
+                UpdateLocalAvatar(actor, attention, seated, sleeping, acting && (state.Activity == HomeActivity.Eat || state.Activity == HomeActivity.Drink));
             }
         }
+
+        void UpdateLocalAvatar(Actor actor, Vector3? attention, bool seated, bool sleeping, bool consuming)
+        {
+            // The supplied learner meshes have mature proportions. Infant and child anatomy retains its own view.
+            bool ageAppropriate = HasAgeAppropriateAvatar(actor);
+            if (ageAppropriate && !actor.LocalAvatarChecked)
+            {
+                actor.LocalAvatarChecked = true;
+                actor.LocalAvatar = HouseholdAvatar.Load(actor.Body);
+            }
+            if (actor.LocalAvatar == null) return;
+            bool visible = ageAppropriate && !_researchPresentation;
+            actor.LocalAvatar.SetVisible(visible);
+            if (visible) actor.LocalAvatar.Follow(attention, seated, sleeping, consuming, _sim.SimSeconds);
+        }
+
+        static bool HasAgeAppropriateAvatar(Actor actor) =>
+            actor.State == null || actor.Body.SampledDevelopmentDays >= HumanoidAnatomy.AdultAgeDays;
 
         void ToggleResearchPresentation()
         {
             _researchPresentation = !_researchPresentation;
+            foreach (var actor in _livingActors)
+                if (actor?.LocalAvatar != null)
+                {
+                    bool visible = !_researchPresentation && (_remote == null || !_remote.Active) && HasAgeAppropriateAvatar(actor);
+                    actor.LocalAvatar.SetVisible(visible);
+                }
             _hud.ShowResearch(_researchPresentation);
         }
 

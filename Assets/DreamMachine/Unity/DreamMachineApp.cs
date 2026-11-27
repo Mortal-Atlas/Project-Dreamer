@@ -46,6 +46,8 @@ namespace DreamMachine.UnityBridge
             public float GaitDistance;
             public float NextPractice;
             public float NextEncounter;
+            public bool LocalAvatarChecked;
+            public HouseholdAvatar LocalAvatar;
             public readonly List<PoseFrame> Seen = new List<PoseFrame>();
         }
 
@@ -288,6 +290,7 @@ namespace DreamMachine.UnityBridge
             }
             foreach (Actor actor in _actors.Values)
             {
+                actor.LocalAvatar?.SetVisible(false);
                 Vector3 before = actor.Pos;
                 if (actor.Spec.Role == MemberRole.Baby) StepBaby(actor, dt);
                 else StepMentor(actor, dt);

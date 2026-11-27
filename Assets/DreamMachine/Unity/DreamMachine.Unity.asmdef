@@ -7,7 +7,8 @@
         "Unity.Collections",
         "Unity.Jobs",
         "Unity.Mathematics",
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "VRM10"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
