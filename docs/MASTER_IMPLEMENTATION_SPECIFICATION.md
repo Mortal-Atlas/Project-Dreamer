@@ -1003,6 +1003,7 @@ Read the whole specification, including repository governance and Appendix A. St
 - **§§349–354**: Unity CLI / MCP inspection, console error retrieval, screenshot verification, and headless batchmode test execution.
 - **§§355–358**: Multi-agent interoperability (`AGENTS.md` ground rules, branch protection, PR-only merges).
 - **§§359–362**: Security, sandboxed execution, deterministic seed reproducibility, and development-cost optimization.
+- **§§363–370**: Task prioritization, autonomous implementation boundaries, model-aware delegation, AI-independent experiment execution, context optimization, developmental experience preservation, and avatar identity preservation (`Merlin`, `Marie`, `Arthur`, `Alice`; `Able.vroid` preserved as source asset).
 
 ---
 

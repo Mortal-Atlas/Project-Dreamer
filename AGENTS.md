@@ -98,3 +98,8 @@ controls events.
 4. Commit with a clear message, push, open a PR into `main`.
 5. In the PR, say what changed, test + benchmark results, and anything you
    couldn't verify (e.g., not run in the Unity editor).
+
+
+### Deterministic Experiment & Validation Commands
+- Core .NET + Phase B.2 tests: `dotnet test dotnet/DreamMachine.Core.Tests -c Release --no-restore --nologo`
+- Phase B.2 validation output: `dotnet test dotnet/DreamMachine.Core.Tests -c Release --no-restore --nologo --filter PhaseB2ValidationTests --logger "console;verbosity=detailed"`
