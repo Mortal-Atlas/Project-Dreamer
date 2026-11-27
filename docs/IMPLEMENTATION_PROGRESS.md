@@ -1,5 +1,9 @@
 # Implementation progress
 
+## Physical development planning · November 27, 2026
+
+The planning addendum defines an optional household Physical Development Mode, persistent motor records, the Motor Vocabulary Browser, Babel composition, and generational and regulatory experiments. The verified implementation remains the L.4 checkpoint. L.5 moved-toy search and C.1.3 controlled return are first in the implementation sequence. [Addendum](PHYSICAL_DEVELOPMENT_ADDENDUM.md)
+
 ## Phase L.4 · active inspection and developmental presentation · November 27, 2026
 
 The household now separates a learner's shape-board inspection, predicted slot and actual placement. The study used a fixed observation budget and 2,080-tick delay. On changed layouts passive retrieval solved 14/96, context-gated inspection 74/96, and direct inspection and unified scoring 93/96 each. Context gating used fewer looks and missed rearrangements that retained the same mark. Unity validates the original infant sleeper and toddler overalls, scoped palm targets and bed-facing sleep. The four-day native run produced 282 records and restored the exact observed checkpoint. [L.4 report](ACTIVE_PERCEPTION_L4.md) · [Timing](PERFORMANCE_BENCHMARKS.md#phase-l4-active-inspection)

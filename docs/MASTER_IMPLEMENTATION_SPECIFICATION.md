@@ -855,6 +855,8 @@ Extend working clock, identity, state ownership, typed communication, module reg
 
 Complete seeded growth, semantic skeleton, physical movement, VRM adapter, topological skin, proprioception, basic physiology and sensorimotor feedback. Start with isolated joints and hand/arm control, then reaching/grasping and body-schema adaptation. Implement real body/skin observability. Acceptance: an individual physically interacts with an object, receives meaningful feedback, improves a bounded motor task, adapts to a variation and restores learned state after restart. Label all engineered assistance and visual placeholders.
 
+The [Physical Development Mode and Motor Vocabulary addendum](PHYSICAL_DEVELOPMENT_ADDENDUM.md) defines the household integration after L.5 moved-toy search and C.1.3 controlled return to double support. It specifies visible physical practice, a browser for motor evidence, Babel composition, and later generational and regulatory experiments.
+
 ## 171. Milestone Three — Founding preschool
 
 Create Merlin and Marie as established teachers and Arthur and Alice as developing squires, using verified user avatar mappings. Introduce headless foundational incubator, attractive anime classroom, physical demonstrations, guidance withdrawal, drawing/writing and curriculum evaluation. Preserve sensorimotor checkpoints without flooding autobiography. Acceptance: a student observes a shape, attempts a physical reproduction, receives tactile/proprioceptive feedback and shows measurable retention/generalization or a documented inconclusive outcome. Teacher and student states, actual classroom visuals and persistence must be inspected.

@@ -4,6 +4,8 @@ Updated November 27, 2026.
 
 ## Active playable household
 
+- The verified implementation checkpoint is L.4 at `c5cc3602fb76d4a623b1da8c230ceb3a25f3105f`. The present work is planning. The first implementation pair is an independent search for a moved toy in L.5 and early cancellation with controlled return to double support in C.1.3. Physical Development Mode and the Motor Vocabulary Browser are the subsequent household integration milestones. [Physical development and motor vocabulary](PHYSICAL_DEVELOPMENT_ADDENDUM.md)
+
 - L.4 starts from `20cc1a662f378d477c8206cb230276ab27aae7ba`, with the core checkpoint at `2ecab3ac779dcb01b85103ad073793b4d7461aeb`. Use the head of [draft PR #8](https://github.com/Mortal-Atlas/Project-Dreamer/pull/8). The household uses the fixed-tick socket sensor, append-only decision evidence and v4 checkpoints. Version 3 restored 277 archived records and matched for 500 ticks after resave. Release .NET passed 83 and Unity Edit Mode passed 84. Protected branch and private asset rules still apply. [L.4 results](ACTIVE_PERCEPTION_L4.md)
 - Verified desktop DX12 reach alignment, infant and toddler artwork, sleep facing and four-day observer/restore parity. All four supplied VRMs keep their prior role and eligibility. Preserve the local screenshot folder and ProBuilder preference. Next, add confidence-gated confirmation when the mark matches, then test reordered containers as a second task family before separating the production memory pathways. Fit child and adolescent variants and quantify seating/contact from a matched pose fixture. Continue C.1.3 on its separate native fixture. [L.4 follow-up](ACTIVE_PERCEPTION_L4.md#reproduction-and-next-slice)
 
