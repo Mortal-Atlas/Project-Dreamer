@@ -73,6 +73,17 @@ namespace DreamMachine.Tests
             Assert.That(DynamicSupport.RecoveryForward(-.15f), Is.EqualTo(-.045f));
         }
 
+        [TestCase(-1)]
+        [TestCase(1)]
+        public void PreliftBrakeDetectsLoadedOutwardAccelerationBeforeTheHardWarning(int side)
+        {
+            var region = new LoadedFootRegion(-.065f, .065f, -.09f, .09f);
+            Assert.That(DynamicSupport.PreliftDeteriorating(region, 1f, .02f * side, .06f * side, .05f * side, side), Is.True);
+            Assert.That(DynamicSupport.WarnOutward(region, true, .02f * side, .06f * side, side), Is.False);
+            Assert.That(DynamicSupport.PreliftDeteriorating(region, 1f, .02f * side, .06f * side, .06f * side, side), Is.False);
+            Assert.That(DynamicSupport.PreliftDeteriorating(region, .6f, .02f * side, .06f * side, .05f * side, side), Is.False);
+        }
+
         static PreliftFailure Gate(LoadedFootRegion region, float stance, float swing, bool pressure) =>
             DynamicSupport.Evaluate(region, true, 1f, stance, swing, 4.905f, pressure, 0f, 0f, 0f, 0f, .02f, 1f, .6f, .001f);
     }

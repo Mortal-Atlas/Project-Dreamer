@@ -26,6 +26,7 @@ internal static class LowerBodyDynamicStudy
     public static void RecoveryDevelopment() => Start("recovery-development");
     public static void RecoveryHeldOut() => Start("recovery-heldout");
     public static void RecoveryVisual() => Start("recovery-visual");
+    public static void PreliftVisual() => Start("prelift-visual");
 
     static void Start(string study)
     {
@@ -49,9 +50,9 @@ internal static class LowerBodyDynamicStudy
 
     static void Run(string cohort)
     {
-        if (cohort == "recovery-visual")
+        if (cohort == "recovery-visual" || cohort == "prelift-visual")
         {
-            RenderRecovery();
+            RenderRecovery(cohort == "prelift-visual");
             return;
         }
         if (cohort.StartsWith("recovery-", StringComparison.Ordinal))
@@ -106,12 +107,12 @@ internal static class LowerBodyDynamicStudy
         LowerBodyTrace.WriteHeader(trace, dynamics: true, recovery: true);
         for (int index = 0; index < seeds.Length; index++)
         for (int side = 0; side < 2; side++)
-        foreach (LowerBodyRecovery policy in Enum.GetValues(typeof(LowerBodyRecovery)))
+        foreach (var policy in new[] { LowerBodyRecovery.ExistingAbort, LowerBodyRecovery.EarlyCancellation, LowerBodyRecovery.ControlledLowering, LowerBodyRecovery.PlantedTarget, LowerBodyRecovery.Combined })
             RecoveryTrial(seeds[index], index % 2 == 0 ? 6f : 3f, side, policy, summary, trace);
         Debug.Log("C13_COMPLETE " + cohort);
     }
 
-    static void RenderRecovery()
+    static void RenderRecovery(bool prelift)
     {
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
         var root = new GameObject("C.1.3 measured lower body", typeof(LowerBodyLabView));
@@ -120,12 +121,16 @@ internal static class LowerBodyDynamicStudy
         type.GetMethod("Start", flags).Invoke(view, null);
         var field = type.GetField("_lab", flags);
         ((NativeLowerBodyLab)field.GetValue(view)).Dispose();
-        var lab = new NativeLowerBodyLab(2113, 3f, controller: LowerBodyController.FrontalPose,
-            stepProtocol: LowerBodyStepProtocol.Prepared, recoveryPolicy: LowerBodyRecovery.Combined);
+        int seed = prelift ? 1010 : 2113;
+        float age = prelift ? 6f : 3f;
+        var policy = prelift ? LowerBodyRecovery.ActivePreliftAndLanding : LowerBodyRecovery.Combined;
+        var lab = new NativeLowerBodyLab(seed, age, controller: LowerBodyController.FrontalPose,
+            stepProtocol: LowerBodyStepProtocol.Prepared, recoveryPolicy: policy);
         field.SetValue(view, lab);
-        using var control = new NativeLowerBodyLab(2113, 3f, controller: LowerBodyController.FrontalPose,
-            stepProtocol: LowerBodyStepProtocol.Prepared, recoveryPolicy: LowerBodyRecovery.Combined);
-        type.GetField("_status", flags).SetValue(view, "Combined recovery");
+        using var control = new NativeLowerBodyLab(seed, age, controller: LowerBodyController.FrontalPose,
+            stepProtocol: LowerBodyStepProtocol.Prepared, recoveryPolicy: policy);
+        type.GetField("_status", flags).SetValue(view, prelift ? "Active prelift brake" : "Combined recovery");
+        string phase = prelift ? "c14" : "c13";
         type.GetField("_initialPelvis", flags).SetValue(view, lab.PelvisPosition);
         var camera = root.GetComponentInChildren<Camera>();
         var target = new RenderTexture(1280, 720, 24);
@@ -144,8 +149,8 @@ internal static class LowerBodyDynamicStudy
             RenderTexture.active = target;
             texture.ReadPixels(new Rect(0, 0, 1280, 720), 0, 0);
             texture.Apply();
-            File.WriteAllBytes(Path.Combine(Application.persistentDataPath, $"phase-c13-{state}.png"), texture.EncodeToPNG());
-            Debug.Log($"C13_VISUAL {state} tick={lab.Tick} phase={lab.MotionPhase} contact={lab.FootContactMask}");
+            File.WriteAllBytes(Path.Combine(Application.persistentDataPath, $"phase-{phase}-{state}.png"), texture.EncodeToPNG());
+            Debug.Log($"{phase.ToUpperInvariant()}_VISUAL {state} tick={lab.Tick} phase={lab.MotionPhase} contact={lab.FootContactMask}");
         }
         try
         {
@@ -164,15 +169,16 @@ internal static class LowerBodyDynamicStudy
                 difference = Mathf.Max(difference, Vector3.Distance(lab.PelvisPosition, control.PelvisPosition),
                     Vector3.Distance(lab.LeftImpulse, control.LeftImpulse), Vector3.Distance(lab.RightImpulse, control.RightImpulse));
                 if (!cancelled && lab.CancellationTick == lab.Tick)
-                { Capture("cancel"); cancelled = true; }
+                { Capture(prelift ? "brake" : "cancel"); cancelled = true; }
                 if (!touched && lab.RecoveryTouchdownTick == lab.Tick)
                 { Capture("touchdown"); touched = true; }
                 if (!returned && lab.ControlledReturn)
                 { Capture("double-support"); returned = true; }
             }
-            if (!cancelled || !touched || !returned || lab.FirstFallTick >= 0) throw new Exception("Recovery visual sequence incomplete.");
+            if (!cancelled || (!prelift && !touched) || !returned || lab.FirstFallTick >= 0)
+                throw new Exception("Recovery visual sequence incomplete.");
             if (difference > .00001f) throw new Exception("Observed recovery measurements diverged.");
-            Debug.Log(FormattableString.Invariant($"C13_VISUAL observer_ticks={lab.Tick} observed_max_delta={difference:R}"));
+            Debug.Log(FormattableString.Invariant($"{phase.ToUpperInvariant()}_VISUAL observer_ticks={lab.Tick} observed_max_delta={difference:R}"));
         }
         finally
         {

@@ -1,0 +1,17 @@
+seed,age,side,policy,step_ms,perturbation_ns,initial_support,initial_left_ns,initial_right_ns,initial_tilt,active_tick,cancel_tick,recovered,recovered_tick,recovered_duration_ticks,swing_started,airborne,held_lift,touchdown_tick,completed_step,fall_tick,body_contact_ticks,peak_clearance_mm,advance_mm,work_j,peak_effort,saturation_ticks,mean_native_us
+1010,6,0,Combined,5.00,0.000,True,2.45196,2.45298,0.1065,-1,251,False,-1,-1,-1,False,False,-1,False,289,51,0.000,0.000,22.3069,1.0000,2,951.56
+1010,6,0,EarlyCancellation,5.00,0.000,True,2.45196,2.45298,0.1065,-1,251,False,-1,-1,-1,False,False,-1,False,277,51,0.000,0.000,17.5612,1.0000,4,983.10
+1010,6,0,ActivePrelift,5.00,0.000,True,2.45196,2.45298,0.1065,244,244,True,277,33,-1,False,False,-1,False,-1,0,0.000,0.000,5.5433,0.7131,0,1018.04
+1010,6,0,ActivePreliftAndLanding,5.00,0.000,True,2.45196,2.45298,0.1065,244,244,True,277,33,-1,False,False,-1,False,-1,0,0.000,0.000,5.5433,0.7131,0,925.46
+1010,6,1,Combined,5.00,0.000,True,2.45196,2.45298,0.1065,-1,252,False,-1,-1,-1,False,False,-1,False,291,51,0.000,0.000,23.2095,1.0000,3,949.17
+1010,6,1,EarlyCancellation,5.00,0.000,True,2.45196,2.45298,0.1065,-1,252,False,-1,-1,-1,False,False,-1,False,278,51,0.000,0.000,21.7357,1.0000,4,940.94
+1010,6,1,ActivePrelift,5.00,0.000,True,2.45196,2.45298,0.1065,245,245,True,278,33,-1,False,False,-1,False,-1,0,0.000,0.000,5.4361,0.7133,0,976.04
+1010,6,1,ActivePreliftAndLanding,5.00,0.000,True,2.45196,2.45298,0.1065,245,245,True,278,33,-1,False,False,-1,False,-1,0,0.000,0.000,5.4361,0.7133,0,938.99
+303,3,0,Combined,5.00,0.000,True,2.45187,2.45307,0.1802,-1,296,True,333,37,252,True,True,299,False,-1,0,17.352,48.168,8.8772,1.0000,1,956.08
+303,3,0,EarlyCancellation,5.00,0.000,True,2.45187,2.45307,0.1802,-1,296,False,-1,-1,252,True,True,301,False,337,51,17.352,48.168,24.5999,1.0000,2,937.46
+303,3,0,ActivePrelift,5.00,0.000,True,2.45187,2.45307,0.1802,-1,302,False,-1,-1,252,True,True,302,False,342,51,17.352,50.987,26.2311,1.0000,2,961.99
+303,3,0,ActivePreliftAndLanding,5.00,0.000,True,2.45187,2.45307,0.1802,-1,296,True,333,37,252,True,True,299,False,-1,0,17.352,48.168,8.8772,1.0000,1,919.40
+303,3,1,Combined,5.00,0.000,True,2.45187,2.45307,0.1802,-1,299,True,315,16,252,True,True,303,False,-1,0,16.278,47.077,9.6122,1.0000,1,945.50
+303,3,1,EarlyCancellation,5.00,0.000,True,2.45187,2.45307,0.1802,-1,299,False,-1,-1,252,True,True,304,False,341,51,16.278,47.077,24.4922,1.0000,2,947.51
+303,3,1,ActivePrelift,5.00,0.000,True,2.45187,2.45307,0.1802,-1,306,False,-1,-1,252,True,True,306,False,347,51,16.278,51.499,29.9620,1.0000,2,972.36
+303,3,1,ActivePreliftAndLanding,5.00,0.000,True,2.45187,2.45307,0.1802,-1,299,True,315,16,252,True,True,303,False,-1,0,16.278,47.077,9.6122,1.0000,1,933.98

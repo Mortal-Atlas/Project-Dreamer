@@ -68,6 +68,17 @@ namespace DreamMachine.Body
             return distance >= -.008f && distance < .018f && distance < region.Width * .5f;
         }
 
+        public static bool PreliftDeteriorating(LoadedFootRegion region, float contactFraction, float xCom,
+            float lateralSpeed, float previousSpeed, int direction)
+        {
+            if (!region.Valid || !(contactFraction >= .8f)) return false;
+            float outward = direction * lateralSpeed;
+            float growth = direction * (lateralSpeed - previousSpeed);
+            float edge = direction < 0 ? xCom - region.MinX : region.MaxX - xCom;
+            return edge >= -.012f && edge < .067f && outward > .042f &&
+                (growth > .0015f || outward > .085f) && edge - .15f * outward < .052f;
+        }
+
         public static bool WarnPrematureTouchdown(float previousHeight, float height) =>
             height > 0f && height < Clearance && previousHeight - height > .00025f;
 

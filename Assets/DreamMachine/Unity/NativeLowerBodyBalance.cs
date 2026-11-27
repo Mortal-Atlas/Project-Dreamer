@@ -106,7 +106,7 @@ namespace DreamMachine.UnityBridge
                     ? Mathf.Clamp(-.16f * Vestibular.Gravity.x / 9.81f + .016f * Vestibular.AngularVelocity.z, -.015f, .015f)
                     : Mathf.Clamp(-.45f * Vestibular.Gravity.x / 9.81f + .065f * Vestibular.AngularVelocity.z, -.045f, .045f);
             }
-            _commandRoll = Mathf.MoveTowards(_commandRoll, reference, .002f);
+            _commandRoll = Mathf.MoveTowards(_commandRoll, reference, StabilizingPrelift ? .006f : .002f);
             _rollTarget[0] = _rollTarget[3] = _commandRoll;
             _rollTarget[2] = _rollTarget[5] = -_commandRoll + ankleTrim;
         }

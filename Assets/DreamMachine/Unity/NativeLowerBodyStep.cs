@@ -5,7 +5,7 @@ using UnityEngine;
 namespace DreamMachine.UnityBridge
 {
     public enum LowerBodyStepProtocol { Legacy, Interlock, Smooth, Prepared, LiftOnly }
-    public enum StepPhase { DoubleSupport, Anticipation, Transfer, Prelift, Lift, Advance, Lower, Reacquire, FinalSupport, Complete, Return, Returned, Rejected, Fell }
+    public enum StepPhase { DoubleSupport, Anticipation, Transfer, Prelift, Lift, Advance, Lower, Reacquire, FinalSupport, Complete, Return, Returned, Rejected, Fell, Stabilize }
 
     public sealed partial class NativeLowerBodyLab
     {
@@ -92,6 +92,11 @@ namespace DreamMachine.UnityBridge
         void PrepareDynamicLoad()
         {
             if (!_staged) return;
+            if (StabilizingPrelift)
+            {
+                _requestedLoad = Mathf.MoveTowards(_requestedLoad, 0f, .095f);
+                return;
+            }
             if (MotorRecovery) { UpdateRecoveryLoad(); return; }
             float target = _requestedLoad;
             if (MotionPhase == StepPhase.Anticipation) target = .18f * _pressureDirection;
@@ -114,6 +119,7 @@ namespace DreamMachine.UnityBridge
 
         float StanceAnkleReflex(int joint)
         {
+            if (StabilizingPrelift && joint % 3 == 2) return PreliftAnkleBrake(joint / 3);
             if (MotorRecovery && joint % 3 == 2) return RecoveryAnkleReflex(joint / 3);
             if (!_staged || (StepProtocol != LowerBodyStepProtocol.Prepared && StepProtocol != LowerBodyStepProtocol.LiftOnly) ||
                 joint % 3 != 2 || SwingStartedTick < 0 ||
@@ -171,10 +177,12 @@ namespace DreamMachine.UnityBridge
             }
             if (MotionPhase == StepPhase.Complete || MotionPhase == StepPhase.Returned) return;
             int elapsed = Tick - _phaseTick;
+            if (MotionPhase == StepPhase.Stabilize) { UpdatePreliftStabilization(elapsed); return; }
             var stance = _sole[1 - _swingSide];
             var swing = _sole[_swingSide];
             if (PreparationRunning)
             {
+                if (TryStabilizePrelift(1 - _swingSide)) return;
                 if (WarnBeforeLift(1 - _swingSide))
                     AbortStaged("prelift-outward-warning");
                 else if (MotionPhase == StepPhase.Anticipation && elapsed >= 8 && FootContactMask == 3 && NetPressureValid &&

@@ -413,6 +413,12 @@ The clock checkpoint extends K evidence for §§5–7, 116, 124, 133 and 169. Pa
 | C.1.3 sections 13-14, 22-23. Recovery, comparison, visual verification and cost | Bounded joint commands, plant-relative target, actual pressure continuity and bilateral gate | Verified for eight fresh swing attempts per motor policy | Native console, capture and observer control. Zero complete steps through the unchanged 80 mm gate. [Native results](LOWER_BODY_C13.md) |
 | Sections 15-18. Body integrity, articulated hand, acquisition and motor vocabulary | Collider-pair audit, calibration and acquisition protocol | Design ready | No hand acquisition or body-fit fixes measured. [Body audit](BODY_INTEGRITY_AUDIT.md) [Hand plan](ARTICULATED_HAND_FIXTURE_PLAN.md) |
 
+## Phase C.1.4
+
+| Requirement | Dependency and implementation | Status | Verification |
+| --- | --- | --- | --- |
+| C.1.4 sections 4-7. Prelift diagnosis, physical braking and intact gates | Existing PhysX actuation, pressure and edge support, explicit stabilization stage | Verified for the matched native cohort | Both 1010 sides and all eight fresh perturbed attempts returned under the active policy. Complete step remains open. [C.1.4 measurements](LOWER_BODY_C14.md) |
+
 ## Physical development and motor vocabulary addendum
 
 The [nervous-system audit](PHYSICAL_NERVOUS_SYSTEM_SPECIFICATION.md#existing-system-audit) identifies existing fixture evidence and integration gaps. The [acceptance plan](PHYSICAL_NERVOUS_SYSTEM_SPECIFICATION.md#experimental-acceptance) records matched tests and scope for the related master requirements §§5–6, 12–21, 46–49, 56–57, 62–64, 92, 128–132, 137, 156–158, 170, 172 and 175.
