@@ -1,11 +1,12 @@
 using System;
+using DreamMachine.Body;
 using DreamMachine.Sim;
 using Unity.Collections;
 using UnityEngine;
 
 namespace DreamMachine.UnityBridge
 {
-    public enum LowerBodyController { Sagittal, FrontalPose, SensorFeedback }
+    public enum LowerBodyController { Sagittal, FrontalPose, SensorFeedback, DampedSensorFeedback }
     public enum SwingOutcome { Idle, GateBlocked, Swing, Recontact, Complete, Aborted, Fell }
 
     public readonly struct VestibularReading
@@ -88,18 +89,22 @@ namespace DreamMachine.UnityBridge
         void PrepareLateralTargets()
         {
             if (Controller == LowerBodyController.Sagittal) return;
-            float reference = -.075f * _requestedLoad;
+            float reference = -.075f * _requestedLoad + PreparedRollTrim();
             float ankleTrim = 0f;
-            if (Controller == LowerBodyController.SensorFeedback)
+            if (Controller == LowerBodyController.SensorFeedback || Controller == LowerBodyController.DampedSensorFeedback)
             {
+                bool damped = Controller == LowerBodyController.DampedSensorFeedback;
                 float sign = Mathf.Sign(_requestedLoad);
-                if (FootContactMask != 0) _filteredShare = Mathf.Lerp(_filteredShare, ReadLoad(StanceSide), .05f);
+                if (FootContactMask != 0) _filteredShare = Mathf.Lerp(_filteredShare, ReadLoad(StanceSide), damped ? .035f : .05f);
                 float loadError = TargetShare - _filteredShare;
-                _feedbackTrim = Mathf.MoveTowards(_feedbackTrim, -sign * Mathf.Clamp(.07f * loadError, -.018f, .020f), .0005f);
+                float correction = damped ? Mathf.Clamp(.020f * loadError, -.004f, .004f) : Mathf.Clamp(.07f * loadError, -.018f, .020f);
+                _feedbackTrim = Mathf.MoveTowards(_feedbackTrim, -sign * correction, .0005f);
                 if (Mathf.Abs(_requestedLoad) < .001f) { _feedbackTrim = 0f; _filteredShare = .5f; }
                 reference += _feedbackTrim;
                 // Use the simulated gravity and gyro sample from the preceding tick.
-                ankleTrim = Mathf.Clamp(-.45f * Vestibular.Gravity.x / 9.81f + .065f * Vestibular.AngularVelocity.z, -.045f, .045f);
+                ankleTrim = damped
+                    ? Mathf.Clamp(-.16f * Vestibular.Gravity.x / 9.81f + .016f * Vestibular.AngularVelocity.z, -.015f, .015f)
+                    : Mathf.Clamp(-.45f * Vestibular.Gravity.x / 9.81f + .065f * Vestibular.AngularVelocity.z, -.045f, .045f);
             }
             _commandRoll = Mathf.MoveTowards(_commandRoll, reference, .002f);
             _rollTarget[0] = _rollTarget[3] = _commandRoll;
@@ -124,6 +129,7 @@ namespace DreamMachine.UnityBridge
                     float weight = Mathf.Abs(contact.impulse.y);
                     _pressure[side].Moment += contact.position * weight;
                     _pressure[side].Weight += weight;
+                    if (weight > .0001f) _contactRegions[side].Add(contact.position);
                 }
             }
         }
@@ -172,6 +178,12 @@ namespace DreamMachine.UnityBridge
             _stanceTicks = _standingVerified && TargetShare + .000001f >= RequiredStanceShare &&
                 ReadLoad(StanceSide) >= RequiredStanceShare && StableSupport(StanceSide)
                 ? _stanceTicks + 1 : 0;
+            _preliftTicks = PreliftFailures == PreliftFailure.None && _stanceTicks > 0 ? _preliftTicks + 1 : 0;
+            if (_staged)
+            {
+                UpdateStagedStep();
+                return;
+            }
             if (Action == SwingOutcome.GateBlocked && SwingReady)
             {
                 Action = SwingOutcome.Idle;
@@ -184,13 +196,18 @@ namespace DreamMachine.UnityBridge
             SwingTravel = Mathf.Max(SwingTravel, sole.Position.z - _swingOrigin.z);
             _swingCleared |= !sole.Contact && sole.Clearance >= .01f;
             if (NonFootContacts > 0) EndSwing(SwingOutcome.Fell, "body-ground-contact");
-            else if (!_sole[1 - _swingSide].Contact) EndSwing(SwingOutcome.Aborted, "stance-contact-lost");
+            else if (!_sole[1 - _swingSide].Contact)
+            {
+                StanceLossTicks++;
+                EndSwing(SwingOutcome.Aborted, "stance-contact-lost");
+            }
             else if (_sole[1 - _swingSide].Drift > .020f) EndSwing(SwingOutcome.Aborted, "stance-drift");
             else if (PelvisTilt > 12f) EndSwing(SwingOutcome.Aborted, "pelvis-tilt");
             else if (_swingCleared && sole.Contact && _actionTicks >= 12 && Action == SwingOutcome.Swing)
             {
                 Action = SwingOutcome.Recontact;
                 _requestedLoad = 0f;
+                EnterPhase(StepPhase.Reacquire, "physical-recontact");
             }
             if (Action == SwingOutcome.Recontact)
             {
@@ -209,28 +226,49 @@ namespace DreamMachine.UnityBridge
         {
             Action = outcome;
             ActionReason = reason;
+            if (outcome == SwingOutcome.Aborted) AbortReason = reason;
             _requestedLoad = 0f;
+            EnterPhase(outcome == SwingOutcome.Fell ? StepPhase.Fell : outcome == SwingOutcome.Aborted ? StepPhase.Return : StepPhase.FinalSupport, reason);
         }
 
         public bool TryRequestSwing()
         {
+            if (StepProtocol == LowerBodyStepProtocol.Prepared || StepProtocol == LowerBodyStepProtocol.LiftOnly)
+            {
+                if (RequestPreparedStep(StanceSide)) return true;
+                if (Action == SwingOutcome.Idle && !_staged)
+                {
+                    Action = SwingOutcome.GateBlocked;
+                    ActionReason = "stable-double-support-required";
+                }
+                return false;
+            }
             if (Action != SwingOutcome.Idle && Action != SwingOutcome.GateBlocked) return false;
-            if (!SwingReady)
+            if (!SwingReady || (StepProtocol == LowerBodyStepProtocol.Interlock && _preliftTicks < DynamicSupport.PreliftTicks))
             {
                 Action = SwingOutcome.GateBlocked;
                 ActionReason = "sustained-support-required";
                 return false;
             }
             _swingSide = 1 - StanceSide;
+            if (StepProtocol == LowerBodyStepProtocol.Smooth)
+            {
+                BeginStagedLift();
+                return true;
+            }
+            DynamicGatePassed = _preliftTicks >= DynamicSupport.PreliftTicks;
+            SwingStartedTick = Tick;
             _swingOrigin = _sole[_swingSide].Position;
             Action = SwingOutcome.Swing;
             ActionReason = "none";
+            EnterPhase(StepPhase.Lift, "legacy-swing-request");
             return true;
         }
 
         float PitchTarget(int joint)
         {
             float rest = _joints[joint].Target;
+            if (_staged) return StagedPitchTarget(joint, rest);
             if (joint / 3 != _swingSide || (Action != SwingOutcome.Swing && Action != SwingOutcome.Recontact && Action != SwingOutcome.Complete)) return rest;
             float t = Mathf.Clamp01((_actionTicks + 1f) / 16f);
             if (Action != SwingOutcome.Swing) t = 1f;

@@ -54,7 +54,7 @@ internal static class LowerBodyLateralStudy
         summary.WriteLine("seed,stage,controller,stance,target,stable_samples,target_samples,mean_share,min_share,max_share,cop_valid,peak_tilt_deg,peak_drift_m,max_height_error_m,min_knee,max_knee,overshoot_rad,penetration_m,saturation_ticks,body_contacts,rms_residual_ns,mean_abs_work_j,us_per_tick,passed,swing");
         LowerBodyTrace.WriteHeader(trace);
         foreach (int seed in seeds)
-        foreach (LowerBodyController controller in Enum.GetValues(typeof(LowerBodyController)))
+        foreach (var controller in new[] { LowerBodyController.Sagittal, LowerBodyController.FrontalPose, LowerBodyController.SensorFeedback })
         for (int side = 0; side < 2; side++)
         {
             float stage = seed == 303 || seed == 808 ? 3f : 6f;

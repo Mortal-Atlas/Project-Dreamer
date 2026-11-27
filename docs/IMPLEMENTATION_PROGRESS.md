@@ -1,5 +1,11 @@
 # Implementation progress
 
+## Phase C.1.2 · dynamic stability and physical lift · November 27, 2026
+
+Added absolute support, contact-region, XCoM and signed margin measurements, a staged preparation and swing controller, and native timestep comparisons. Four of six held-out combined trials achieved supported lift. Maximum clearance was 17.04 mm and forward displacement 57.14 mm. No trial completed a step. Two combined trials fell before lift and four after abort. The 5 ms native substep preserved eligibility where all three coarser settings failed. [Audit, failed gates and native evidence](LOWER_BODY_C12.md)
+
+Passed 74 .NET and 75 Unity Edit Mode tests. Native DX12 exercised the staged controller, tray and fixed-clock observer comparison. Household Play Mode preserved the observed and control checkpoint digest. [Numerical, native and household measurements](PERFORMANCE_BENCHMARKS.md#phase-c12-dynamic-support)
+
 ## Phase C.1.1 · lateral balance and first swing experiment · November 27, 2026
 
 Added native roll actuation, idealized pelvis sensors, sole pressure measurements and a gated physical swing. On three fresh seeds, both sides of frontal pose passed the 85% requirement, with 86.33–88.36% mean loading. The feedback variant passed through 80%. All six physical attempts lost stance contact and aborted. Five subsequently made non-foot contact. The verified transfer controller remains selectable apart from the swing. [Experiment, negative results and live observatory](LOWER_BODY_C11.md)

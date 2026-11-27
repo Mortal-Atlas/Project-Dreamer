@@ -52,7 +52,8 @@ namespace DreamMachine.UnityBridge
         public int JointCount => _joints.Length;
 
         public NativeLowerBodyLab(int seed, float stage, float friction = 0.85f,
-            LowerBodyController controller = LowerBodyController.Sagittal, float vestibularNoise = 0f)
+            LowerBodyController controller = LowerBodyController.Sagittal, float vestibularNoise = 0f,
+            LowerBodyStepProtocol stepProtocol = LowerBodyStepProtocol.Legacy, int physicsSubsteps = Substeps)
         {
             if (!Application.isPlaying) throw new InvalidOperationException("Native contact callbacks require Play Mode.");
             if (!(stage >= 0f && stage <= HumanoidAnatomy.AdultAgeDays && friction >= 0f && friction <= 1f))
@@ -61,6 +62,9 @@ namespace DreamMachine.UnityBridge
             Stage = stage;
             Friction = friction;
             Controller = controller;
+            if (physicsSubsteps < 1 || physicsSubsteps > 40) throw new ArgumentOutOfRangeException(nameof(physicsSubsteps));
+            PhysicsSubsteps = physicsSubsteps;
+            StepProtocol = stepProtocol;
             _vestibularNoise = Mathf.Clamp01(vestibularNoise);
             Dimensions = new HumanoidAnatomy(seed).AtAge(stage);
             _travel = Dimensions.HipWidth * 0.78f;
@@ -101,6 +105,7 @@ namespace DreamMachine.UnityBridge
                 Physics.IgnoreCollision(_bodies[i].GetComponent<BoxCollider>(), _bodies[j].GetComponent<BoxCollider>());
             SampleMass();
             CaptureSensors(Vector3.zero);
+            CaptureDynamics();
             if (Controller != LowerBodyController.Sagittal) Physics.ContactEvent += RecordPressure;
         }
 
@@ -167,9 +172,9 @@ namespace DreamMachine.UnityBridge
         public void RequestLoad(float side)
         {
             if (float.IsNaN(side) || float.IsInfinity(side)) throw new ArgumentOutOfRangeException(nameof(side));
-            if (Action == SwingOutcome.Swing || Action == SwingOutcome.Recontact) return;
+            if (Action == SwingOutcome.Swing || Action == SwingOutcome.Recontact || PreparationRunning) return;
             float requested = Mathf.Clamp(side, -1f, 1f);
-            if (_requestedLoad != requested) _stanceTicks = 0;
+            if (_requestedLoad != requested) _stanceTicks = _preliftTicks = 0;
             _requestedLoad = requested;
         }
 
@@ -180,14 +185,19 @@ namespace DreamMachine.UnityBridge
                 throw new ArgumentOutOfRangeException(nameof(disturbanceImpulse), "Research impulse capped at 4 N s.");
             Vector3 before = Momentum;
             Vector3 pelvisVelocity = PelvisVelocity;
+            PrepareDynamicLoad();
+            PlanStagedFeet();
             PrepareLateralTargets();
             Array.Clear(_pressure, 0, _pressure.Length);
+            Array.Clear(_contactRegions, 0, _contactRegions.Length);
+            Array.Clear(_footLoadedSteps, 0, _footLoadedSteps.Length);
             foreach (var c in _contacts) c.ResetTick();
             AbsoluteWork = SignedWork = 0;
             Saturated = false;
+            PeakEffortFraction = 0f;
             ExternalImpulse = disturbanceImpulse;
             if (disturbanceImpulse != Vector3.zero) _pelvis.AddForce(disturbanceImpulse, ForceMode.Impulse);
-            for (int substep = 0; substep < Substeps; substep++)
+            for (int substep = 0; substep < PhysicsSubsteps; substep++)
             {
                 SampleMass();
                 // Positive ankle torque on the foot applies the opposite torque to
@@ -201,11 +211,15 @@ namespace DreamMachine.UnityBridge
                     int foot = joint == 2 ? 4 : joint == 5 ? 7 : -1;
                     bool enabled = (DisabledDrives & (1u << joint)) == 0;
                     _joints[joint].Apply(enabled, foot >= 0 && _contacts[foot].Impulse.y > 0f ? balance : 0f,
-                        _rollTarget[joint], PitchTarget(joint));
+                        _rollTarget[joint], PitchTarget(joint), StanceAnkleReflex(joint), PhysicsStepSeconds);
                     Saturated |= _joints[joint].Saturated;
+                    PeakEffortFraction = Mathf.Max(PeakEffortFraction, _joints[joint].EffortFraction);
                 }
-                ShiftBallast();
-                _physics.Simulate(Substep);
+                ShiftBallast(PhysicsStepSeconds);
+                float leftBefore = LeftImpulse.y, rightBefore = RightImpulse.y;
+                _physics.Simulate(PhysicsStepSeconds);
+                if (LeftImpulse.y - leftBefore > .0001f) _footLoadedSteps[0]++;
+                if (RightImpulse.y - rightBefore > .0001f) _footLoadedSteps[1]++;
                 foreach (var drive in _joints)
                 {
                     float work = drive.Torque * (drive.Angle - drive.Previous);
@@ -240,10 +254,11 @@ namespace DreamMachine.UnityBridge
                     JointLimitOvershoot = Mathf.Max(JointLimitOvershoot, Mathf.Abs(drive.RollAngle) - drive.RollLimit);
             }
             CaptureSensors(pelvisVelocity);
+            CaptureDynamics();
             UpdateSupportGate();
         }
 
-        void ShiftBallast()
+        void ShiftBallast(float stepSeconds)
         {
             Vector3 axis = _pelvis.rotation * Vector3.right;
             Vector3 point = _ballast.worldCenterOfMass;
@@ -252,10 +267,11 @@ namespace DreamMachine.UnityBridge
             Vector3 applied = axis * force;
             _ballast.AddForce(applied);
             _pelvis.AddForceAtPosition(-applied, point);
-            float work = force * speed * Substep;
+            float work = force * speed * stepSeconds;
             SignedWork += work;
             AbsoluteWork += Mathf.Abs(work);
             Saturated |= Mathf.Abs(force) >= 25f;
+            PeakEffortFraction = Mathf.Max(PeakEffortFraction, Mathf.Abs(force) / 25f);
         }
 
         void SampleMass()
@@ -308,6 +324,7 @@ namespace DreamMachine.UnityBridge
             public readonly float RollLimit;
             public float RollTarget, RollTorque, PreviousRoll;
             public float Torque, Previous, AppliedTarget;
+            public float EffortFraction => Mathf.Max(Mathf.Abs(Torque) / _cap, RollLimit > 0 ? Mathf.Abs(RollTorque) / _rollCap : 0f);
             public bool Saturated;
             public Vector3 Axis => _parent.rotation * Vector3.right;
             public Vector3 Position => _child.position + _child.rotation * _anchor;
@@ -365,7 +382,7 @@ namespace DreamMachine.UnityBridge
                 }
             }
 
-            public void Apply(bool enabled, float balanceTorque, float rollTarget, float pitchTarget)
+            public void Apply(bool enabled, float balanceTorque, float rollTarget, float pitchTarget, float rollReflex, float stepSeconds)
             {
                 Previous = Angle;
                 Vector3 axis = Axis;
@@ -373,10 +390,10 @@ namespace DreamMachine.UnityBridge
                 // Evaluate spring and damper at the predicted end of the substep.
                 // The projected two-box inertia keeps small distal links from overshooting in one explicit update.
                 const float stiffness = 150f, damping = 5f;
-                float effectiveDamping = damping + stiffness * Substep;
+                float effectiveDamping = damping + stiffness * stepSeconds;
                 AppliedTarget = Mathf.Clamp(pitchTarget, Min, Max);
                 float effort = enabled ? (stiffness * (AppliedTarget - Previous) - effectiveDamping * speed) /
-                    (1f + effectiveDamping * Substep / _effectiveInertia) + balanceTorque : 0f;
+                    (1f + effectiveDamping * stepSeconds / _effectiveInertia) + balanceTorque : 0f;
                 Torque = Mathf.Clamp(effort, -_cap, _cap);
                 Saturated = Mathf.Abs(effort) >= _cap;
                 _child.AddTorque(axis * Torque);
@@ -385,9 +402,9 @@ namespace DreamMachine.UnityBridge
                 RollTarget = rollTarget;
                 PreviousRoll = RollAngle;
                 const float rollStiffness = 220f, rollDamping = 9f;
-                float effectiveRollDamping = rollDamping + rollStiffness * Substep;
+                float effectiveRollDamping = rollDamping + rollStiffness * stepSeconds;
                 float rollEffort = enabled ? (rollStiffness * (RollTarget - PreviousRoll) - effectiveRollDamping * RollVelocity) /
-                    (1f + effectiveRollDamping * Substep / _rollInertia) : 0f;
+                    (1f + effectiveRollDamping * stepSeconds / _rollInertia) + rollReflex : 0f;
                 RollTorque = Mathf.Clamp(rollEffort, -_rollCap, _rollCap);
                 Saturated |= Mathf.Abs(rollEffort) >= _rollCap;
                 _child.AddTorque(RollAxis * RollTorque);

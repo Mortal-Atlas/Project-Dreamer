@@ -82,7 +82,7 @@ internal static class LowerBodyTraySmoke
             var exported = Directory.EnumerateFiles(Application.persistentDataPath, "lower-body-101-*.csv")
                 .OrderByDescending(File.GetLastWriteTimeUtc).First();
             var rows = File.ReadAllLines(exported);
-            if (rows.Length != 282 || !rows[0].StartsWith("schema,provenance,") || !rows[1].StartsWith("2,isolated-physical-measurement,"))
+            if (rows.Length != 282 || !rows[0].Contains("angular_momentum_kg_m2_s") || !rows[1].StartsWith("3,isolated-physical-measurement,"))
                 throw new Exception("The exported trajectory must contain the schema and every recorded tick.");
             var watch = Stopwatch.StartNew();
             for (int i = 0; i < 100; i++) workspace.RefreshVisible();
@@ -102,6 +102,9 @@ internal static class LowerBodyTraySmoke
             if (clock.Paused) throw new Exception("Resume did not release the clock.");
             Click("Pause / run");
             if (!clock.Paused) throw new Exception("Pause did not stop the clock.");
+            Click("Request swing");
+            if (lab.MotionPhase != StepPhase.Anticipation || lab.SwingStartedTick >= 0)
+                throw new Exception("The prepared protocol should start with physical preparation.");
             Click("Next body");
             var next = (NativeLowerBodyLab)typeof(LowerBodyLabView).GetField("_lab", Flags).GetValue(view);
             if (next.Tick != 0 || next.Seed != 202 || !clock.Paused) throw new Exception("Anatomy selection did not reset the isolated fixture.");
@@ -140,7 +143,7 @@ internal static class LowerBodyTraySmoke
             RenderTexture.active = target;
             image.ReadPixels(new Rect(0, 0, target.width, target.height), 0, 0);
             image.Apply();
-            File.WriteAllBytes(Path.Combine(Application.persistentDataPath, "phase-c11-observatory.png"), image.EncodeToPNG());
+            File.WriteAllBytes(Path.Combine(Application.persistentDataPath, "phase-c12-observatory.png"), image.EncodeToPNG());
         }
         finally
         {

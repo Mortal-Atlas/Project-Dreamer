@@ -119,3 +119,13 @@ Held-out DX12 trials on the same Windows workstation averaged **0.801 ms/tick** 
 At the verified paused stance, 100 direct workspace refreshes averaged 47.440 µs open and 0.089 µs closed. These measurements include telemetry formatting and dispatch. Retained memory, Canvas layout, and GPU rendering are outside this timed comparison.
 
 The separate Release household benchmark again used five process runs for each cast. The four-person median was 45,785 ticks/s (45,357–47,485), and the twelve-person median was 29,331 ticks/s (28,316–29,436). The owner Unity editor was open and isolated experiments overlapped the run. These are descriptive figures for the headless kernel.
+
+## Phase C.1.2 dynamic support
+
+The pure Release .NET dynamic support calculation averaged 21.3 ns per sample across five warmed one-million-sample trials, with zero measured per-operation allocations. The timed sample computed both XCoM coordinates and the full numerical prelift check with varying inputs. It excludes physics, observed contact collection and telemetry formatting.
+
+Native development timing per 50 ms clock tick was 0.912 ms at 5 ms substeps, 0.465 ms at 10 ms, 0.377 ms at 12.5 ms, and 0.211 ms at 25 ms. These are means of the four matched legacy configuration means per setting. Only the 5 ms step preserved 85% stance eligibility. Faster coarse trials measured failed transfer or standing. [Timestep study](LOWER_BODY_C12.md#timestep-sensitivity)
+
+Held-out native means at 5 ms were 0.970 ms/tick for legacy, 0.942 for interlock-only, 0.957 for smooth-only, 0.968 for prepared and 0.959 for prepared lift-only. Each is the mean of six trial means and includes contact, angular momentum and diagnostic collection. CSV generation and rendering are outside those timings. Direct paused tray refreshes averaged 55.353 µs open and 0.102 µs closed. [Per-trial data](evidence/phase-c12-heldout-summary.csv)
+
+Five separate Release headless runs per cast gave median household throughput of 48,117 ticks/s for four people (44,845–52,596) and 30,719 for twelve (28,753–32,550). These were concurrent with editor work on the same workstation. The native rig remains an isolated opt-in experiment.

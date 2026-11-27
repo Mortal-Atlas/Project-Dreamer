@@ -2,7 +2,13 @@
 
 Updated November 27, 2026.
 
-## Active Phase C.1.1 lateral balance
+## Active Phase C.1.2 dynamic support
+
+- Branch `feature/embodiment-contact-lab`, [draft PR #8](https://github.com/Mortal-Atlas/Project-Dreamer/pull/8) targeting protected main. Started at `d7efca112d46167f70da77a1380b4b5123e8fde9`. Audit and numerical gates committed in `edd7169`. Exclude the owner's existing ProBuilder preference and local VRMs.
+- Held-out prepared trials achieved four supported lifts and 57.14 mm maximum native forward travel. No configuration completed a step. Seed 1010 fell during prelift on both sides. All attempted combined forward swings touched down early and later fell. Controlled return is open. Full raw trials and failed pilots are stored in the owner's `phase-c12` experiment backup. [Experiment evidence](LOWER_BODY_C12.md)
+- Keep 5 ms physics. Use the combined controller to develop an early prelift return when the estimated margin approaches the edge. Evaluate it independently of swing. Then test a planted-foot-relative landing target and sustained stance response through contact. Keep all acceptance gates and use new held-out seeds. Leave restricted avatars outside the build pending permission.
+
+## Phase C.1.1 lateral balance
 
 - Branch `feature/embodiment-contact-lab`, [draft PR #8](https://github.com/Mortal-Atlas/Project-Dreamer/pull/8) targeting protected `main`. Started at `22bca58498a811364d04a1ef8b22e581485ed0c4`. Research and protocol checkpoint `9d8248e`. Keep the owner's existing ProBuilder preference outside commits and the original household and local VRMs out of scratch tests.
 - The frontal pose variant passed 85% for all held-out seed/side pairs. All six commanded swings aborted when the stance foot lost contact, and five later made body contact. The feedback variant passed through 80%. The owner experiment backup `phase-c11` contains the full native traces. [Protocol, results and visual capture](LOWER_BODY_C11.md)
