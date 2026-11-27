@@ -37,6 +37,7 @@ namespace DreamMachine.Cli
                     if (args[i] == "--room") return RoomExperimentCommand.Run(args);
                     if (args[i] == "--discover") return DiscoveryCommand.Run(args);
                     if (args[i] == "--lower-body") return RunLowerBodyReference();
+                    if (args[i] == "--retention" && i + 1 < args.Length) return RunHouseholdRetention(args[i + 1]);
                     if (args[i] == "--elbow-lab" && i + 1 < args.Length) return ElbowLabCommand.Run(args[i + 1]);
                     if (args[i] == "--archive-pilots") return ArchivePilotCommand.Run(args, i);
                     if (args[i] == "--benchmark")
@@ -134,6 +135,20 @@ namespace DreamMachine.Cli
             household.WritePhysiologyCsv(physio);
             Console.WriteLine("Physiology:" + System.IO.Path.GetFullPath(physio));
             Console.WriteLine("Days simulated: " + nursery.Day + ", babies: " + nursery.Babies.Count);
+            return 0;
+        }
+
+        static int RunHouseholdRetention(string path)
+        {
+            using var report = System.IO.File.CreateText(path);
+            report.WriteLine("cohort,seed,access,cue,arrangement,choice,decision,source,transfer,success,repeated_training_mistake");
+            for (int seed = 771; seed <= 796; seed++)
+            {
+                string cohort = seed < 781 ? "development" : "heldout";
+                foreach (RetentionAccess access in Enum.GetValues(typeof(RetentionAccess)))
+                foreach (RetentionTrial trial in HouseholdRetention.Probe(seed, access))
+                    report.WriteLine(FormattableString.Invariant($"{cohort},{trial.Seed},{trial.Access},{trial.Cue},{trial.Rotation},{trial.Choice},{trial.Decision},{trial.Source},{trial.Transfer},{trial.Success},{trial.RepeatedTrainingMistake}"));
+            }
             return 0;
         }
 

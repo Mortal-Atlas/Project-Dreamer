@@ -36,7 +36,8 @@ namespace DreamMachine.Sim
     {
         // Version 1 stores the embedded kernel at a completed tick boundary.
         const int CheckpointVersion = 1;
-        const int HouseholdCheckpointVersion = 2;
+        const int PreviousHouseholdCheckpointVersion = 2;
+        const int HouseholdCheckpointVersion = 3;
         const int MaxCheckpointBytes = 64 * 1024 * 1024;
         readonly System.Collections.Generic.List<ResearchIntervention> _interventions =
             new System.Collections.Generic.List<ResearchIntervention>();
@@ -136,7 +137,7 @@ namespace DreamMachine.Sim
                 if (checkpoint.Length > MaxCheckpointBytes || envelope.ReadString() != "DreamMachine.World")
                     throw new InvalidDataException("Unsupported world checkpoint.");
                 int version = envelope.ReadInt32();
-                if (version != CheckpointVersion && version != HouseholdCheckpointVersion)
+                if (version != CheckpointVersion && version != PreviousHouseholdCheckpointVersion && version != HouseholdCheckpointVersion)
                     throw new InvalidDataException("Unsupported world checkpoint.");
                 int length = envelope.ReadInt32();
                 if (length < 0 || length != envelope.BaseStream.Length - envelope.BaseStream.Position - 32)
@@ -148,10 +149,10 @@ namespace DreamMachine.Sim
                     throw new InvalidDataException("World checkpoint checksum failed.");
                 using var payload = new BinaryReader(new MemoryStream(bytes, writable: false));
                 WorldSimulation world = ReadCheckpoint(payload);
-                if (version == HouseholdCheckpointVersion)
+                if (version != CheckpointVersion)
                 {
                     if (!world.EnableHouseholdLife()) throw new InvalidDataException("Household activity roster does not match.");
-                    world.Home.Read(payload);
+                    world.Home.Read(payload, version == PreviousHouseholdCheckpointVersion);
                 }
                 if (payload.BaseStream.Position != payload.BaseStream.Length)
                     throw new InvalidDataException("Unexpected trailing checkpoint data.");

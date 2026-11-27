@@ -6,7 +6,7 @@ using DreamMachine.World;
 
 namespace DreamMachine.Sim
 {
-    public enum HomeActivity { Rest, Inspect, Roll, Stack, Open, Close, Watch, Eat, Drink, Sleep }
+    public enum HomeActivity { Rest, Inspect, Roll, Stack, Open, Close, Watch, Eat, Drink, Sleep, Sort, Tidy }
     public enum HomePhase { Resting, Approach, Act, Observe }
     public enum HomeEvidence { Firsthand, Demonstration, Witnessed, Imitation, Failed, Replay }
     public enum HomeReason { Resting, Curiosity, Practice, ObservedExample, Teach, Hunger, Thirst, Night, Blocked }
@@ -23,6 +23,13 @@ namespace DreamMachine.Sim
             Tick = tick; Actor = actor; Activity = activity; Target = target; Evidence = evidence;
             Source = source; Revision = revision; Changed = changed;
         }
+    }
+
+    public readonly struct HomeCompetence
+    {
+        public readonly int IndependentAttempts, IndependentSuccesses, Witnesses, Imitations, Failures, LastIndependentSuccess;
+        internal HomeCompetence(int attempts, int successes, int witnesses, int imitations, int failures, int lastSuccess)
+        { IndependentAttempts = attempts; IndependentSuccesses = successes; Witnesses = witnesses; Imitations = imitations; Failures = failures; LastIndependentSuccess = lastSuccess; }
     }
 
     public readonly struct HomePersonView
@@ -46,9 +53,12 @@ namespace DreamMachine.Sim
     /// <summary>Fixed-tick household affordances. All contacts here are kinematic references.</summary>
     public sealed class HouseholdLife
     {
-        public const int ItemCount = 12;
-        static readonly string[] Names = { "Picture cards", "Ball", "Wooden blocks", "Lidded box", "Food", "Water", "Left seat", "Right seat", "Merlin's bed", "Marie's bed", "Arthur's bed", "Alice's bed" };
-        static readonly HomeActivity[] Activities = { HomeActivity.Inspect, HomeActivity.Roll, HomeActivity.Stack, HomeActivity.Open, HomeActivity.Close };
+        const int PreviousItemCount = 12;
+        public const int ItemCount = 14;
+        public const int SortingBoard = 12, ToyBin = 13;
+        static readonly string[] Names = { "Picture cards", "Ball", "Wooden blocks", "Lidded box", "Food", "Water", "Left seat", "Right seat", "Merlin's bed", "Marie's bed", "Arthur's bed", "Alice's bed", "Shape board", "Toy bin" };
+        static readonly (int Item, HomeActivity Activity)[] Play = { (0, HomeActivity.Inspect), (1, HomeActivity.Roll),
+            (2, HomeActivity.Stack), (3, HomeActivity.Open), (SortingBoard, HomeActivity.Sort), (ToyBin, HomeActivity.Tidy) };
         readonly WorldSimulation _world;
         readonly Person[] _people = new Person[4];
         readonly Item[] _items = new Item[ItemCount];
@@ -59,6 +69,12 @@ namespace DreamMachine.Sim
         public int ExperienceCount => _memory.Count;
         public HomeExperience Experience(int index) => _memory[index];
         public HomePersonView ReadPerson(int index) => new HomePersonView(_people[index]);
+        public HomeCompetence ReadCompetence(int actor, int item)
+        {
+            Person p = _people[actor];
+            return new HomeCompetence(p.SoloAttempts[item], p.SoloSuccesses[item], p.Witnesses[item], p.Copies[item],
+                p.Failed[item], p.LastSuccess[item]);
+        }
         public string PersonId(int index) => _people[index].Spec.Id;
         public static string ItemName(int index) => Names[index];
         public (float X, float Z, int Value, int Revision) ReadItem(int index)
@@ -89,6 +105,8 @@ namespace DreamMachine.Sim
             _items[9] = new Item(2.08f, -.23f);
             _items[10] = new Item(-2.86f, -.09f);
             _items[11] = new Item(2.86f, -.09f);
+            _items[SortingBoard] = new Item(.95f, .53f);
+            _items[ToyBin] = new Item(-.87f, .68f);
         }
 
         public int FindPerson(string id)
@@ -179,7 +197,7 @@ namespace DreamMachine.Sim
             }
             int teacher = index - 2;
             if (p.Child != null && p.LastWatched != _people[teacher].Sequence && _people[teacher].Phase == HomePhase.Act &&
-                _people[teacher].Activity >= HomeActivity.Inspect && _people[teacher].Activity <= HomeActivity.Close &&
+                _people[teacher].Reason == HomeReason.Teach &&
                 Distance2(p.X, p.Z, _people[teacher].X, _people[teacher].Z) <= 9f)
             {
                 p.Activity = HomeActivity.Watch; p.Phase = HomePhase.Observe; p.Reason = HomeReason.Teach;
@@ -189,22 +207,35 @@ namespace DreamMachine.Sim
             }
             float best = float.NegativeInfinity;
             int chosen = -1;
-            for (int item = 0; item < Activities.Length - 1; item++)
+            HomeActivity activity = HomeActivity.Rest;
+            foreach (var candidate in Play)
             {
-                if (!Available(index, item)) continue;
+                int item = candidate.Item;
+                if (!Available(index, item) || (item == ToyBin && _items[2].Value == 0)) continue;
                 Item target = _items[item];
                 int preference = (p.Spec.BirthSeed + 3 * item) & 7;
                 float novelty = p.Practice[item] == 0 ? .30f : 0f;
                 float retained = p.Replay >= 0 && _memory[p.Replay].Target == item ? .16f : 0f;
                 float curiosity = p.Child == null ? .45f : p.Child.State.Emotions.Curiosity;
+                float evidenceInterest = Math.Min(.24f, .05f * p.SoloSuccesses[item]) - Math.Min(.35f, .08f * p.Failed[item]);
                 float score = preference * .07f + curiosity * novelty + retained -
                     Math.Min(2f, Distance2(p.X, p.Z, target.X, target.Z) * .13f) -
-                    (p.LastItem == item ? 1.4f : 0f) - Math.Min(.55f, p.Practice[item] * .025f);
-                if (score > best) { best = score; chosen = item; }
+                    (p.LastItem == item ? 1.4f : 0f) - Math.Min(.55f, p.Practice[item] * .025f) + evidenceInterest;
+                if (score > best) { best = score; chosen = item; activity = candidate.Activity; }
             }
             if (chosen < 0) { Rest(p, tick + 14, HomeReason.Resting); return; }
-            HomeActivity activity = chosen == 3 && _items[3].Value == 1 ? HomeActivity.Close : Activities[chosen];
-            Assign(p, activity, chosen, p.Child == null ? HomeReason.Teach : p.Practice[chosen] == 0 ? HomeReason.Curiosity : HomeReason.Practice, tick);
+            if (chosen == 3 && _items[3].Value == 1) activity = HomeActivity.Close;
+            bool demonstrate = p.Child == null && UsefulDemonstration(index, chosen, tick);
+            Assign(p, activity, chosen, demonstrate ? HomeReason.Teach : p.Practice[chosen] == 0 ? HomeReason.Curiosity : HomeReason.Practice, tick);
+        }
+
+        bool UsefulDemonstration(int teacher, int item, int tick)
+        {
+            var learner = _people[teacher + 2];
+            var actor = _people[teacher];
+            int threshold = learner.Failed[item] > learner.SoloSuccesses[item] ? 3 : 2;
+            return learner.SoloSuccesses[item] < threshold && tick - actor.LastDemo[item] >= 230 &&
+                Distance2(learner.X, learner.Z, _items[item].X, _items[item].Z) <= 5f;
         }
 
         bool Available(int index, int item)
@@ -268,6 +299,7 @@ namespace DreamMachine.Sim
             if (p.Activity == HomeActivity.Sleep) { p.Until = tick + 2000; return; }
             if (p.Activity == HomeActivity.Rest) { p.Phase = HomePhase.Resting; p.Until = tick + 40; return; }
             bool changed = false;
+            int appliedSource = p.Source;
             bool reached = Distance2(p.X, p.Z, target.X, target.Z) <= (p.Child == null ? .34f : .15f);
             bool success = reached;
             if (reached)
@@ -279,6 +311,23 @@ namespace DreamMachine.Sim
                         target.V = target.X >= .54f ? -.68f : .68f; changed = true; break;
                     case HomeActivity.Stack:
                         target.Value = target.Value == 2 ? 0 : target.Value + 1; changed = true; break;
+                    case HomeActivity.Sort:
+                        int cue = ShapeBoard.Cue(target.Value), rotation = ShapeBoard.Rotation(target.Value);
+                        int guess = p.Child == null ? ShapeBoard.Socket(cue, rotation) : (int)((uint)(p.Spec.BirthSeed + p.Failed[p.Item] + p.SoloSuccesses[p.Item]) % 3);
+                        if (p.Child != null && p.Source < 0 && p.SortSources[cue] >= 0)
+                        {
+                            // The board has no other writer. Its revision identifies the successful placement across rotations.
+                            int previous = _memory[p.SortSources[cue]].Revision - 1;
+                            int previousChoice = ShapeBoard.Socket(ShapeBoard.Cue(previous), ShapeBoard.Rotation(previous));
+                            guess = (previousChoice - ShapeBoard.Rotation(previous) + rotation + 3) % 3;
+                            appliedSource = p.SortSources[cue];
+                        }
+                        success = changed = ShapeBoard.Place(ref target.Value, guess);
+                        break;
+                    case HomeActivity.Tidy:
+                        success = changed = _items[2].Value > 0;
+                        if (changed) { target.Value += _items[2].Value; _items[2].Value = 0; _items[2].Revision++; }
+                        break;
                     case HomeActivity.Open:
                     case HomeActivity.Close:
                         int next = p.Activity == HomeActivity.Open ? 1 : 0;
@@ -301,7 +350,7 @@ namespace DreamMachine.Sim
             p.Attempts++;
             HomeEvidence evidence = !success ? HomeEvidence.Failed : p.Source >= 0 ? HomeEvidence.Imitation :
                 p.Child == null && p.Reason == HomeReason.Teach ? HomeEvidence.Demonstration : HomeEvidence.Firsthand;
-            int eventIndex = Record(index, evidence, p.Source, changed);
+            int eventIndex = Record(index, evidence, success ? appliedSource : p.Source, changed);
             if (success)
             {
                 p.Successes++;
@@ -337,10 +386,35 @@ namespace DreamMachine.Sim
         int Append(int index, HomeActivity activity, int item, HomeEvidence kind, int source, int revision, bool changed)
         {
             int id = _memory.Count;
-            _memory.Add(new HomeExperience(_world.TickCount, index, activity, item, kind, source, revision, changed));
+            var record = new HomeExperience(_world.TickCount, index, activity, item, kind, source, revision, changed);
+            _memory.Add(record);
+            IndexEvidence(record, id);
             _people[index].Last = id;
             if (kind != HomeEvidence.Replay) _people[index].LastActual = id;
             return id;
+        }
+
+        void IndexEvidence(HomeExperience record, int id)
+        {
+            Person p = _people[record.Actor];
+            int item = record.Target;
+            switch (record.Evidence)
+            {
+                case HomeEvidence.Firsthand:
+                    p.SoloAttempts[item]++;
+                    p.SoloSuccesses[item]++;
+                    p.LastSuccess[item] = id;
+                    if (item == SortingBoard && record.Changed && record.Revision > 0)
+                        p.SortSources[ShapeBoard.Cue(record.Revision - 1)] = id;
+                    break;
+                case HomeEvidence.Failed:
+                    p.Failed[item]++;
+                    if (record.Source < 0) p.SoloAttempts[item]++;
+                    break;
+                case HomeEvidence.Witnessed: p.Witnesses[item]++; break;
+                case HomeEvidence.Imitation: p.Copies[item]++; break;
+                case HomeEvidence.Demonstration: p.LastDemo[item] = record.Tick; break;
+            }
         }
 
         static float Distance2(float x, float z, float tx, float tz) => (tx - x) * (tx - x) + (tz - z) * (tz - z);
@@ -363,7 +437,10 @@ namespace DreamMachine.Sim
         internal void ReplaceLearner(SimChild learner)
         {
             int index = FindPerson(learner.Spec.Id);
-            if (index >= 2) _people[index] = new Person(learner.Spec, learner, learner.X);
+            if (index < 2) return;
+            _people[index] = new Person(learner.Spec, learner, learner.X);
+            for (int i = 0; i < _memory.Count; i++)
+                if (_memory[i].Actor == index) IndexEvidence(_memory[i], i);
         }
 
         internal sealed class Person
@@ -379,7 +456,14 @@ namespace DreamMachine.Sim
                 RestAllowedAfter;
             public bool Eating;
             public readonly int[] Practice = new int[ItemCount];
-            public Person(PersonSpec spec, SimChild child, float x) { Spec = spec; Child = child; X = child?.X ?? x; Z = child?.Z ?? .13f; Yaw = child?.Yaw ?? 0f; }
+            public readonly int[] SoloAttempts = new int[ItemCount], SoloSuccesses = new int[ItemCount], Witnesses = new int[ItemCount],
+                Copies = new int[ItemCount], Failed = new int[ItemCount], LastSuccess = new int[ItemCount], LastDemo = new int[ItemCount];
+            public readonly int[] SortSources = { -1, -1, -1 };
+            public Person(PersonSpec spec, SimChild child, float x)
+            {
+                Spec = spec; Child = child; X = child?.X ?? x; Z = child?.Z ?? .13f; Yaw = child?.Yaw ?? 0f;
+                Array.Fill(LastSuccess, -1); Array.Fill(LastDemo, -230);
+            }
         }
 
         sealed class Item
@@ -409,11 +493,12 @@ namespace DreamMachine.Sim
             { writer.Write(e.Tick); writer.Write((byte)e.Actor); writer.Write((byte)e.Activity); writer.Write((byte)e.Target); writer.Write((byte)e.Evidence); writer.Write(e.Source); writer.Write(e.Revision); writer.Write(e.Changed); }
         }
 
-        internal void Read(BinaryReader reader)
+        internal void Read(BinaryReader reader, bool previousLayout)
         {
             _wasNight = reader.ReadBoolean();
-            foreach (Item item in _items)
-            { item.X = ReadFinite(reader); item.Z = ReadFinite(reader); item.V = ReadFinite(reader); item.Value = reader.ReadInt32(); item.Revision = reader.ReadInt32(); }
+            int itemCount = previousLayout ? PreviousItemCount : ItemCount;
+            for (int i = 0; i < itemCount; i++)
+            { Item item = _items[i]; item.X = ReadFinite(reader); item.Z = ReadFinite(reader); item.V = ReadFinite(reader); item.Value = reader.ReadInt32(); item.Revision = reader.ReadInt32(); }
             foreach (Person p in _people)
             {
                 p.X = ReadFinite(reader); p.Z = ReadFinite(reader); p.Yaw = ReadFinite(reader); p.Thirst = ReadFinite(reader);
@@ -424,7 +509,7 @@ namespace DreamMachine.Sim
                 p.Attempts = reader.ReadInt32(); p.Successes = reader.ReadInt32(); p.Observed = reader.ReadInt32(); p.Imitated = reader.ReadInt32();
                 p.LastItem = reader.ReadInt32(); p.ObservedSource = reader.ReadInt32(); p.LastImitation = reader.ReadInt32();
                 p.LastWatched = reader.ReadInt32(); p.KnowledgeEvidence = reader.ReadInt32(); p.RestAllowedAfter = reader.ReadInt32();
-                for (int i = 0; i < p.Practice.Length; i++) p.Practice[i] = reader.ReadInt32();
+                for (int i = 0; i < itemCount; i++) p.Practice[i] = reader.ReadInt32();
                 if (p.Item < -1 || p.Item >= ItemCount || p.Watch < -1 || p.Watch >= PersonCount ||
                     !Enum.IsDefined(typeof(HomePhase), p.Phase) || !Enum.IsDefined(typeof(HomeActivity), p.Activity) ||
                     ((p.Phase == HomePhase.Approach || p.Phase == HomePhase.Act) && p.Item < 0) || (p.Phase == HomePhase.Observe && p.Watch < 0))
@@ -439,6 +524,7 @@ namespace DreamMachine.Sim
                 if (e.Actor >= PersonCount || e.Target >= ItemCount || e.Source < -1 || e.Source >= i || e.Tick < 0 || e.Tick > _world.TickCount)
                     throw new InvalidDataException("Invalid household memory reference.");
                 _memory.Add(e);
+                IndexEvidence(e, i);
             }
             foreach (Person p in _people)
                 foreach (int reference in new[] { p.Source, p.Last, p.LastActual, p.Replay, p.ObservedSource, p.LastImitation, p.KnowledgeEvidence })
