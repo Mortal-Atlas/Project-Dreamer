@@ -1,6 +1,6 @@
 # Master workstream traceability
 
-This register reconciles the November 27, 2026 *Project Dreamer — Master Development Specification* M01–M46 with implementation through H8. The older v348 and original Phase II requirements remain in the specification archive. Their engineering numbers and the conversation crosswalk have separate meanings. The [existing requirement register](REQUIREMENTS_TRACEABILITY.md) retains detailed tests and older numbering. Status here describes the whole workstream. An isolated or integrated result applies only to the named capability.
+This register reconciles the November 27, 2026 *Project Dreamer — Master Development Specification* M01–M46 with implementation through H9. The older v348 and original Phase II requirements remain in the specification archive. Their engineering numbers and the conversation crosswalk have separate meanings. The [existing requirement register](REQUIREMENTS_TRACEABILITY.md) retains detailed tests and older numbering. Status here describes the whole workstream. An isolated or integrated result applies only to the named capability.
 
 ## Foundation, embodiment and learning
 
@@ -82,6 +82,15 @@ Use the same world-owned ball and two destination regions to evaluate supported 
 ## Integration decision after H6
 
 H6 articulation reaches and transfers weight through the persistent Ball, with release drift exposing the next control dependency. Add live visible Ball, hand and support estimation to the proprioceptive loop, compare deceleration under fixed H5 acceptance gates and retain actual failed consequences. Keep dynamic torso support, full-body balance and locomotion as the next integration boundary for self-directed pickup and recovery. [H6 transfer and persistence evidence](ARTICULATED_UPPER_BODY_H6.md#loaded-transfer-and-persistence)
+
+## H9 postural integration
+
+| Requirement | Implemented path | Next evidence |
+| --- | --- | --- |
+| M03–M08 · articulated body, posture and sensation | The shoulder, lumbar, neck and arm exchange actual forces. A head-attached geometry sensor carries capture-time extrinsics. Passive spring, reactive and anticipatory conditions are separately documented. [H9 physical chain](DYNAMIC_SEATED_SUPPORT_H9.md#physical-chain-and-sensing) | Free the pelvis progressively and verify seat and foot load transfer before evaluation of independent standing, sitting and falling. Calibrate visual and vestibular references when the support frame changes. |
+| M10–M14, M17, M22 · self-model, attention, motivation and experience | Measured head motion, posture corrections, sensory misses and committed Ball outcomes are available to future arbitration. The low-level controller runs on the shared physical clock. [H9 comparison](DYNAMIC_SEATED_SUPPORT_H9.md) | Keep readiness, curiosity, suspicion, confidence and valence distinct. Test endogenous gaze and automaticity with matched sensory load. Connect modeled muscle tension, breathing and attention to actual actuator limits after support control is measured. |
+| M15–M18, M26–M28, M35, M39 · learning and physical activity | H9 records actual body and perception. A head/torso actuator path exists for future looking and seating. [H9 workflow](DYNAMIC_SEATED_SUPPORT_H9.md) | Retain and transfer acquired posture through calibration reset and held-out growth. Tie evidence-derived Library I relationships and genuine Library II candidate movement to Library III outcomes. Writing, drawing, tools and instruments eventually use the same body. Reflection, chair approach, sit/stand and ordinary locomotion remain open. |
+| M41, M43–M45 · demonstrations, persistence and verification | The household offers rigid and compliant conditions alongside H5–H8. The audit checks input hashes before native scoring. Camera-off and replay tests exercise observer independence. [H9 report](DYNAMIC_SEATED_SUPPORT_H9.md) | Keep trajectory scope explicit. Settled world and recorded pose are separate from the active solver state. |
 
 ## H8 visual and proprioceptive integration
 

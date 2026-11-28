@@ -1,5 +1,9 @@
 # Isolated Unity observer experiment
 
+## H9 dynamic seated posture
+
+Use [the audited launcher](Run-VisualPlacementAudit.ps1) with **-Study Seated** and the guarded scratch project. Run **-Phase Development**, then **-Phase HeldOut** after freezing the source. **HouseholdArmSmoke.H9Run**, **H9ObserverClosed**, **H9Alice**, **H9Restart**, **H9Return**, **H9RestartReturn**, **H9Rigid** and **H9Passive** exercise the rendered household and archives in separate processes. [H9 protocol](../../docs/DYNAMIC_SEATED_SUPPORT_H9.md)
+
 ## H8 embodied depth comparison
 
 Use [the audited launcher](Run-VisualPlacementAudit.ps1) with the guarded scratch project and the chosen phase. It verifies native source and relevant configuration before both development and held-out execution. The isolated product receives the complete traces and an input manifest. For the household, use **HouseholdArmSmoke.H8Run**, **H8ObserverClosed**, **H8Alice**, **H8Restart**, **H8Return** and **H8RestartReturn** in separate processes. Keep the owner’s saves and private captures outside the experiment. [H8 protocol and evidence](../../docs/VISUAL_COORDINATION_H8.md)

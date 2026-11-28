@@ -27,6 +27,8 @@ To watch supported physical Ball placement, open **Physical development → Ball
 
 Choose **Visual coordination** in the same tray to see H8's timestamped hand and Ball estimates, uncertainty and corrections during descent. [Phase H8 workflow and measured results](docs/VISUAL_COORDINATION_H8.md)
 
+The **H9** row compares rigid torso, passive compliance, reactive stabilization and anticipatory support. The head follows the physical neck, and the tray shows seat and lumbar support separately. [Phase H9 workflow and measured results](docs/DYNAMIC_SEATED_SUPPORT_H9.md)
+
 The rest of this file is the research notes for the kernel, the experiment, and the limits of the prototype.
 
 A research prototype of a small cognitive architecture. Six baby agents live in one yard with six mentor characters. The babies try to learn two things at once:

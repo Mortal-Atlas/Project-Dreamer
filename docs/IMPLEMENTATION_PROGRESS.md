@@ -2,6 +2,10 @@
 
 C.1.4 and H1 verify active prelift recovery, an anatomical pair registry, pose diagnostics, a native supported grasp, and small scalar acquisition with parameter retention. The Motor attempts tray replays actual laboratory successes and failures. H2 demonstrates Arthur's learner-bound household practice and settled restart. H3 compared fixed, scalar and contact-gated policies on 10 held-out objects. The fixed policy completed 6, scalar 4 and contact feedback 3. Online feedback remained experimental. [H3 evidence](PHYSICAL_HAND_H3.md) [H2 results](PHYSICAL_DEVELOPMENT_H2.md) [H1 report](PHYSICAL_HAND_H1.md) [Body audit](BODY_INTEGRITY_AUDIT.md)
 
+## Phase H9 · dynamic seated torso and moving perception · November 28, 2026
+
+The Ball station now couples the existing arm to a gravity-loaded torso, a physical neck and a head-mounted depth sensor. Rigid, passive, reactive and anticipatory support can be compared in the household. The frozen five-policy experiment produced 7/11 completed placements per policy. Active support reduced torso rotation and seat load, while loaded-lift failures persisted for the heavy and lateral cases. Arthur's camera-off run matched live observation, and the failed Alice return remained a physical consequence. Next is seat-to-foot load transfer with a dynamic pelvis. [H9 evidence and workflow](DYNAMIC_SEATED_SUPPORT_H9.md)
+
 ## Phase H8 · embodied depth and hand-eye coordination · November 28, 2026
 
 The supported arm now uses delayed bench depth and joint-chain estimates to correct descent, carry temporary predictions through occlusion and update the active learner's measured spatial belief. In 60 matched held-out trials, H7, visual only and fused each completed 10/15, and measure only completed 9/15. Fusion reduced median Ball estimation error and drift through settlement. H7 retained lower median final error from the destination center. Earlier reach and loaded-lift failures remained common to all four policies. Unity verified camera-off parity and fresh-process recovery of both a successful placement and a failed return. [H8 evidence and reproduction](VISUAL_COORDINATION_H8.md)
