@@ -211,12 +211,22 @@ namespace DreamMachine.UnityBridge
             if (pose?.Placement != null)
             {
                 var placement = pose.Placement;
-                string movement = placement.Tracked ? $"Ball {placement.EstimatedSpeed:F2} m/s" : "Ball occluded";
+                string movement = placement.Tracked ? $"Ball estimate {placement.EstimatedSpeed:F2} m/s" : "Ball occluded";
+                string observation = placement.Observation switch
+                {
+                    PlacementObservation.Occluded => "Occluded",
+                    PlacementObservation.Moving => "Moving",
+                    PlacementObservation.StillAtDestination => "Still at destination",
+                    PlacementObservation.Displaced => "Displaced",
+                    PlacementObservation.BelowDestination => "Below destination",
+                    _ => "Awaiting release sample"
+                };
                 _practiceText.text += $"Palm {placement.PalmSpeed:F2} m/s, {placement.PalmSpin:F2} rad/s  |  {movement}\n" +
-                    $"Steady support {placement.StableTicks}/5  |  drift {placement.Drift * 1000f:F0} mm  |  {placement.Observation}\n";
+                    $"Steady support {placement.StableTicks}/5  |  drift {placement.Drift * 1000f:F0} mm  |  {observation}\n";
             }
             if (record.HasValue) _practiceText.text += $"{record.Value.Outcome}  |  {record.Value.MemoryId}\n";
-            _practiceText.text += _practiceStatus ?? "Choose a learner, transfer the ball or inspect a sighting.";
+            if (record?.Outcome != _practiceStatus || !record.HasValue)
+                _practiceText.text += _practiceStatus ?? "Choose a learner, transfer the ball or inspect a sighting.";
         }
     }
 }

@@ -26,6 +26,9 @@ internal static class HouseholdArmSmoke
     static string Action(string mode) => Coordinated(mode) ? mode.Substring(3) : mode;
     static string Archive(string mode) => Path.Combine(Application.persistentDataPath, Prefix(mode) + Action(mode) + ".checkpoint");
     static string RunMode(string mode) => Coordinated(mode) ? "h7-run" : "run";
+    static string Trace(string mode) => Path.Combine(Application.persistentDataPath, Prefix(mode) + Action(mode) + "-trace.csv");
+    static bool Restoring(string mode) => Action(mode).EndsWith("restart", StringComparison.Ordinal);
+    static string RestoreSource(string mode) => Action(mode) == "return-restart" ? "h7-return" : RunMode(mode);
 
     static HouseholdArmSmoke()
     {
@@ -41,14 +44,18 @@ internal static class HouseholdArmSmoke
     public static void H7ObserverClosed() => Start("h7-closed");
     public static void H7Alice() => Start("h7-alice");
     public static void H7Restart() => Start("h7-restart");
+    public static void H7Return() => Start("h7-return");
+    public static void H7RestartReturn() => Start("h7-return-restart");
 
     static void Start(string mode)
     {
         if (Application.productName != "Dreamer Audit Isolated Smoke") throw new InvalidOperationException("Scratch project required.");
-        if (Action(mode) == "restart")
+        if (Restoring(mode) || Action(mode) == "return")
         {
-            WorldSimulation.PublishCheckpoint(Primary, File.ReadAllBytes(Archive(RunMode(mode))),
+            long started = Stopwatch.GetTimestamp();
+            WorldSimulation.PublishCheckpoint(Primary, File.ReadAllBytes(Archive(RestoreSource(mode))),
                 path => WorldSimulation.LoadCheckpoint(path) != null);
+            Debug.Log(FormattableString.Invariant($"HOUSEHOLD_RESTORE_READ {Fixture(mode)} publish_and_validate_ms={(Stopwatch.GetTimestamp() - started) * 1000d / Stopwatch.Frequency:F2}"));
         }
         else
         {
@@ -83,43 +90,59 @@ internal static class HouseholdArmSmoke
         {
             var world = Get<WorldSimulation>(app, "_sim");
             var home = world.Home;
+            if (!Get<TimeGovernor>(app, "_governor").Paused) throw new InvalidOperationException("Expected a paused household.");
             Click("Physical development");
             Click("Ball / switch learner");
             string mode = SessionState.GetString(Key, "");
-            if (Action(mode) == "restart")
+            if (Restoring(mode))
             {
-                byte[] saved = File.ReadAllBytes(Archive(RunMode(mode)));
-                if (!world.CaptureCheckpoint().SequenceEqual(saved) || home.BallTransfer(0).Intent.Policy != (Coordinated(mode) ? HouseholdGripPolicy.CoordinatedPlacement : HouseholdGripPolicy.Articulated))
+                byte[] saved = File.ReadAllBytes(Archive(RestoreSource(mode)));
+                var latest = home.BallTransfer(home.BallTransferCount - 1);
+                string restoredActor = home.PersonId(latest.Intent.Actor);
+                if (!world.CaptureCheckpoint().SequenceEqual(saved) || latest.Intent.Policy != (Coordinated(mode) ? HouseholdGripPolicy.CoordinatedPlacement : HouseholdGripPolicy.Articulated))
                     throw new InvalidOperationException("Fresh process did not restore the articulated outcome.");
                 var pose = home.ReadBallPose();
                 Vector3 expected = new Vector3(pose.X, pose.Y, pose.Z);
                 if (Vector3.Distance(Get<Transform[]>(app, "_livingItems")[HouseholdLife.BallItem].position, expected) > .0001f ||
-                    world.Find("son").State.Library.GetOrNull(home.BallTransfer(0).MemoryId) == null)
+                    world.Find(restoredActor).State.Library.GetOrNull(latest.MemoryId) == null ||
+                    (Coordinated(mode) && !HasTracking(world, restoredActor, latest)))
                     throw new InvalidOperationException("The settled object or firsthand evidence was missing.");
+                if (Action(mode) == "return-restart")
+                {
+                    if (restoredActor != "daughter" || latest.Success || !latest.Intent.Before.Equals(home.BallTransfer(0).After))
+                        throw new InvalidOperationException("The displaced Ball or the original transfer was replaced.");
+                    Click("Ball / switch learner");
+                }
                 VerifyReplay(app, world, mode, true);
-                Debug.Log($"{Fixture(mode)}_RESTART tick={world.TickCount} hash={Digest(saved)}");
+                Debug.Log($"{Fixture(mode)}_RESTART mode={mode} actor={restoredActor} tick={world.TickCount} outcome={latest.Outcome} hash={Digest(saved)}");
                 EditorApplication.ExitPlaymode();
                 return;
             }
-            if (Action(mode) == "alice") Click("Ball / switch learner");
+            bool returning = Action(mode) == "return";
+            int priorAttempts = home.BallTransferCount;
+            if (Action(mode) == "alice" || returning) Click("Ball / switch learner");
             Click(Coordinated(mode) ? "Coordinated placement" : "Articulated arm");
             var arm = Get<NativeHandLab>(app, "_practiceHand");
             if (arm == null || !arm.Articulated || arm.Coordinated != Coordinated(mode) || !arm.FreeObject || !home.BallTransferRunning)
                 throw new InvalidOperationException("Expected the persistent free Ball and supported articulated chain.");
             var intent = home.BallIntent.Value;
+            if (returning && (priorAttempts != 1 || !intent.Before.Equals(home.BallTransfer(0).After) || intent.TargetTop != 0f))
+                throw new InvalidOperationException("The return must start with the same Ball settled on the previous destination.");
             string actor = home.PersonId(intent.Actor);
-            if (actor != (Action(mode) == "alice" ? "daughter" : "son")) throw new InvalidOperationException("Wrong learner selected.");
+            if (actor != (Action(mode) == "alice" || returning ? "daughter" : "son")) throw new InvalidOperationException("Wrong learner selected.");
             var camera = Camera.main;
             if (Action(mode) == "closed") { Click("Physical development"); camera.enabled = false; }
             arm.Profile = true;
             bool captured = false;
             float peakClearance = 0;
-            using var trace = File.CreateText(Path.Combine(Application.persistentDataPath, Prefix(mode) + Action(mode) + "-trace.csv"));
+            using var trace = File.CreateText(Trace(mode));
             trace.WriteLine("learner,tick,phase,requested_wrist_m,proposed_elbow_m,actual_wrist_m,actual_elbow_m,ball_m,joint_degrees,joint_rad_s,actuator_torque_nm,torso_s,upper_to_hand_s,torso_depth_mm,left_n,right_n,support_n,clearance_m,corrections" + (Coordinated(mode) ? ",tracking,estimated_ball_ms,steady_ticks,observation,drift_m" : ""));
             long begin = Stopwatch.GetTimestamp();
             for (int i = 0; i < 700 && home.BallTransferRunning; i++)
             {
-                if (arm.Phase == (Coordinated(mode) ? GripPhase.Release : GripPhase.Hold) && !captured && Action(mode) == "run")
+                bool observeRelease = arm.Phase == GripPhase.Release && arm.PlacementTracked &&
+                    arm.PlacementObservation != DreamMachine.Body.PlacementObservation.None;
+                if ((Coordinated(mode) ? observeRelease : arm.Phase == GripPhase.Hold) && !captured && Action(mode) == "run")
                 {
                     Capture(app, Prefix(mode) + (Coordinated(mode) ? "release" : "hold"));
                     captured = true;
@@ -134,20 +157,31 @@ internal static class HouseholdArmSmoke
                 if (arm.Tick != world.TickCount - intent.Start) throw new InvalidOperationException("Clock divergence.");
             }
             double ms = (Stopwatch.GetTimestamp() - begin) * 1000d / Stopwatch.Frequency / arm.Tick;
-            if (!arm.HouseholdSettled || home.BallTransferRunning || home.BallTransferCount != 1)
+            if (!arm.HouseholdSettled || home.BallTransferRunning || home.BallTransferCount != priorAttempts + 1)
                 throw new InvalidOperationException("Arm attempt did not reach its settled commit boundary.");
             if (Action(mode) == "closed") { camera.enabled = true; Click("Physical development"); }
-            var record = home.BallTransfer(0);
+            var record = home.BallTransfer(priorAttempts);
             var owner = world.Find(actor);
             var other = world.Find(actor == "son" ? "daughter" : "son");
-            if (!record.After.Equals(home.ReadBallPose()) || owner.State.Library.GetOrNull(record.MemoryId) == null ||
+            var memory = owner.State.Library.GetOrNull(record.MemoryId);
+            if (!record.After.Equals(home.ReadBallPose()) || memory == null ||
                 other.State.Library.GetOrNull(record.MemoryId) != null ||
                 other.State.Library.GetOrNull(Fixture(mode) + "-existing") == null)
                 throw new InvalidOperationException("Persistent object or individual evidence did not survive.");
+            if (Coordinated(mode) && ((!returning && !record.Success) || !HasTracking(world, actor, record) ||
+                owner.State.Library.GetOrNull(Fixture(mode) + "-existing") == null))
+                throw new InvalidOperationException("The coordinated placement or its firsthand tracking evidence was missing.");
             VerifyReplay(app, world, mode, Action(mode) == "run");
             byte[] checkpoint = world.CaptureCheckpoint();
+            trace.Dispose();
+            if (Coordinated(mode) && Action(mode) == "closed" &&
+                (!checkpoint.SequenceEqual(File.ReadAllBytes(Archive(RunMode(mode)))) ||
+                 !File.ReadAllLines(Trace(mode)).SequenceEqual(File.ReadAllLines(Trace(RunMode(mode))))))
+                throw new InvalidOperationException("Closing observation changed the native trajectory or household.");
             WorldSimulation.PublishCheckpoint(Archive(mode), checkpoint,
-                path => File.Exists(path) && File.ReadAllBytes(path).SequenceEqual(checkpoint));
+                path => WorldSimulation.LoadCheckpoint(path) != null);
+            if (!File.ReadAllBytes(Archive(mode)).SequenceEqual(checkpoint))
+                throw new InvalidOperationException("The archived bytes differ from the verified outcome.");
             var final = arm.ReadArm();
             double scale = 1000d / Stopwatch.Frequency / arm.Tick;
             int tape = (int)new FileInfo(Path.Combine(Application.persistentDataPath, "motor-trajectories", record.Tape + ".h5")).Length;
@@ -156,6 +190,10 @@ internal static class HouseholdArmSmoke
         }
         catch (Exception error) { Debug.LogException(error); EditorApplication.Exit(1); }
     }
+
+    static bool HasTracking(WorldSimulation world, string actor, BallTransferRecord record) =>
+        world.Find(actor).State.Library.GetOrNull(record.MemoryId)?.Appendices
+            .Any(entry => entry.Evidence.Contains("Settled bench tracking:")) == true;
 
     static void VerifyReplay(DreamMachineApp app, WorldSimulation world, string mode, bool capture)
     {

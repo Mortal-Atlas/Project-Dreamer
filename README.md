@@ -23,6 +23,8 @@ Open **Dream Machine → Body Observatory** to inspect a live rig or compare see
 
 You should see one house, four people, and a panel of beliefs and feelings. The displayed names come from `Assets/DreamMachine/Resources/family.json`. Drag the yard to look around. Open **Simulation** to pause, step, change speed, save, or restore. The workspace remembers whether the tray was open independently of the world checkpoint.
 
+To watch supported physical Ball placement, open **Physical development → Ball / switch learner → Coordinated placement**. Use **Earlier attempt** and **Next frame** to inspect a saved attempt. **Articulated arm** and **Transfer ball** run the H6 and H5 reference policies. [Phase H7 workflow and measured results](docs/SENSORIMOTOR_PLACEMENT_H7.md)
+
 The rest of this file is the research notes for the kernel, the experiment, and the limits of the prototype.
 
 A research prototype of a small cognitive architecture. Six baby agents live in one yard with six mentor characters. The babies try to learn two things at once:
