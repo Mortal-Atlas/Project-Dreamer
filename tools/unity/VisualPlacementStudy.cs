@@ -65,6 +65,12 @@ internal static class VisualPlacementStudy
         new Trial("lateral", high: false)
     };
 
+    static readonly Trial[] DestinationSupplement =
+    {
+        new Trial("surface-visible-matched"),
+        new Trial("surface-withheld-matched", BenchOcclusion.Surface, 30)
+    };
+
     static VisualPlacementStudy()
     {
         if (SessionState.GetString(Key, "") != "") EditorApplication.playModeStateChanged += Changed;
@@ -72,6 +78,7 @@ internal static class VisualPlacementStudy
 
     public static void Develop() => Start("development");
     public static void HeldOut() => Start("heldout");
+    public static void Supplement() => Start("supplement");
 
     static void Start(string cohort)
     {
@@ -87,7 +94,7 @@ internal static class VisualPlacementStudy
         string manifest = Environment.GetEnvironmentVariable("DREAMER_H8_SOURCE_MANIFEST");
         if (string.IsNullOrWhiteSpace(manifest))
         {
-            if (cohort == "heldout") throw new InvalidOperationException("Run the verified audit launcher before scoring held-outs.");
+            if (cohort != "development") throw new InvalidOperationException("Run the verified audit launcher before scoring this cohort.");
             return;
         }
         var project = Directory.GetParent(Application.dataPath).FullName;
@@ -119,7 +126,12 @@ internal static class VisualPlacementStudy
         using var trace = File.CreateText(prefix + "-trace.csv");
         output.WriteLine("cohort,case,policy,seed,destination_m,pickup_m,eye_yaw,arm_yaw,body_days,high,mass_kg,shelf_half_width,occlusion,occlusion_ticks,period_ticks,delay_ticks,load_n,loads,impulse_ns,reach,grasp,loaded_lift,support,release,settled,complete,ticks,release_window_mm,total_drift_mm,goal_error_mm,outcome,proprio_rmse_mm,hand_rmse_mm,ball_rmse_mm,predicted_ball_rmse_mm,seen_hand,seen_ball,predicted_ball,mean_age_ticks,low_conf_rmse_mm,high_conf_rmse_mm,low_conf_count,high_conf_count,ball_reacquire_ticks,hand_reacquire_ticks,first_correction_ticks,corrections,work_j,effort_ns,torso_s,limit_excursions,visual_us,fusion_us,correction_us,physics_us");
         trace.WriteLine("case,policy,tick,phase_before,phase,aperture,proprio_m,actual_hand_m,actual_ball_m,hand_source,hand_obs_tick,hand_age,hand_hits,hand_conf,hand_m,ball_source,ball_obs_tick,ball_age,ball_hits,ball_conf,ball_m,ball_velocity,innovation_mm,surface_obs_tick,surface_conf,surface_m,contact_s,correction_m,correction_tick,release_ticks,left_n,right_n,support_n,joints_deg,torque_nm,arm_work_j");
-        var cases = cohort == "heldout" ? Independent : Development;
+        var cases = cohort switch
+        {
+            "heldout" => Independent,
+            "supplement" => DestinationSupplement,
+            _ => Development
+        };
         for (int i = 0; i < cases.Length; i++)
             for (int p = 0; p < 4; p++) Measure(cohort, cases[i], (Policy)((i + p) % 4), output, trace);
         Debug.Log($"H8_COMPLETE {cohort} {cases.Length * 4}");

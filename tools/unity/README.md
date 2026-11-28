@@ -1,5 +1,9 @@
 # Isolated Unity observer experiment
 
+## H8 embodied depth comparison
+
+Use [the audited launcher](Run-VisualPlacementAudit.ps1) with the guarded scratch project and the chosen phase. It verifies native source and relevant configuration before both development and held-out execution. The isolated product receives the complete traces and an input manifest. For the household, use **HouseholdArmSmoke.H8Run**, **H8ObserverClosed**, **H8Alice**, **H8Restart**, **H8Return** and **H8RestartReturn** in separate processes. Keep the owner’s saves and private captures outside the experiment. [H8 protocol and evidence](../../docs/VISUAL_COORDINATION_H8.md)
+
 ## H6 articulated reach and household transfer
 
 Copy **ArticulatedArmStudy.cs** and **HouseholdArmSmoke.cs** to **Assets/Editor** in the guarded scratch project. In separate Unity 6000.3.19f1 DX12 processes run **ArticulatedArmStudy.Develop**, **ArticulatedArmStudy.Final** and **ArticulatedArmStudy.BodyClearance**. Keep the full native CSVs in the scratch product. The bench records **H6_REACH**, **H6_TRANSFER** and **H6_ARM_COMPLETE**.

@@ -136,6 +136,7 @@ internal static class HouseholdArmSmoke
                 !arm.FreeObject || !home.BallTransferRunning)
                 throw new InvalidOperationException("Expected the persistent free Ball and supported articulated chain.");
             var intent = home.BallIntent.Value;
+            var otherSighting = home.ReadBallBelief(intent.Actor == 2 ? 3 : 2);
             if (returning && (priorAttempts != 1 || !intent.Before.Equals(home.BallTransfer(0).After) || intent.TargetTop != 0f))
                 throw new InvalidOperationException("The return must start with the same Ball settled on the previous destination.");
             string actor = home.PersonId(intent.Actor);
@@ -188,6 +189,8 @@ internal static class HouseholdArmSmoke
             if (Coordinated(mode) && ((!Visual(mode) && !returning && !record.Success) || !HasTracking(world, actor, record, mode) ||
                 owner.State.Library.GetOrNull(Fixture(mode) + "-existing") == null))
                 throw new InvalidOperationException("The coordinated placement or its firsthand tracking evidence was missing.");
+            if (Visual(mode) && !home.ReadBallBelief(intent.Actor == 2 ? 3 : 2).Equals(otherSighting))
+                throw new InvalidOperationException("The attempt changed another learner's visual knowledge.");
             VerifyReplay(app, world, mode, Action(mode) == "run");
             byte[] checkpoint = world.CaptureCheckpoint();
             trace.Dispose();
@@ -218,9 +221,17 @@ internal static class HouseholdArmSmoke
         byte[] before = world.CaptureCheckpoint();
         Click("Earlier attempt");
         for (int i = 0; i < (Coordinated(mode) ? 145 : 45); i++) Click("Next frame");
-        if (Get<Array>(app, "_practiceReplay") == null ||
+        var frames = Get<Array>(app, "_practiceReplay");
+        if (frames == null ||
             !Get<Transform[]>(app, "_armParts").All(x => x.gameObject.activeSelf))
             throw new InvalidOperationException("Recorded chain was not reconstructed.");
+        if (Visual(mode))
+        {
+            var frame = frames.GetValue(Get<int>(app, "_practiceFrameIndex"));
+            if (frame.GetType().GetField("Vision")?.GetValue(frame) is not VisualPlacementReading reading ||
+                reading.Ball.ObservationTick < 0)
+                throw new InvalidOperationException("Recorded vision or its capture timestamp was missing.");
+        }
         if (capture) Capture(app, Prefix(mode) + "replay");
         Click("Live view");
         if (!before.SequenceEqual(world.CaptureCheckpoint())) throw new InvalidOperationException("Replay changed authoritative bytes.");

@@ -1,6 +1,6 @@
 # Master workstream traceability
 
-This register reconciles the November 27, 2026 *Project Dreamer — Master Development Specification* M01–M46 with implementation through H7. The older v348 and original Phase II requirements remain in the specification archive. Their engineering numbers and the conversation crosswalk have separate meanings. The [existing requirement register](REQUIREMENTS_TRACEABILITY.md) retains detailed tests and older numbering. Status here describes the whole workstream. An isolated or integrated result applies only to the named capability.
+This register reconciles the November 27, 2026 *Project Dreamer — Master Development Specification* M01–M46 with implementation through H8. The older v348 and original Phase II requirements remain in the specification archive. Their engineering numbers and the conversation crosswalk have separate meanings. The [existing requirement register](REQUIREMENTS_TRACEABILITY.md) retains detailed tests and older numbering. Status here describes the whole workstream. An isolated or integrated result applies only to the named capability.
 
 ## Foundation, embodiment and learning
 
@@ -82,6 +82,16 @@ Use the same world-owned ball and two destination regions to evaluate supported 
 ## Integration decision after H6
 
 H6 articulation reaches and transfers weight through the persistent Ball, with release drift exposing the next control dependency. Add live visible Ball, hand and support estimation to the proprioceptive loop, compare deceleration under fixed H5 acceptance gates and retain actual failed consequences. Keep dynamic torso support, full-body balance and locomotion as the next integration boundary for self-directed pickup and recovery. [H6 transfer and persistence evidence](ARTICULATED_UPPER_BODY_H6.md#loaded-transfer-and-persistence)
+
+## H8 visual and proprioceptive integration
+
+| Requirement | Current integration | Next evidence |
+| --- | --- | --- |
+| M03, M06, M08 · individual perception and embodied control | A fixed bench eye produces timestamped depth samples independently of the observer camera. Joint geometry and contacts enter prediction and closed-loop descent. [H8 sensor boundary](VISUAL_COORDINATION_H8.md#what-the-learner-receives) | Fit anatomy-calibrated hand observations across dynamic head and torso motion. Separate view availability from gaze selection, peripheral attention and task-specific processing. |
+| M10, M12, M15–M18 · sensory belief and three libraries | Time-limited predictions remain transient. Reacquired measurements revise the active learner's working track and eligible measurements update that learner's saved spatial belief. Firsthand evidence and actual settled poses survive separately. [H8 comparison](VISUAL_COORDINATION_H8.md) | Measure retained body schema with acquisition reset and transfer. Project validated calibration into Library I and store genuine alternatives in Library II with source labels and later outcomes. |
+| M11, M13, M14, M22 · sensory allocation and regulation | Model discrepancy, observation age and confidence are explicit interface signals. The H8 controller slows under insufficient Ball information. [H8 sensor boundary](VISUAL_COORDINATION_H8.md#what-the-learner-receives) | Add voluntary gaze/head movement and attention allocation. Reconcile prediction errors against evidence and priorities before invoking curiosity, suspicion, threat appraisal or arousal. Preserve the causal regulatory requirements below. |
+| M26–M31, M39 · creative practice and indirect views | The position/timing contract can receive samples from different viewpoints. Actual physical placement uses vision to alter movement. [H8](VISUAL_COORDINATION_H8.md) | Verify reflected observations and learned self-motion correspondence, then connect movement, tools, materials and perceived marks through measured corrections. Handwriting, drawing, sculpting, painting, pigments, physical instruments and expressive movement depend on this relationship. |
+| M41, M43–M45 · observer and governance | Passive feedback replay and the versioned tape expose timestamps and sources. A verified input manifest records actual study source and configuration. [H8 reproduction](VISUAL_COORDINATION_H8.md#reproduction-and-evidence-integrity) | Preserve native mid-contact boundaries and use matched controls as support becomes compliant. Continue performance tracking as other individuals receive independent sensor schedules. |
 
 ## H7 nervous-system and regulatory requirements
 

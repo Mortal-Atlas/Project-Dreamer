@@ -243,9 +243,11 @@ namespace DreamMachine.UnityBridge
         {
             string Expected(float seconds) => seconds < 0f ? "unknown" : $"{seconds:F2} s";
             string plane = v.Surface.Confidence > 0f ? $"surface {v.Surface.Position.Y:F2} m" : "surface uncertain";
-            return $"Depth view  |  {v.Occlusion}  |  {plane}  |  contact {Expected(v.ExpectedContactSeconds)}\n" +
+            var wrist = v.ProprioceptiveWrist;
+            return $"Depth view (bench m)  |  {v.Occlusion}  |  {plane}  |  contact {Expected(v.ExpectedContactSeconds)}\n" +
                 $"{EstimateText("Hand", v.Hand)}\n{EstimateText("Ball", v.Ball)}\n" +
-                $"Joint-sensed elbow {pose.Arm.Joints.y:F0}°  |  Ball velocity {v.Ball.Velocity.Length():F2} m/s\n" +
+                $"Joint-sensed wrist  {wrist.x:F2}, {wrist.y:F2}, {wrist.z:F2}  |  elbow {pose.Arm.Joints.y:F0}°\n" +
+                $"Ball velocity {v.Ball.Velocity.Length():F2} m/s\n" +
                 $"Prediction error {v.Ball.PredictionError * 1000f:F0} mm  |  correction tick {v.CorrectionTick}\n" +
                 $"Correction {v.Correction.magnitude * 1000f:F0} mm  |  drift {pose.Placement.Drift * 1000f:F0} mm\n";
         }

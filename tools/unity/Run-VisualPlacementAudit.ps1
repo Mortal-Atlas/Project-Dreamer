@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$ProjectPath,
-    [Parameter(Mandatory)][ValidateSet('Development', 'HeldOut')][string]$Phase,
+    [Parameter(Mandatory)][ValidateSet('Development', 'HeldOut', 'Supplement')][string]$Phase,
     [Parameter(Mandatory)][string]$LogFile,
     [string]$Unity = 'C:\Program Files\Unity\Hub\Editor\6000.3.19f1\Editor\Unity.exe'
 )
@@ -18,8 +18,8 @@ $scope = @('Assets/DreamMachine', 'Assets/Settings', 'Assets/Scenes/DreamMachine
     'ProjectSettings/DynamicsManager.asset', 'ProjectSettings/TimeManager.asset', 'ProjectSettings/TagManager.asset',
     'ProjectSettings/QualitySettings.asset', 'ProjectSettings/GraphicsSettings.asset', 'ProjectSettings/ProjectVersion.txt',
     'Packages/manifest.json', 'Packages/packages-lock.json', 'tools/unity/VisualPlacementStudy.cs')
-if ($Phase -eq 'HeldOut' -and (git -C $source status --porcelain -- $scope)) {
-    throw 'Commit the controller, configuration and study before running the held-out cases.'
+if ($Phase -ne 'Development' -and (git -C $source status --porcelain -- $scope)) {
+    throw 'Commit the controller, configuration and study before running a scored cohort.'
 }
 $files = @(git -C $source ls-files -c -o --exclude-standard -- $scope | Sort-Object -Unique)
 if ($LASTEXITCODE -or !$files) { throw 'Cannot enumerate the audit source files.' }
@@ -43,7 +43,7 @@ foreach ($relative in $files) {
 $lines.Add("$((Get-FileHash -LiteralPath (Join-Path $scratch $product) -Algorithm SHA256).Hash) $product")
 [System.IO.File]::WriteAllLines($manifest, $lines)
 $env:DREAMER_H8_SOURCE_MANIFEST = $manifest
-$entry = if ($Phase -eq 'HeldOut') { 'HeldOut' } else { 'Develop' }
+$entry = if ($Phase -eq 'Development') { 'Develop' } else { $Phase }
 try {
     $process = Start-Process -FilePath $Unity -ArgumentList "-batchmode -force-d3d12 -projectPath `"$scratch`" -executeMethod VisualPlacementStudy.$entry -logFile `"$LogFile`"" -WindowStyle Hidden -PassThru
     $process.WaitForExit()
