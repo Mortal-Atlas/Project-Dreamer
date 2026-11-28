@@ -1,0 +1,4 @@
+mode,actor,seed,tick,outcome,clearance_mm,work_j,torso_s,self_s,cpu_ms,physics_ms,command_ms,bytes,tape,hash,trace_sha256,fresh_process_verified
+run,son,303,187,release-gate-failed,263.36,30.2542,0.000,0.000,3.945,0.692,0.067,23192,102656,b0b7b9577aca49dff6c708e1a2b11c0d6874270d7f71092fbe743a7fadcbb728,addc6d0fa3722fb001edb964fce63118ebd55752b328e751764a8d6b6c1e1b37,True
+closed,son,303,187,release-gate-failed,263.36,30.2542,0.000,0.000,1.097,0.579,0.059,23192,102656,b0b7b9577aca49dff6c708e1a2b11c0d6874270d7f71092fbe743a7fadcbb728,addc6d0fa3722fb001edb964fce63118ebd55752b328e751764a8d6b6c1e1b37,False
+alice,daughter,404,168,settled-outside-destination,260.29,20.1696,0.000,0.000,1.195,0.610,0.063,23108,92282,d19fbf761f36adc3bae77581113e50aba5f0e03636fba1744e0dc7372d54ed4e,9d3eb2712f725282a9f376f7fe4eb30b136e57f4cc22167430611ae723eeab53,False

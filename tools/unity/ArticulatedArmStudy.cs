@@ -48,6 +48,13 @@ internal static class ArticulatedArmStudy
         new ReachCase("alice-shorter-calibration", .12f, .215f, -.295f, seed: 404, age: 2.55f),
     };
 
+    static readonly ReachCase[] Clearance =
+    {
+        new ReachCase("aligned-with-torso", -.045f, .240f, -.654f),
+        new ReachCase("adjacent-shoulder", .150f, .470f, -.680f),
+        new ReachCase("behind-opposite-waist", -.200f, .260f, -.610f),
+    };
+
     static ArticulatedArmStudy()
     {
         if (SessionState.GetString(Key, "") != "") EditorApplication.playModeStateChanged += Changed;
@@ -55,6 +62,7 @@ internal static class ArticulatedArmStudy
 
     public static void Develop() => Start("development");
     public static void Final() => Start("heldout");
+    public static void BodyClearance() => Start("clearance");
 
     static void Start(string name)
     {
@@ -79,10 +87,16 @@ internal static class ArticulatedArmStudy
         using var trace = File.CreateText(prefix + "-reach-trace.csv");
         rows.WriteLine("cohort,case,seed,age,pole,blocked,yaw_deg,wrist_load_n,target_m,initial_error_mm,end_error_mm,wrist_orientation_error_deg,overshoot_mm,undershoot_mm,completed_tick,geometric_envelope,torso_s,torso_impulse_ns,torso_depth_mm,upper_fore_hand_contact_s,obstacle_s,upper_distal_s,corrections,elbow_limit_excursions,peak_torque_nm,work_j,controller_us,physics_us");
         trace.WriteLine("cohort,case,pole,tick,wrist_load_n,target_m,proposed_elbow_m,elbow_m,wrist_m,joint_degrees,joint_rad_s,torque_nm,torso_s,torso_depth_mm,obstacle_s,upper_distal_s,corrections");
-        foreach (var test in cohort == "development" ? Development : HeldOut)
+        var cases = cohort == "development" ? Development : cohort == "clearance" ? Clearance : HeldOut;
+        foreach (var test in cases)
         {
             Reach(cohort, test, false, rows, trace);
             Reach(cohort, test, true, rows, trace);
+        }
+        if (cohort == "clearance")
+        {
+            Debug.Log("H6_ARM_COMPLETE cohort=clearance");
+            return;
         }
         using var transfers = File.CreateText(prefix + "-transfer.csv");
         using var transferTrace = File.CreateText(prefix + "-transfer-trace.csv");

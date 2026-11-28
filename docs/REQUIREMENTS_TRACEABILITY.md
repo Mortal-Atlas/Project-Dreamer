@@ -465,6 +465,16 @@ The clock checkpoint extends K evidence for §§5–7, 116, 124, 133 and 169. Pa
 | H5 sections 14–15 | Once managed, actual object consequences remain in Living | Partially implemented | Shared authority permits later containers, furniture and cleanup. Independent reaching and motivation remain open. [H5 dependencies](HOUSEHOLD_TRANSFER_H5.md#unity-workflow-and-dependencies) |
 | H5 sections 16–18 | Existing physical and Simulation trays, native playback, dated performance evidence | Verified and integrated | Paired observer/camera run, save, restores, UI and benchmark. [H5 report](HOUSEHOLD_TRANSFER_H5.md) |
 
+## Phase H6 supported articulated upper body
+
+| Requirement | Implementation | Status | Evidence and dependencies |
+| --- | --- | --- | --- |
+| H6 sections 1–5, 7–9 | Physical upper arm, forearm, wrist and digits, fixed torso, configured joints and bounded torque | Verified in isolation | Fitted proxy contacts with measured duration and penetration. Dynamic torso, forearm pronation, full articulated digits and avatars remain open. [Native arm](../Assets/DreamMachine/Unity/NativeArticulatedArm.cs) |
+| H6 sections 6, 10, 13–14, 18 | Geometric reach proposals, measured responses, high versus lateral elbow and separate tests | Experimental | New targets, poses, yaw and load scored. Live visual control and durable acquisition are open. [Reach proposals](../Assets/DreamMachine/Core/Body/SupportedArmReach.cs) [H6 report](ARTICULATED_UPPER_BODY_H6.md) |
+| H6 sections 11–12, 15–16, 20, 22–23 | Shared world Ball, existing settlement gates, separate learner outcomes and stored histories | Partially implemented | Held and transferred weight with the higher elbow. Full placement gate remains unverified. Library III records physical outcomes, with wider learned affordances and candidate indexing open. [Physical findings](ARTICULATED_UPPER_BODY_H6.md#loaded-transfer-and-persistence) |
+| H6 sections 19, 21 | Arm trajectory overlay and replay in the existing tray, native observer comparison and paired throughput | Verified and integrated | Arm motion, goal and contacts are inspectable. Desktop profiling covers physics and controller. [Unity smoke](../tools/unity/HouseholdArmSmoke.cs) |
+| H6 section 17 | Reusable articulated reach, grasp, support and evidence interfaces | Partially implemented | Next establish visually grounded support and deceleration. Ordinary use of tools and furniture awaits dynamic body support. [Integration path](ARTICULATED_UPPER_BODY_H6.md#observation-and-integration) |
+
 ## Physical development and motor vocabulary addendum
 
 The [nervous-system audit](PHYSICAL_NERVOUS_SYSTEM_SPECIFICATION.md#existing-system-audit) identifies existing fixture evidence and integration gaps. The [acceptance plan](PHYSICAL_NERVOUS_SYSTEM_SPECIFICATION.md#experimental-acceptance) records matched tests and scope for the related master requirements §§5–6, 12–21, 46–49, 56–57, 62–64, 92, 128–132, 137, 156–158, 170, 172 and 175.

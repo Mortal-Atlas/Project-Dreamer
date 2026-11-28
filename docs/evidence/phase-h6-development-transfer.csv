@@ -1,0 +1,4 @@
+cohort,case,seed,articulated,pole,disturbance_n,applied_ticks,ticks,phase,outcome,opposed,lift,held_ticks,placement,settled,ball_m,peak_pad_n,slip_ticks,torso_s,torso_depth_mm,upper_distal_s,elbow_limit_excursions,corrections,actuator_work_j,arm_work_j,controller_us,physics_us
+development,arthur-reference,303,False,False,0.000,0,100,Complete,physical-lift-hold-place-release,True,True,12,True,True,-0.30810;0.17500;0.00590,3.2641,0,0.0000,0.000,0.0000,0,0,16.468890,0.000000,28.36,490.92
+development,arthur-reference,303,True,False,0.000,0,271,Failed,hold-gate-failed,True,False,0,False,True,1.01231;0.12500;0.93083,4.8438,0,0.0000,0.000,0.0000,0,0,2.600693,7.491013,42.44,464.77
+development,arthur-alternate,303,True,True,0.000,0,187,Failed,release-gate-failed,True,True,12,True,True,-0.17658;0.17500;0.00342,5.2582,0,0.0000,0.000,0.0000,0,0,3.557558,30.254280,47.49,555.39

@@ -1,5 +1,11 @@
 # Isolated Unity observer experiment
 
+## H6 articulated reach and household transfer
+
+Copy **ArticulatedArmStudy.cs** and **HouseholdArmSmoke.cs** to **Assets/Editor** in the guarded scratch project. In separate Unity 6000.3.19f1 DX12 processes run **ArticulatedArmStudy.Develop**, **ArticulatedArmStudy.Final** and **ArticulatedArmStudy.BodyClearance**. Keep the full native CSVs in the scratch product. The bench records **H6_REACH**, **H6_TRANSFER** and **H6_ARM_COMPLETE**.
+
+Run **HouseholdArmSmoke.Run**, **HouseholdArmSmoke.ObserverClosed**, **HouseholdArmSmoke.Alice** and **HouseholdArmSmoke.Restart** in separate processes. Restart reads the first H6 world archive and confirms the visible Ball, memory and replay. Compare the Run and ObserverClosed checkpoint and trace hashes. These commands use the guarded product’s own primary world checkpoint. **H6_HOUSE**, **H6_RESTART** and **H6_RENDER** summarize the observed results. Private rendered captures remain local. [Protocol and results](../../docs/ARTICULATED_UPPER_BODY_H6.md)
+
 ## H5 household ball verification
 
 Copy **HouseholdBallSmoke.cs** to **Assets/Editor** in the product named **Dreamer Audit Isolated Smoke**. The harness verifies the product name and writes that scratch product’s primary world checkpoint. Preserve the scratch checkpoint before reusing it for other studies. The harness creates a **world.checkpoint.before-h5** backup on the first H5 run when a prior primary exists.

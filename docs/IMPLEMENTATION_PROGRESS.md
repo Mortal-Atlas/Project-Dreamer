@@ -2,6 +2,10 @@
 
 C.1.4 and H1 verify active prelift recovery, an anatomical pair registry, pose diagnostics, a native supported grasp, and small scalar acquisition with parameter retention. The Motor attempts tray replays actual laboratory successes and failures. H2 demonstrates Arthur's learner-bound household practice and settled restart. H3 compared fixed, scalar and contact-gated policies on 10 held-out objects. The fixed policy completed 6, scalar 4 and contact feedback 3. Online feedback remained experimental. [H3 evidence](PHYSICAL_HAND_H3.md) [H2 results](PHYSICAL_DEVELOPMENT_H2.md) [H1 report](PHYSICAL_HAND_H1.md) [Body audit](BODY_INTEGRITY_AUDIT.md)
 
+## Phase H6 · articulated upper body · November 28, 2026
+
+The supported household tray now runs an articulated arm with torque-driven shoulder, elbow and wrist in a separate condition. Actual motion, candidate elbow positions, loads, contacts and settled Ball outcomes are recorded. The higher elbow reached the full hold and surface-load gates for Arthur and Alice. Release drift or later rolling prevented full transfers. H5 remains the reference. H6 observations, shared-clock replay and settled restoration preserve learner and object identity. Visual tracking through release and dynamic body support are open. [H6 report](ARTICULATED_UPPER_BODY_H6.md)
+
 ## Phase H5 · persistent household ball · November 27, 2026
 
 Arthur and Alice moved the existing household ball using supported native grip. The household commits its actual pose and distinct learner evidence after settlement. Both the intended placement and a failed lift with unintended displacement survived a fresh Unity process. A camera-disabled repeat produced the same authoritative state. Arthur’s remembered table location remained stale until he inspected after Alice moved the object. Present limits include an engineered supported seat and carriage, range-qualified sampled vision, independent H4 archive calibration, and unsettled native restoration. [H5 verification](HOUSEHOLD_TRANSFER_H5.md)
