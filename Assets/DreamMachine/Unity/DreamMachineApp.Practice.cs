@@ -15,6 +15,8 @@ namespace DreamMachine.UnityBridge
         NativeHandLab _practiceHand;
         Transform _practiceRoot;
         GameObject _sphereSupport, _ballSupport;
+        readonly Transform[] _armParts = new Transform[3];
+        Transform _armTarget;
         readonly Transform[] _practiceParts = new Transform[7];
         readonly Transform[] _practiceContacts = new Transform[2];
         readonly List<PracticeFrame> _practiceFrames = new List<PracticeFrame>(96);
@@ -49,7 +51,8 @@ namespace DreamMachine.UnityBridge
             rect.anchorMin = new Vector2(.055f, .40f);
             rect.anchorMax = new Vector2(.945f, .96f);
             rect.offsetMin = rect.offsetMax = Vector2.zero;
-            AddPracticeRow(area, .30f, .39f, ("Sphere practice", () => SetBallTab(false)), ("Ball / switch learner", OpenBallTab));
+            AddPracticeRow(area, .30f, .39f, ("Sphere practice", () => SetBallTab(false)), ("Ball / switch learner", OpenBallTab),
+                ("Articulated arm", () => { SetBallTab(true); BeginBallTransfer(HouseholdGripPolicy.Articulated); }));
             _sphereActions = AddPracticeRow(area, .19f, .29f, ("Enter station", EnterPractice), ("Try grasp", BeginPracticeAttempt),
                 ("Return to Living", LeavePractice));
             _ballActions = AddPracticeRow(area, .19f, .29f, ("Transfer ball", () => BeginBallTransfer(HouseholdGripPolicy.Fixed)),
@@ -250,6 +253,10 @@ namespace DreamMachine.UnityBridge
                 new Vector3(.26f, .074f, .22f), "#624D43");
             _ballTargetMarker = Piece(_practiceRoot, PrimitiveType.Cylinder, "Assigned placement area", Vector3.zero,
                 new Vector3(.21f, .001f, .24f), "#A2D7C6");
+            _armParts[0] = Piece(_practiceRoot, PrimitiveType.Cube, "Supported torso collider", Vector3.zero, Vector3.one, "#516677");
+            _armParts[1] = Piece(_practiceRoot, PrimitiveType.Capsule, "Upper arm collider", Vector3.zero, Vector3.one, "#71BFAB");
+            _armParts[2] = Piece(_practiceRoot, PrimitiveType.Capsule, "Forearm collider", Vector3.zero, Vector3.one, "#81CABE");
+            _armTarget = Piece(_practiceRoot, PrimitiveType.Sphere, "Requested wrist location", Vector3.zero, Vector3.one * .034f, "#EFC763");
         }
 
         void DrawPractice()
@@ -272,6 +279,23 @@ namespace DreamMachine.UnityBridge
             }
             var pose = _practiceReplay != null ? _practiceReplay[_practiceFrameIndex] :
                 _practiceFrames.Count == 0 ? null : _practiceFrames[_practiceFrames.Count - 1];
+            var arm = pose?.Arm;
+            bool hasArm = arm != null;
+            foreach (var part in _armParts) part.gameObject.SetActive(hasArm);
+            _armTarget.gameObject.SetActive(hasArm);
+            if (hasArm)
+            {
+                _ballSupport.SetActive(false);
+                _armTarget.localPosition = arm.Target;
+                for (int i = 0; i < _armParts.Length; i++)
+                {
+                    var part = _armParts[i];
+                    part.localPosition = arm.Positions[i];
+                    part.localRotation = arm.Rotations[i] * (i == 0 ? Quaternion.identity : Quaternion.Euler(90f, 0f, 0f));
+                    var size = arm.Sizes[i];
+                    part.localScale = i == 0 ? size : new Vector3(size.x, size.z * .5f, size.y);
+                }
+            }
             if (pose == null)
             {
                 _practiceParts[0].localPosition = new Vector3(0, -.025f, .025f);
@@ -346,9 +370,10 @@ namespace DreamMachine.UnityBridge
         {
             using var stream = new MemoryStream();
             using var writer = new BinaryWriter(stream);
-            writer.Write(ball ? 3 : 2);
+            int version = ball ? (_practiceFrames[0].Arm != null ? 4 : 3) : 2;
+            writer.Write(version);
             writer.Write(_practiceFrames.Count);
-            foreach (var frame in _practiceFrames) frame.Write(writer, ball);
+            foreach (var frame in _practiceFrames) frame.Write(writer, version);
             var bytes = stream.ToArray();
             string name = PracticeHash(bytes);
             string path = PracticePath(name, ball);
@@ -367,13 +392,13 @@ namespace DreamMachine.UnityBridge
         static PracticeFrame[] ReadPracticeTape(string hash, bool ball = false)
         {
             var path = PracticePath(hash, ball);
-            if (!File.Exists(path) || new FileInfo(path).Length > (ball ? 640000 : 100000))
+            if (!File.Exists(path) || new FileInfo(path).Length > (ball ? 950000 : 100000))
                 throw new InvalidDataException("Missing or oversized grip trajectory.");
             byte[] bytes = File.ReadAllBytes(path);
             if (PracticeHash(bytes) != hash) throw new InvalidDataException("Grip trajectory checksum failed.");
             using var reader = new BinaryReader(new MemoryStream(bytes, false));
             int version = reader.ReadInt32();
-            if (ball ? version != 3 : version != 1 && version != 2) throw new InvalidDataException("Unsupported grip trajectory.");
+            if (ball ? version != 3 && version != 4 : version != 1 && version != 2) throw new InvalidDataException("Unsupported grip trajectory.");
             int count = reader.ReadInt32();
             if (count <= 0 || count > (ball ? BallFrameLimit : 240)) throw new InvalidDataException("Invalid grip trajectory frame count.");
             var frames = new PracticeFrame[count];
@@ -391,6 +416,7 @@ namespace DreamMachine.UnityBridge
             public readonly float Support, Cap;
             public readonly Vector3 LinearVelocity, AngularVelocity;
             public readonly int Tick, Corrections;
+            public readonly PracticeArmFrame Arm;
             public readonly bool Slip;
             public readonly Vector3 LeftPoint, RightPoint;
 
@@ -403,6 +429,7 @@ namespace DreamMachine.UnityBridge
                 LeftPoint = f.Left.Point; RightPoint = f.Right.Point;
                 Support = f.SupportForce; Cap = lab.EffectiveGripCap; Tick = f.Tick; Corrections = lab.GripCorrections;
                 LinearVelocity = f.ObjectVelocity; AngularVelocity = lab.ObjectAngularVelocity;
+                if (lab.Articulated) Arm = new PracticeArmFrame(lab);
                 for (int i = 0; i < Positions.Length; i++)
                 {
                     var part = lab.ReadPart(i);
@@ -426,9 +453,10 @@ namespace DreamMachine.UnityBridge
                     Support = reader.ReadSingle(); Cap = reader.ReadSingle(); Tick = reader.ReadInt32(); Corrections = reader.ReadInt32();
                     LinearVelocity = ReadVector(reader); AngularVelocity = ReadVector(reader);
                 }
+                if (version >= 4) Arm = new PracticeArmFrame(reader);
             }
 
-            public void Write(BinaryWriter output, bool ball)
+            public void Write(BinaryWriter output, int version)
             {
                 output.Write((byte)Phase); output.Write(LeftForce); output.Write(RightForce); output.Write(LeftTravel);
                 output.Write(RightTravel); output.Write(Clearance);
@@ -440,15 +468,60 @@ namespace DreamMachine.UnityBridge
                     var q = Rotations[i];
                     output.Write(q.x); output.Write(q.y); output.Write(q.z); output.Write(q.w);
                 }
-                if (ball)
+                if (version >= 3)
                 {
                     output.Write(Support); output.Write(Cap); output.Write(Tick); output.Write(Corrections);
                     WriteVector(output, LinearVelocity); WriteVector(output, AngularVelocity);
                 }
+                if (version >= 4) Arm.Write(output);
             }
 
-            static Vector3 ReadVector(BinaryReader reader) => new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
-            static void WriteVector(BinaryWriter output, Vector3 v) { output.Write(v.x); output.Write(v.y); output.Write(v.z); }
+            internal static Vector3 ReadVector(BinaryReader reader) => new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+            internal static void WriteVector(BinaryWriter output, Vector3 v) { output.Write(v.x); output.Write(v.y); output.Write(v.z); }
+        }
+
+        sealed class PracticeArmFrame
+        {
+            public readonly Vector3[] Positions = new Vector3[3], Sizes = new Vector3[3];
+            public readonly Quaternion[] Rotations = new Quaternion[3];
+            public readonly Vector3 Target, ProposedElbow, Joints;
+            public readonly float ContactSeconds, Penetration;
+            public readonly int Corrections;
+
+            public PracticeArmFrame(NativeHandLab lab)
+            {
+                var a = lab.ReadArm();
+                Target = a.Target; ProposedElbow = a.ProposedElbow; Joints = a.JointDegrees;
+                ContactSeconds = a.TorsoSeconds; Penetration = a.TorsoDepth; Corrections = a.Corrections;
+                for (int i = 0; i < 3; i++)
+                {
+                    var segment = lab.ReadArmPart(i);
+                    Positions[i] = segment.Position; Sizes[i] = segment.Size; Rotations[i] = segment.Rotation;
+                }
+            }
+
+            public PracticeArmFrame(BinaryReader input)
+            {
+                Target = PracticeFrame.ReadVector(input); ProposedElbow = PracticeFrame.ReadVector(input); Joints = PracticeFrame.ReadVector(input);
+                ContactSeconds = input.ReadSingle(); Penetration = input.ReadSingle(); Corrections = input.ReadInt32();
+                for (int i = 0; i < 3; i++)
+                {
+                    Positions[i] = PracticeFrame.ReadVector(input); Sizes[i] = PracticeFrame.ReadVector(input);
+                    Rotations[i] = new Quaternion(input.ReadSingle(), input.ReadSingle(), input.ReadSingle(), input.ReadSingle());
+                }
+            }
+
+            public void Write(BinaryWriter output)
+            {
+                PracticeFrame.WriteVector(output, Target); PracticeFrame.WriteVector(output, ProposedElbow); PracticeFrame.WriteVector(output, Joints);
+                output.Write(ContactSeconds); output.Write(Penetration); output.Write(Corrections);
+                for (int i = 0; i < 3; i++)
+                {
+                    PracticeFrame.WriteVector(output, Positions[i]); PracticeFrame.WriteVector(output, Sizes[i]);
+                    var q = Rotations[i];
+                    output.Write(q.x); output.Write(q.y); output.Write(q.z); output.Write(q.w);
+                }
+            }
         }
     }
 }

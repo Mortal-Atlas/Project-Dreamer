@@ -70,8 +70,10 @@ namespace DreamMachine.UnityBridge
                 intent.TargetTop == 0f ? HouseholdLife.BallShelfTop : 0f);
             int seed = _sim.Find(home.PersonId(intent.Actor)).Spec.BirthSeed;
             _practiceHand = new NativeHandLab(seed, HouseholdLife.BallMass, HouseholdLife.BallRadius, HouseholdLife.BallFriction,
-                policy == HouseholdGripPolicy.Fixed ? GripAcquisition.ReferenceCap : GripAcquisition.InitialCap, placement: true,
-                exploration: policy == HouseholdGripPolicy.Feedback ? GraspExploration.ForceOnly : GraspExploration.Off, household: setup);
+                policy == HouseholdGripPolicy.Fixed || policy == HouseholdGripPolicy.Articulated
+                    ? GripAcquisition.ReferenceCap : GripAcquisition.InitialCap, placement: true,
+                exploration: policy == HouseholdGripPolicy.Feedback ? GraspExploration.ForceOnly : GraspExploration.Off, household: setup,
+                articulated: policy == HouseholdGripPolicy.Articulated ? new ArmBenchSetup(true) : null);
             _practiceFrames.Add(new PracticeFrame(_practiceHand));
             _practiceStatus = "Researcher-assigned transfer. Use the Simulation controls to run or step.";
             DrawLiving(WorldSimulation.Dt);
@@ -99,7 +101,8 @@ namespace DreamMachine.UnityBridge
                 var p = hand.ObjectPosition + _ballOrigin;
                 var q = hand.ObjectRotation.normalized;
                 var actual = new HouseholdBallPose(p.x, p.y, p.z, q.x, q.y, q.z, q.w);
-                _sim.Home.CompleteBallTransfer(actual, hand.Phase == GripPhase.Complete, hand.GripCorrections, hand.Outcome, tape);
+                _sim.Home.CompleteBallTransfer(actual, hand.Phase == GripPhase.Complete,
+                    hand.GripCorrections + hand.ReadArm().Corrections, hand.Outcome, tape);
                 _practiceStatus = hand.Outcome;
                 hand.Dispose();
                 _practiceHand = null;
@@ -196,6 +199,9 @@ namespace DreamMachine.UnityBridge
             if (pose != null)
                 _practiceText.text += $"{pose.Phase} at tick {pose.Tick}  |  pads {pose.LeftForce:F2} / {pose.RightForce:F2} N\n" +
                     $"Support {pose.Support:F2} N  |  cap {pose.Cap:F2} N  |  corrections {pose.Corrections}\n";
+            if (pose?.Arm != null)
+                _practiceText.text += $"Elbow {pose.Arm.Joints.y:F0}°  |  wrist error {Vector3.Distance(pose.Arm.Target, pose.Positions[1]) * 1000f:F0} mm\n" +
+                    $"Torso contact {pose.Arm.ContactSeconds:F2} s  |  depth {pose.Arm.Penetration * 1000f:F1} mm\n";
             if (record.HasValue) _practiceText.text += $"{record.Value.Outcome}  |  {record.Value.MemoryId}\n";
             _practiceText.text += _practiceStatus ?? "Choose a learner, transfer the ball or inspect a sighting.";
         }

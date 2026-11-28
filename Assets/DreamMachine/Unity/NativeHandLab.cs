@@ -84,6 +84,8 @@ namespace DreamMachine.UnityBridge
         readonly PhysicsScene _physics;
         readonly PhysicsMaterial _padMaterial, _objectMaterial;
         readonly Rigidbody _carriage, _palm, _object;
+        readonly NativeArticulatedArm _arm;
+        readonly Vector3 _armRest;
         readonly Rigidbody[] _fingers = new Rigidbody[2];
         readonly Vector3[] _guideOrigin = new Vector3[2];
         readonly Collider[] _pads = new Collider[2], _shafts = new Collider[2];
@@ -98,6 +100,7 @@ namespace DreamMachine.UnityBridge
         readonly float _scale, _pickupY, _reachZ, _liftY, _radialGoal, _depthGoal;
         string _pendingOutcome;
         int _restedTicks;
+        bool _armReachRejected;
         float _settleSupport, _measuredWeight;
         int _settleSamples;
         readonly PadAccumulator[] _reading = new PadAccumulator[2];
@@ -160,13 +163,18 @@ namespace DreamMachine.UnityBridge
             _object.transform.parent == null && _object.GetComponents<Joint>().Length == 0;
         public bool Settled => Terminal && _releaseTicks >= 5;
         public bool HouseholdSettled => _household.HasValue && Terminal && _restedTicks >= 8;
+        public bool Articulated => _arm != null;
+        public ArmReading ReadArm() => _arm == null ? default : new ArmReading(_arm);
+        public Vector3 ArmTorsoContactSeconds => _arm == null ? Vector3.zero :
+            new Vector3(_arm.UpperTorsoSeconds, _arm.ForearmTorsoSeconds, _arm.HandTorsoSeconds);
+        public (Vector3 Position, Quaternion Rotation, Vector3 Size) ReadArmPart(int index) => _arm.ReadPart(index);
         public bool Terminal => Phase == GripPhase.Complete || Phase == GripPhase.Failed;
         public float TravelTarget { get; private set; }
 
         public NativeHandLab(int seed, float mass, float radius, float friction, float gripCap, int closeTicks = 12,
             float orientation = 0f, HandObjectSetup? objectSetup = null, bool contactGated = false,
             bool placement = false, GraspExploration exploration = GraspExploration.Off, Vector2 objectOffset = default,
-            HouseholdHandSetup? household = null)
+            HouseholdHandSetup? household = null, ArmBenchSetup? articulated = null)
         {
             if (!Application.isPlaying) throw new InvalidOperationException("Native contact callbacks require Play Mode.");
             _scale = household.HasValue ? HouseholdLife.BallRadius / .028f : 1f;
@@ -184,6 +192,8 @@ namespace DreamMachine.UnityBridge
             _placement = placement;
             if (household.HasValue && (!placement || objectSetup.HasValue || contactGated || exploration == GraspExploration.Tactile))
                 throw new ArgumentException("Household transfer requires the supported placement reference.", nameof(household));
+            if (articulated.HasValue && !household.HasValue)
+                throw new ArgumentException("The articulated bench requires household-scale geometry.", nameof(articulated));
             _household = household;
             _researchObject = objectSetup.HasValue || household.HasValue;
             if (objectSetup.HasValue)
@@ -201,7 +211,8 @@ namespace DreamMachine.UnityBridge
             _pickupY = PickupY * _scale + (household?.PickupHeight ?? 0f);
             _verticalTarget = _pickupY;
             _reachZ = ReachZ * _scale;
-            _liftY = LiftY * _scale + Mathf.Max(household?.PickupHeight ?? 0f, household?.Target.y ?? 0f);
+            _liftY = articulated.HasValue ? .427f + .65f * household.Value.PickupHeight :
+                LiftY * _scale + Mathf.Max(household?.PickupHeight ?? 0f, household?.Target.y ?? 0f);
             _radialGoal = household?.Target.x ?? PlacementX;
             _depthGoal = household?.Target.z ?? 0f;
             _scene = SceneManager.CreateScene("Supported hand " + Guid.NewGuid().ToString("N"),
@@ -219,17 +230,30 @@ namespace DreamMachine.UnityBridge
                     Vector3.zero, _objectMaterial);
             }
             else _table = Box(New("Table", new Vector3(0, -.025f, .025f)), new Vector3(.40f, .05f, .50f), Vector3.zero, _objectMaterial);
-            _carriage = Body("Supported wrist carriage", new Vector3(0, _pickupY, StartZ * _scale), .85f);
-            var rail = _carriage.gameObject.AddComponent<ConfigurableJoint>();
-            rail.autoConfigureConnectedAnchor = false;
-            rail.connectedAnchor = _carriage.position;
-            rail.angularXMotion = rail.angularYMotion = rail.angularZMotion = ConfigurableJointMotion.Locked;
-            rail.xMotion = placement ? ConfigurableJointMotion.Limited : ConfigurableJointMotion.Locked;
-            rail.yMotion = rail.zMotion = ConfigurableJointMotion.Limited;
-            rail.linearLimit = new SoftJointLimit { limit = .155f * _scale, contactDistance = .001f };
-            _palm = Body("Palm and wrist", _carriage.position, .12f);
+            _armRest = new Vector3(.106f, _pickupY + .035f, -.408f);
+            var startPalm = articulated.HasValue ? _armRest : new Vector3(0, _pickupY, StartZ * _scale);
+            if (articulated.HasValue)
+            {
+                _arm = new NativeArticulatedArm(articulated.Value, seed, startPalm, Body, _padMaterial);
+                _palm = _carriage = _arm.Palm;
+                if (articulated.Value.Obstruction)
+                    _arm.SetObstacle(Box(New("Reach probe obstruction", new Vector3(.085f, .302f, -.262f)),
+                        new Vector3(.071f, .22f, .075f), Vector3.zero, _objectMaterial));
+            }
+            else
+            {
+                _carriage = Body("Supported wrist carriage", startPalm, .85f);
+                var rail = _carriage.gameObject.AddComponent<ConfigurableJoint>();
+                rail.autoConfigureConnectedAnchor = false;
+                rail.connectedAnchor = _carriage.position;
+                rail.angularXMotion = rail.angularYMotion = rail.angularZMotion = ConfigurableJointMotion.Locked;
+                rail.xMotion = placement ? ConfigurableJointMotion.Limited : ConfigurableJointMotion.Locked;
+                rail.yMotion = rail.zMotion = ConfigurableJointMotion.Limited;
+                rail.linearLimit = new SoftJointLimit { limit = .155f * _scale, contactDistance = .001f };
+                _palm = Body("Palm and wrist", _carriage.position, .12f);
+                Hinge(_palm, _carriage, _palm.position, Vector3.right, -11f, 11f);
+            }
             _palmCollider = Box(_palm.gameObject, new Vector3(.097f, .026f, .024f) * _scale, Vector3.zero, _padMaterial);
-            Hinge(_palm, _carriage, _palm.position, Vector3.right, -11f, 11f);
             float objectHeight = objectSetup?.Size.y ?? 2f * radius;
             _object = Body(household.HasValue ? HouseholdLife.BallId : "Free grasp object",
                 household?.Object ?? new Vector3(objectOffset.x, objectHeight * .5f + .001f, objectOffset.y), mass);
@@ -248,8 +272,14 @@ namespace DreamMachine.UnityBridge
             for (int i = 0; i < 2; i++)
             {
                 float side = 2 * i - 1;
-                Vector3 anchor = _palm.position + new Vector3(separation * side, 0f, .012f) * _scale;
-                var finger = _fingers[i] = Body(i == 0 ? "Opposing thumb" : "Index finger", anchor + Vector3.forward * (.030f * _scale), .045f);
+                Vector3 anchor = _palm.position + _palm.rotation * (new Vector3(separation * side, 0f, .012f) * _scale);
+                var finger = _fingers[i] = Body(i == 0 ? "Opposing thumb" : "Index finger",
+                    anchor + _palm.rotation * (Vector3.forward * (.030f * _scale)), .045f);
+                if (_arm != null)
+                {
+                    finger.transform.rotation = _palm.rotation;
+                    finger.rotation = _palm.rotation;
+                }
                 _shafts[i] = Box(finger.gameObject, new Vector3(.012f, .019f, .048f) * _scale, Vector3.zero, _padMaterial);
                 _pads[i] = Box(finger.gameObject, new Vector3(.016f, GripCalibration.PadHeight, GripCalibration.PadLength) * _scale,
                     new Vector3(0, 0, .027f) * _scale, _padMaterial);
@@ -262,6 +292,7 @@ namespace DreamMachine.UnityBridge
                 Physics.IgnoreCollision(_palmCollider, _shafts[i], excluded);
             }
             _palm.ResetInertiaTensor();
+            _arm?.SetDistal(_palmCollider, _pads, _shafts);
             Physics.ContactEvent += Contacts;
         }
 
@@ -310,7 +341,17 @@ namespace DreamMachine.UnityBridge
 
         public void Step() => Step(Vector3.zero, Vector3.zero);
 
-        public void Step(Vector3 researchLoad, Vector3 researchImpulse)
+        public void Step(Vector3 researchLoad, Vector3 researchImpulse) => Step(researchLoad, researchImpulse, null, null, 0f);
+
+        public void StepReachProbe(Vector3 target, float yaw, float wristLoad = 0f)
+        {
+            if (_arm == null || !float.IsFinite(target.sqrMagnitude) || target.sqrMagnitude > 4f ||
+                !float.IsFinite(yaw) || Mathf.Abs(yaw) > 40f || !(wristLoad >= 0f && wristLoad <= 1.5f))
+                throw new ArgumentOutOfRangeException(nameof(target));
+            Step(Vector3.zero, Vector3.zero, target, yaw, wristLoad);
+        }
+
+        void Step(Vector3 researchLoad, Vector3 researchImpulse, Vector3? reachProbe, float? probeYaw, float wristLoad)
         {
             if (_disposed) throw new ObjectDisposedException(nameof(NativeHandLab));
             if (Terminal) return;
@@ -353,7 +394,13 @@ namespace DreamMachine.UnityBridge
                 }
             }
             _verticalTarget = Mathf.MoveTowards(_verticalTarget, y, liftStep);
-            var target = new Vector3(_lateralTarget, _verticalTarget, z);
+            var target = reachProbe ?? new Vector3(_lateralTarget, _verticalTarget, z);
+            if (_arm != null)
+            {
+                if (!reachProbe.HasValue && (Phase == GripPhase.Settle || Phase == GripPhase.RestingObject))
+                    target = _armRest;
+                _arm.Request(target, reachProbe.HasValue || Phase == GripPhase.Approach, probeYaw);
+            }
             Array.Clear(_reading, 0, _reading.Length);
             _supportImpulse = 0f; _shelfImpulse = 0f; _supportMoment = Vector3.zero;
             _otherContacts = 0;
@@ -365,23 +412,30 @@ namespace DreamMachine.UnityBridge
                 long start = Profile ? Stopwatch.GetTimestamp() : 0;
                 float left = FingerTravel(0), right = FingerTravel(1);
                 Vector3 before = _carriage.position;
-                DriveForce = Vector3.ClampMagnitude(240f * (target - before) - 27f * _carriage.linearVelocity +
-                    Vector3.up * (6.7f * -Physics.gravity.y / 6f), 22f);
-                _carriage.AddForce(DriveForce);
                 Vector3 axis = _carriage.rotation * Vector3.right;
-                float wrist = Vector3.SignedAngle(_carriage.rotation * Vector3.forward, _palm.rotation * Vector3.forward, axis);
-                float wristSpeed = Vector3.Dot(_palm.angularVelocity - _carriage.angularVelocity, axis);
-                float torque = Mathf.Clamp((.24f * (PitchTarget - wrist) - .08f * wristSpeed) * _scale, -.9f * _scale, .9f * _scale);
-                TorquePair(_palm, _carriage, axis * torque);
+                float wrist = 0f, torque = 0f;
+                if (_arm == null)
+                {
+                    DriveForce = Vector3.ClampMagnitude(240f * (target - before) - 27f * _carriage.linearVelocity +
+                        Vector3.up * (6.7f * -Physics.gravity.y / 6f), 22f);
+                    _carriage.AddForce(DriveForce);
+                    wrist = Vector3.SignedAngle(_carriage.rotation * Vector3.forward, _palm.rotation * Vector3.forward, axis);
+                    float wristSpeed = Vector3.Dot(_palm.angularVelocity - _carriage.angularVelocity, axis);
+                    torque = Mathf.Clamp((.24f * (PitchTarget - wrist) - .08f * wristSpeed) * _scale, -.9f * _scale, .9f * _scale);
+                    TorquePair(_palm, _carriage, axis * torque);
+                }
+                else _arm.Drive(PhysicsDt);
                 DriveFinger(0, left, cap);
                 DriveFinger(1, right, cap);
                 if (_researchObject) DigitEffort += (Mathf.Abs(_closingForce[0]) + Mathf.Abs(_closingForce[1])) * PhysicsDt;
                 if (researchLoad != Vector3.zero) _object.AddForce(researchLoad);
+                if (wristLoad > 0f) _palm.AddForce(Vector3.down * wristLoad);
                 if (Profile) CommandCpuTicks += Stopwatch.GetTimestamp() - start;
                 long physicsStart = Profile ? Stopwatch.GetTimestamp() : 0;
                 _physics.Simulate(PhysicsDt);
                 if (Profile) PhysicsCpuTicks += Stopwatch.GetTimestamp() - physicsStart;
-                if (_placement)
+                _arm?.EndSubstep(PhysicsDt);
+                if (_placement && _arm == null)
                 {
                     float turn = Vector3.SignedAngle(_carriage.rotation * Vector3.forward, _palm.rotation * Vector3.forward, axis);
                     WristWork += Mathf.Abs(torque * (turn - wrist) * Mathf.Deg2Rad);
@@ -399,6 +453,7 @@ namespace DreamMachine.UnityBridge
             PeakPenetration = Mathf.Max(PeakPenetration, Penetration);
             PeakClearance = Mathf.Max(PeakClearance, Clearance);
             Tick++;
+            if (reachProbe.HasValue) return;
             bool suspended = Phase == GripPhase.Lift || Phase == GripPhase.Hold || Phase == GripPhase.Transport;
             if (suspended && (_last[0].Slip || _last[1].Slip)) SlipTicks++;
             if (_researchObject && Phase == GripPhase.Settle && Tick >= 12)
@@ -436,7 +491,17 @@ namespace DreamMachine.UnityBridge
                     if (elapsed >= 18) Enter(GripPhase.Approach);
                     break;
                 case GripPhase.Approach:
-                    if (Mathf.Abs(_carriage.position.z - _reachZ) < .004f * _scale || elapsed >= 36) Enter(GripPhase.Close);
+                    if (_arm == null)
+                    {
+                        if (Mathf.Abs(_carriage.position.z - _reachZ) < .004f * _scale || elapsed >= 36) Enter(GripPhase.Close);
+                    }
+                    else if (Vector3.Distance(_palm.position, _arm.Target) < .034f && _palm.linearVelocity.magnitude < .16f)
+                        Enter(GripPhase.Close);
+                    else if (elapsed >= 55)
+                    {
+                        _armReachRejected = true;
+                        Enter(GripPhase.Release);
+                    }
                     break;
                 case GripPhase.Close:
                     if (_exploration != null)
@@ -505,7 +570,8 @@ namespace DreamMachine.UnityBridge
                     _releaseTicks = released ? _releaseTicks + 1 : 0;
                     if (_releaseTicks >= 5 || elapsed >= 30)
                     {
-                        Outcome = !_held ? "hold-gate-failed" : _placement && !ControlledPlacement ? "placement-gate-failed" :
+                        Outcome = _armReachRejected ? "articulated-reach-gate-failed" : !_held ? "hold-gate-failed" :
+                            _placement && !ControlledPlacement ? "placement-gate-failed" :
                             _releaseTicks < 5 ? "release-gate-failed" :
                             PeakPenetration > GripCalibration.MaximumPenetration ? "penetration-gate-failed" :
                             MaxJointTravel > GuideLimit * _scale + .002f ? "joint-gate-failed" : "physical-lift-hold-release";
@@ -589,6 +655,13 @@ namespace DreamMachine.UnityBridge
             for (int index = 0; index < header.pairCount; index++)
             {
                 var pair = header.GetContactPair(index);
+                if (_arm?.IsMonitoredContact(pair.colliderInstanceID, pair.otherColliderInstanceID) == true)
+                    for (int j = 0; j < pair.contactCount; j++)
+                    {
+                        var contact = pair.GetContactPoint(j);
+                        _arm.ObserveContact(pair.colliderInstanceID, pair.otherColliderInstanceID,
+                            Mathf.Abs(Vector3.Dot(contact.impulse, contact.normal)));
+                    }
                 int other = pair.colliderInstanceID == target ? pair.otherColliderInstanceID :
                     pair.otherColliderInstanceID == target ? pair.colliderInstanceID : 0;
                 if (other == 0) continue;

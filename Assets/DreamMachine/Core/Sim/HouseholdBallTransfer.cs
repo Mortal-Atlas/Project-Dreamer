@@ -5,7 +5,7 @@ using DreamMachine.World;
 
 namespace DreamMachine.Sim
 {
-    public enum HouseholdGripPolicy : byte { Fixed, Light, Feedback }
+    public enum HouseholdGripPolicy : byte { Fixed, Light, Feedback, Articulated }
 
     public readonly struct HouseholdBallPose
     {
