@@ -36,7 +36,7 @@ namespace DreamMachine.Sim
     {
         // Version 1 stores the embedded kernel at a completed tick boundary.
         const int CheckpointVersion = 1;
-        const int HouseholdCheckpointVersion = 6;
+        const int HouseholdCheckpointVersion = 7;
         const int MaxCheckpointBytes = 64 * 1024 * 1024;
         readonly System.Collections.Generic.List<ResearchIntervention> _interventions =
             new System.Collections.Generic.List<ResearchIntervention>();
@@ -58,7 +58,7 @@ namespace DreamMachine.Sim
 
         public byte[] CaptureCheckpoint()
         {
-            if (PhysicalPractice?.AttemptRunning == true)
+            if (PhysicalPractice?.AttemptRunning == true || Home?.BallTransferRunning == true)
                 throw new InvalidDataException("Wait for the supported grip attempt to finish before saving.");
             using var payload = new MemoryStream();
             using var writer = new BinaryWriter(payload);
@@ -122,6 +122,7 @@ namespace DreamMachine.Sim
             {
                 writer.Write(PhysicalPractice != null);
                 PhysicalPractice?.Write(writer);
+                Home.WriteBallTransfer(writer);
             }
             byte[] bytes = payload.ToArray();
             using var envelope = new MemoryStream();
@@ -161,6 +162,7 @@ namespace DreamMachine.Sim
                     world.Home.Read(payload, version);
                     if (version >= 6 && payload.ReadBoolean())
                         world.PhysicalPractice = HouseholdGripSession.Read(payload, world.Find(HouseholdGripSession.Arthur), world.TickCount);
+                    if (version >= 7) world.Home.ReadBallTransfer(payload);
                 }
                 if (payload.BaseStream.Position != payload.BaseStream.Length)
                     throw new InvalidDataException("Unexpected trailing checkpoint data.");

@@ -14,6 +14,7 @@ namespace DreamMachine.UnityBridge
         const string PracticeTray = "household.physical-practice";
         NativeHandLab _practiceHand;
         Transform _practiceRoot;
+        GameObject _sphereSupport, _ballSupport;
         readonly Transform[] _practiceParts = new Transform[7];
         readonly Transform[] _practiceContacts = new Transform[2];
         readonly List<PracticeFrame> _practiceFrames = new List<PracticeFrame>(96);
@@ -45,19 +46,25 @@ namespace DreamMachine.UnityBridge
         {
             _practiceText = NewLabel(area, "Physical evidence", 18);
             var rect = _practiceText.rectTransform;
-            rect.anchorMin = new Vector2(.055f, .31f);
+            rect.anchorMin = new Vector2(.055f, .40f);
             rect.anchorMax = new Vector2(.945f, .96f);
             rect.offsetMin = rect.offsetMax = Vector2.zero;
-            AddPracticeRow(area, .19f, .29f, ("Enter station", EnterPractice), ("Try grasp", BeginPracticeAttempt),
+            AddPracticeRow(area, .30f, .39f, ("Sphere practice", () => SetBallTab(false)), ("Ball / switch learner", OpenBallTab));
+            _sphereActions = AddPracticeRow(area, .19f, .29f, ("Enter station", EnterPractice), ("Try grasp", BeginPracticeAttempt),
                 ("Return to Living", LeavePractice));
+            _ballActions = AddPracticeRow(area, .19f, .29f, ("Transfer ball", () => BeginBallTransfer(HouseholdGripPolicy.Fixed)),
+                ("Light grip", () => BeginBallTransfer(HouseholdGripPolicy.Light)),
+                ("Grip feedback", () => BeginBallTransfer(HouseholdGripPolicy.Feedback)), ("Inspect sighting", () => LookForBall(false)),
+                ("Search nearby", () => LookForBall(true)));
             AddPracticeRow(area, .09f, .19f, ("Earlier attempt", () => SelectPracticeRecord(-1)),
                 ("Later attempt", () => SelectPracticeRecord(1)), ("Live view", StopPracticeReplay));
             AddPracticeRow(area, 0f, .09f, ("Play / pause", () => _practicePlaying = _practiceReplay != null && !_practicePlaying),
                 ("First frame", () => SeekPracticeFrame(0)), ("Next frame", () => SeekPracticeFrame(_practiceFrameIndex + 1)),
                 ("Close", OpenPracticeTray));
+            SetBallTab(_ballTab);
         }
 
-        void AddPracticeRow(RectTransform parent, float bottom, float top, params (string Label, Action Click)[] actions)
+        GameObject AddPracticeRow(RectTransform parent, float bottom, float top, params (string Label, Action Click)[] actions)
         {
             var row = new GameObject("Practice controls", typeof(RectTransform)).GetComponent<RectTransform>();
             row.SetParent(parent, false);
@@ -69,6 +76,7 @@ namespace DreamMachine.UnityBridge
                 AddTimeButton(row, action.Label, i / (float)actions.Length, (i + 1) / (float)actions.Length, () => action.Click());
                 ((RectTransform)row.GetChild(i)).anchorMax = new Vector2((i + 1) / (float)actions.Length, .97f);
             }
+            return row.gameObject;
         }
 
         void EnterPractice()
@@ -140,6 +148,7 @@ namespace DreamMachine.UnityBridge
 
         void AdvanceHouseholdTick()
         {
+            if (_sim.Home?.BallTransferRunning == true) { AdvanceBallTransfer(); return; }
             if (_practiceHand?.Terminal == true && _sim.PhysicalPractice.AttemptRunning)
             {
                 FinalizePracticeAttempt();
@@ -182,6 +191,7 @@ namespace DreamMachine.UnityBridge
 
         void SelectPracticeRecord(int delta)
         {
+            if (_ballTab) { ReadBallReplay(delta); return; }
             var session = _sim.PhysicalPractice;
             if (session == null || session.Records.Count == 0 || session.AttemptRunning) return;
             int index = _practiceRecordIndex < 0 ? session.Records.Count - 1 :
@@ -224,23 +234,42 @@ namespace DreamMachine.UnityBridge
                     Vector3.zero, Vector3.one, i == 0 ? "#456373" : i == 6 ? "#D78C47" : "#70B5AC");
             for (int i = 0; i < 2; i++)
                 _practiceContacts[i] = Piece(_practiceRoot, PrimitiveType.Sphere, "Measured pad contact", Vector3.zero, Vector3.zero, "#F2D46C");
-            Piece(_practiceRoot, PrimitiveType.Cube, "Visible wrist support", new Vector3(0, .005f, -.158f),
+            _sphereSupport = new GameObject("Sphere fixture support");
+            _sphereSupport.transform.SetParent(_practiceRoot, false);
+            Piece(_sphereSupport.transform, PrimitiveType.Cube, "Visible wrist support", new Vector3(0, .005f, -.158f),
                 new Vector3(.12f, .026f, .070f), "#456373");
-            Piece(_practiceRoot, PrimitiveType.Cube, "Table pedestal", new Vector3(0, -.15f, .02f),
+            Piece(_sphereSupport.transform, PrimitiveType.Cube, "Table pedestal", new Vector3(0, -.15f, .02f),
                 new Vector3(.20f, .25f, .20f), "#456373");
-            Piece(_practiceRoot, PrimitiveType.Cube, "Supported seat", new Vector3(0, -.112f, -.37f),
+            Piece(_sphereSupport.transform, PrimitiveType.Cube, "Supported seat", new Vector3(0, -.112f, -.37f),
                 new Vector3(.21f, .064f, .19f), "#624D43");
+            _ballSupport = new GameObject("Ball wrist carriage support");
+            _ballSupport.transform.SetParent(_practiceRoot, false);
+            Piece(_ballSupport.transform, PrimitiveType.Cube, "Carriage rail", new Vector3(0, .038f, -.53f),
+                new Vector3(1.05f, .076f, .18f), "#486E77");
+            Piece(_ballSupport.transform, PrimitiveType.Cube, "Supported learner seat", new Vector3(-.135f, .037f, -.77f),
+                new Vector3(.26f, .074f, .22f), "#624D43");
+            _ballTargetMarker = Piece(_practiceRoot, PrimitiveType.Cylinder, "Assigned placement area", Vector3.zero,
+                new Vector3(.21f, .001f, .24f), "#A2D7C6");
         }
 
         void DrawPractice()
         {
-            bool show = _sim?.PhysicalPractice?.Active == true || _practiceReplay != null;
+            bool show = _practiceReplay != null || (_ballTab ? _practiceHand != null : _sim?.PhysicalPractice?.Active == true);
             if (!show) { if (_practiceRoot != null) _practiceRoot.gameObject.SetActive(false); return; }
             if (!_actors.TryGetValue(HouseholdGripSession.Arthur, out var actor)) return;
             if (_practiceRoot == null) MakePracticeStation();
             _practiceRoot.gameObject.SetActive(true);
+            _sphereSupport.SetActive(!_ballTab);
+            _ballSupport.SetActive(_ballTab);
+            _ballTargetMarker.gameObject.SetActive(_ballTab);
             _practiceRoot.SetPositionAndRotation(new Vector3(HouseholdGripSession.StationX,
                 Mathf.Max(.22f, actor.Body.Dimensions.Height * .48f), HouseholdGripSession.StationZ + .37f), Quaternion.identity);
+            if (_ballTab)
+            {
+                var intent = _practiceReplay != null ? _sim.Home.BallTransfer(_practiceRecordIndex).Intent : _sim.Home.BallIntent.Value;
+                _practiceRoot.position = new Vector3(intent.X, 0f, intent.Z);
+                _ballTargetMarker.position = new Vector3(intent.TargetX, intent.TargetTop + .002f, intent.TargetZ);
+            }
             var pose = _practiceReplay != null ? _practiceReplay[_practiceFrameIndex] :
                 _practiceFrames.Count == 0 ? null : _practiceFrames[_practiceFrames.Count - 1];
             if (pose == null)
@@ -264,7 +293,7 @@ namespace DreamMachine.UnityBridge
             for (int i = 0; i < _practiceParts.Length; i++)
             {
                 var part = _practiceParts[i];
-                part.gameObject.SetActive(true);
+                part.gameObject.SetActive(!_ballTab || (i != 0 && (i != 6 || _practiceReplay != null)));
                 part.localPosition = pose.Positions[i]; part.localRotation = pose.Rotations[i]; part.localScale = pose.Sizes[i];
             }
             PaintPracticeContact(0, pose.LeftPoint, pose.LeftForce);
@@ -282,6 +311,7 @@ namespace DreamMachine.UnityBridge
         void RefreshPractice()
         {
             if (_practiceText == null) return;
+            if (_ballTab) { RefreshBall(); return; }
             var session = _sim.PhysicalPractice;
             if (session == null)
             {
@@ -310,18 +340,18 @@ namespace DreamMachine.UnityBridge
             _practiceText.text += _practiceStatus;
         }
 
-        static string PracticePath(string hash) => Path.Combine(Application.persistentDataPath, "motor-trajectories", hash + ".h2");
+        static string PracticePath(string hash, bool ball) => Path.Combine(Application.persistentDataPath, "motor-trajectories", hash + (ball ? ".h5" : ".h2"));
 
-        string SavePracticeTape()
+        string SavePracticeTape(bool ball = false)
         {
             using var stream = new MemoryStream();
             using var writer = new BinaryWriter(stream);
-            writer.Write(2);
+            writer.Write(ball ? 3 : 2);
             writer.Write(_practiceFrames.Count);
-            foreach (var frame in _practiceFrames) frame.Write(writer);
+            foreach (var frame in _practiceFrames) frame.Write(writer, ball);
             var bytes = stream.ToArray();
             string name = PracticeHash(bytes);
-            string path = PracticePath(name);
+            string path = PracticePath(name, ball);
             if (!File.Exists(path))
                 WorldSimulation.PublishCheckpoint(path, bytes, candidate => File.Exists(candidate) &&
                     PracticeHash(File.ReadAllBytes(candidate)) == name);
@@ -334,18 +364,18 @@ namespace DreamMachine.UnityBridge
             return BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-", "").ToLowerInvariant();
         }
 
-        static PracticeFrame[] ReadPracticeTape(string hash)
+        static PracticeFrame[] ReadPracticeTape(string hash, bool ball = false)
         {
-            var path = PracticePath(hash);
-            if (!File.Exists(path) || new FileInfo(path).Length > 100000)
+            var path = PracticePath(hash, ball);
+            if (!File.Exists(path) || new FileInfo(path).Length > (ball ? 640000 : 100000))
                 throw new InvalidDataException("Missing or oversized grip trajectory.");
             byte[] bytes = File.ReadAllBytes(path);
             if (PracticeHash(bytes) != hash) throw new InvalidDataException("Grip trajectory checksum failed.");
             using var reader = new BinaryReader(new MemoryStream(bytes, false));
             int version = reader.ReadInt32();
-            if (version != 1 && version != 2) throw new InvalidDataException("Unsupported grip trajectory.");
+            if (ball ? version != 3 : version != 1 && version != 2) throw new InvalidDataException("Unsupported grip trajectory.");
             int count = reader.ReadInt32();
-            if (count <= 0 || count > 240) throw new InvalidDataException("Invalid grip trajectory frame count.");
+            if (count <= 0 || count > (ball ? BallFrameLimit : 240)) throw new InvalidDataException("Invalid grip trajectory frame count.");
             var frames = new PracticeFrame[count];
             for (int i = 0; i < count; i++) frames[i] = new PracticeFrame(reader, version);
             return frames;
@@ -358,6 +388,9 @@ namespace DreamMachine.UnityBridge
             public readonly GripPhase Phase;
             public readonly float LeftForce, RightForce, LeftTravel, RightTravel, Clearance;
             public readonly float Target, LeftEffort, RightEffort;
+            public readonly float Support, Cap;
+            public readonly Vector3 LinearVelocity, AngularVelocity;
+            public readonly int Tick, Corrections;
             public readonly bool Slip;
             public readonly Vector3 LeftPoint, RightPoint;
 
@@ -368,6 +401,8 @@ namespace DreamMachine.UnityBridge
                 LeftForce = f.Left.NormalForce; RightForce = f.Right.NormalForce;
                 LeftTravel = f.LeftTravel; RightTravel = f.RightTravel; Clearance = f.Clearance; Slip = f.Left.Slip || f.Right.Slip;
                 LeftPoint = f.Left.Point; RightPoint = f.Right.Point;
+                Support = f.SupportForce; Cap = lab.EffectiveGripCap; Tick = f.Tick; Corrections = lab.GripCorrections;
+                LinearVelocity = f.ObjectVelocity; AngularVelocity = lab.ObjectAngularVelocity;
                 for (int i = 0; i < Positions.Length; i++)
                 {
                     var part = lab.ReadPart(i);
@@ -386,9 +421,14 @@ namespace DreamMachine.UnityBridge
                     Positions[i] = ReadVector(reader); Sizes[i] = ReadVector(reader);
                     Rotations[i] = new Quaternion(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
                 }
+                if (version >= 3)
+                {
+                    Support = reader.ReadSingle(); Cap = reader.ReadSingle(); Tick = reader.ReadInt32(); Corrections = reader.ReadInt32();
+                    LinearVelocity = ReadVector(reader); AngularVelocity = ReadVector(reader);
+                }
             }
 
-            public void Write(BinaryWriter output)
+            public void Write(BinaryWriter output, bool ball)
             {
                 output.Write((byte)Phase); output.Write(LeftForce); output.Write(RightForce); output.Write(LeftTravel);
                 output.Write(RightTravel); output.Write(Clearance);
@@ -399,6 +439,11 @@ namespace DreamMachine.UnityBridge
                     WriteVector(output, Positions[i]); WriteVector(output, Sizes[i]);
                     var q = Rotations[i];
                     output.Write(q.x); output.Write(q.y); output.Write(q.z); output.Write(q.w);
+                }
+                if (ball)
+                {
+                    output.Write(Support); output.Write(Cap); output.Write(Tick); output.Write(Corrections);
+                    WriteVector(output, LinearVelocity); WriteVector(output, AngularVelocity);
                 }
             }
 

@@ -806,7 +806,7 @@ namespace DreamMachine.UnityBridge
             try
             {
                 if (_remote != null && _remote.Active) return;
-                if (_sim.PhysicalPractice?.AttemptRunning == true ||
+                if (_sim.Home?.BallTransferRunning == true || _sim.PhysicalPractice?.AttemptRunning == true ||
                     _sim.PhysicalPractice?.Active == true && _practiceHand != null && !_practiceHand.Settled)
                 {
                     _practiceStatus = "Save when the object has settled on the table.";
@@ -836,9 +836,9 @@ namespace DreamMachine.UnityBridge
         void RestoreWorld()
         {
             if (_remote != null && _remote.Active) return;
-            if (_sim.PhysicalPractice?.AttemptRunning == true)
+            if (_sim.Home?.BallTransferRunning == true || _sim.PhysicalPractice?.AttemptRunning == true)
             {
-                _practiceStatus = "Finish the grip before restoring.";
+                _practiceStatus = "Finish the physical interaction before restoring.";
                 RefreshPractice();
                 return;
             }
@@ -890,7 +890,7 @@ namespace DreamMachine.UnityBridge
         void ResetBabies()
         {
             if (_remote != null && _remote.Active) return;
-            if (_sim.PhysicalPractice?.Active == true)
+            if (_sim.Home?.BallTransferRunning == true || _sim.PhysicalPractice?.Active == true)
             {
                 _practiceStatus = "Return to Living before resetting.";
                 RefreshPractice();
@@ -1070,7 +1070,8 @@ namespace DreamMachine.UnityBridge
             if (_sim.Home != null && !_researchPresentation) look = new Vector3(0f, .63f, 1.27f);
             Quaternion orbit = Quaternion.Euler(_orbitPitch, _orbitYaw, 0f);
             if (practiceView) look = _practiceRoot.position + Vector3.up * .08f + orbit * Vector3.right * .22f;
-            Vector3 offset = orbit * new Vector3(0f, 0f, practiceView ? -1.30f : -_zoom);
+            if (practiceView && _ballTab) look = _practiceRoot.position + new Vector3(-.13f, .23f, -.26f) + orbit * Vector3.right * .20f;
+            Vector3 offset = orbit * new Vector3(0f, 0f, practiceView ? (_ballTab ? -2.05f : -1.30f) : -_zoom);
             Camera.main.transform.position = look + offset;
             Camera.main.transform.LookAt(look);
         }

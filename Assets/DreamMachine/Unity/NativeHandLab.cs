@@ -8,9 +8,18 @@ using UnityEngine.SceneManagement;
 
 namespace DreamMachine.UnityBridge
 {
-    public enum GripPhase { Settle, Approach, Close, Lift, Hold, Lower, Release, Complete, Failed, Reposition, Transport }
+    public enum GripPhase { Settle, Approach, Close, Lift, Hold, Lower, Release, Complete, Failed, Reposition, Transport, RestingObject }
 
     public enum GraspExploration { Off, ForceOnly, Tactile }
+
+    public readonly struct HouseholdHandSetup
+    {
+        public readonly Vector3 Origin, Object, Target, Shelf;
+        public readonly Quaternion Rotation;
+        public readonly float PickupHeight;
+        public HouseholdHandSetup(Vector3 origin, Vector3 position, Quaternion rotation, Vector3 target, Vector3 shelf, float pickupHeight)
+        { Origin = origin; Object = position; Rotation = rotation; Target = target; Shelf = shelf; PickupHeight = pickupHeight; }
+    }
 
     public enum HandObjectShape { Sphere, Box, Capsule }
 
@@ -79,11 +88,16 @@ namespace DreamMachine.UnityBridge
         readonly Vector3[] _guideOrigin = new Vector3[2];
         readonly Collider[] _pads = new Collider[2], _shafts = new Collider[2];
         readonly Collider _table, _palmCollider;
+        readonly Collider _shelf;
         readonly Collider _objectCollider;
         readonly bool _researchObject;
         readonly ContactGatedGrip _feedback;
         readonly TactileGrasp _exploration;
         readonly bool _placement;
+        readonly HouseholdHandSetup? _household;
+        readonly float _scale, _pickupY, _reachZ, _liftY, _radialGoal, _depthGoal;
+        string _pendingOutcome;
+        int _restedTicks;
         float _settleSupport, _measuredWeight;
         int _settleSamples;
         readonly PadAccumulator[] _reading = new PadAccumulator[2];
@@ -94,7 +108,7 @@ namespace DreamMachine.UnityBridge
         float _lateralTarget, _forwardOffset;
         Vector3 _supportMoment, _releaseOrigin;
         int _phaseTick, _releaseTicks, _otherContacts;
-        float _supportImpulse;
+        float _supportImpulse, _shelfImpulse;
         bool _held, _disposed, _emergencyLower;
         public const string FixtureId = "engineered.h1.opposed-digits";
         public int Seed { get; }
@@ -123,7 +137,8 @@ namespace DreamMachine.UnityBridge
         public Vector3 ObjectVelocity => _object.linearVelocity;
         public Vector3 ObjectAngularVelocity => _object.angularVelocity;
         public Quaternion ObjectRotation => _object.rotation;
-        public float Clearance => _researchObject ? _objectCollider.bounds.min.y : _object.position.y - Radius;
+        public float Clearance => (_researchObject ? _objectCollider.bounds.min.y : _object.position.y - Radius) -
+            (_household?.PickupHeight ?? 0f);
         public float EffectiveGripCap => _exploration?.Cap ?? _feedback?.Cap ?? GripCap;
         public int GripCorrections => _exploration?.Corrections ?? _feedback?.Corrections ?? 0;
         public bool GripUncertain => _exploration?.Uncertain ?? _feedback?.Uncertain == true;
@@ -143,15 +158,18 @@ namespace DreamMachine.UnityBridge
         public bool FreeObject => !_object.isKinematic && _object.useGravity && _object.constraints == RigidbodyConstraints.None &&
             _object.transform.parent == null && _object.GetComponents<Joint>().Length == 0;
         public bool Settled => Terminal && _releaseTicks >= 5;
+        public bool HouseholdSettled => _household.HasValue && Terminal && _restedTicks >= 8;
         public bool Terminal => Phase == GripPhase.Complete || Phase == GripPhase.Failed;
         public float TravelTarget { get; private set; }
 
         public NativeHandLab(int seed, float mass, float radius, float friction, float gripCap, int closeTicks = 12,
             float orientation = 0f, HandObjectSetup? objectSetup = null, bool contactGated = false,
-            bool placement = false, GraspExploration exploration = GraspExploration.Off, Vector2 objectOffset = default)
+            bool placement = false, GraspExploration exploration = GraspExploration.Off, Vector2 objectOffset = default,
+            HouseholdHandSetup? household = null)
         {
             if (!Application.isPlaying) throw new InvalidOperationException("Native contact callbacks require Play Mode.");
-            if (!(mass >= .035f && mass <= .20f && radius >= .021f && radius <= .036f && friction >= .10f && friction <= 1f &&
+            _scale = household.HasValue ? HouseholdLife.BallRadius / .028f : 1f;
+            if (!(mass >= .035f && mass <= .20f && radius / _scale >= .021f && radius / _scale <= .036f && friction >= .10f && friction <= 1f &&
                 gripCap >= .08f && gripCap <= 7f && closeTicks >= 4 && closeTicks <= 30))
                 throw new ArgumentOutOfRangeException(nameof(mass), "Unsupported engineering fixture settings.");
             if (!float.IsFinite(orientation)) throw new ArgumentOutOfRangeException(nameof(orientation));
@@ -163,7 +181,10 @@ namespace DreamMachine.UnityBridge
             _feedback = contactGated ? new ContactGatedGrip(gripCap) : null;
             _exploration = exploration == GraspExploration.Off ? null : new TactileGrasp(gripCap, exploration == GraspExploration.Tactile);
             _placement = placement;
-            _researchObject = objectSetup.HasValue;
+            if (household.HasValue && (!placement || objectSetup.HasValue || contactGated || exploration == GraspExploration.Tactile))
+                throw new ArgumentException("Household transfer requires the supported placement reference.", nameof(household));
+            _household = household;
+            _researchObject = objectSetup.HasValue || household.HasValue;
             if (objectSetup.HasValue)
             {
                 var setup = objectSetup.Value;
@@ -176,26 +197,43 @@ namespace DreamMachine.UnityBridge
                     throw new ArgumentOutOfRangeException(nameof(objectSetup));
             }
             Seed = seed; Radius = radius; Friction = friction; GripCap = gripCap; _closeTicks = closeTicks;
+            _pickupY = PickupY * _scale + (household?.PickupHeight ?? 0f);
+            _verticalTarget = _pickupY;
+            _reachZ = ReachZ * _scale;
+            _liftY = LiftY * _scale + Mathf.Max(household?.PickupHeight ?? 0f, household?.Target.y ?? 0f);
+            _radialGoal = household?.Target.x ?? PlacementX;
+            _depthGoal = household?.Target.z ?? 0f;
             _scene = SceneManager.CreateScene("Supported hand " + Guid.NewGuid().ToString("N"),
                 new CreateSceneParameters(LocalPhysicsMode.Physics3D));
             _physics = _scene.GetPhysicsScene();
             _padMaterial = Material("Pad", friction);
             _objectMaterial = Material("Object", friction);
-            _table = Box(New("Table", new Vector3(0, -.025f, .025f)), new Vector3(.40f, .05f, .50f), Vector3.zero, _objectMaterial);
-            _carriage = Body("Supported wrist carriage", new Vector3(0, PickupY, StartZ), .85f);
+            if (household.HasValue)
+            {
+                var h = household.Value;
+                _table = Box(New("Household play floor", new Vector3(-h.Origin.x, -.025f, 1.45f - h.Origin.z)),
+                    new Vector3(6.60f, .05f, 4.55f), Vector3.zero, _objectMaterial);
+                _shelf = Box(New("Household transfer table", h.Shelf - Vector3.up * HouseholdLife.BallShelfTop * .5f),
+                    new Vector3(2f * HouseholdLife.BallShelfHalfWidth, HouseholdLife.BallShelfTop, 2f * HouseholdLife.BallShelfHalfDepth),
+                    Vector3.zero, _objectMaterial);
+            }
+            else _table = Box(New("Table", new Vector3(0, -.025f, .025f)), new Vector3(.40f, .05f, .50f), Vector3.zero, _objectMaterial);
+            _carriage = Body("Supported wrist carriage", new Vector3(0, _pickupY, StartZ * _scale), .85f);
             var rail = _carriage.gameObject.AddComponent<ConfigurableJoint>();
             rail.autoConfigureConnectedAnchor = false;
             rail.connectedAnchor = _carriage.position;
             rail.angularXMotion = rail.angularYMotion = rail.angularZMotion = ConfigurableJointMotion.Locked;
             rail.xMotion = placement ? ConfigurableJointMotion.Limited : ConfigurableJointMotion.Locked;
             rail.yMotion = rail.zMotion = ConfigurableJointMotion.Limited;
-            rail.linearLimit = new SoftJointLimit { limit = .155f, contactDistance = .001f };
+            rail.linearLimit = new SoftJointLimit { limit = .155f * _scale, contactDistance = .001f };
             _palm = Body("Palm and wrist", _carriage.position, .12f);
-            _palmCollider = Box(_palm.gameObject, new Vector3(.097f, .026f, .024f), Vector3.zero, _padMaterial);
+            _palmCollider = Box(_palm.gameObject, new Vector3(.097f, .026f, .024f) * _scale, Vector3.zero, _padMaterial);
             Hinge(_palm, _carriage, _palm.position, Vector3.right, -11f, 11f);
             float objectHeight = objectSetup?.Size.y ?? 2f * radius;
-            _object = Body("Free grasp object", new Vector3(objectOffset.x, objectHeight * .5f + .001f, objectOffset.y), mass);
-            _object.rotation = Quaternion.Euler(0f, orientation, 0f);
+            _object = Body(household.HasValue ? HouseholdLife.BallId : "Free grasp object",
+                household?.Object ?? new Vector3(objectOffset.x, objectHeight * .5f + .001f, objectOffset.y), mass);
+            _object.rotation = household?.Rotation ?? Quaternion.Euler(0f, orientation, 0f);
+            if (household.HasValue) { _object.linearDamping = .27f; _object.angularDamping = .8f; }
             _objectCollider = MakeObjectCollider(objectSetup, radius);
             _objectCollider.contactOffset = .001f;
             _objectCollider.providesContacts = true;
@@ -209,14 +247,14 @@ namespace DreamMachine.UnityBridge
             for (int i = 0; i < 2; i++)
             {
                 float side = 2 * i - 1;
-                Vector3 anchor = _palm.position + new Vector3(separation * side, 0f, .012f);
-                var finger = _fingers[i] = Body(i == 0 ? "Opposing thumb" : "Index finger", anchor + Vector3.forward * .030f, .045f);
-                _shafts[i] = Box(finger.gameObject, new Vector3(.012f, .019f, .048f), Vector3.zero, _padMaterial);
-                _pads[i] = Box(finger.gameObject, new Vector3(.016f, GripCalibration.PadHeight, GripCalibration.PadLength),
-                    new Vector3(0, 0, .027f), _padMaterial);
+                Vector3 anchor = _palm.position + new Vector3(separation * side, 0f, .012f) * _scale;
+                var finger = _fingers[i] = Body(i == 0 ? "Opposing thumb" : "Index finger", anchor + Vector3.forward * (.030f * _scale), .045f);
+                _shafts[i] = Box(finger.gameObject, new Vector3(.012f, .019f, .048f) * _scale, Vector3.zero, _padMaterial);
+                _pads[i] = Box(finger.gameObject, new Vector3(.016f, GripCalibration.PadHeight, GripCalibration.PadLength) * _scale,
+                    new Vector3(0, 0, .027f) * _scale, _padMaterial);
                 _guideOrigin[i] = Quaternion.Inverse(_palm.rotation) * (finger.position - _palm.position);
                 finger.ResetInertiaTensor();
-                GuideFinger(finger, _palm, _guideOrigin[i]);
+                GuideFinger(finger, _palm, _guideOrigin[i], _scale);
                 BodySegment segment = i == 0 ? BodySegment.RightThumb : BodySegment.RightIndex;
                 bool excluded = AnatomyContacts.ExcludePair(BodySegment.RightHand, segment);
                 Physics.IgnoreCollision(_palmCollider, _pads[i], excluded);
@@ -260,7 +298,8 @@ namespace DreamMachine.UnityBridge
         public (Vector3 Position, Quaternion Rotation, Vector3 Size) ReadPart(int part)
         {
             Collider geometry = part switch { 0 => _table, 1 => _palmCollider, 2 => _shafts[0], 3 => _pads[0],
-                4 => _shafts[1], 5 => _pads[1], 6 => _objectCollider, _ => throw new ArgumentOutOfRangeException(nameof(part)) };
+                4 => _shafts[1], 5 => _pads[1], 6 => _objectCollider, 7 when _shelf != null => _shelf,
+                _ => throw new ArgumentOutOfRangeException(nameof(part)) };
             var t = geometry.transform;
             if (geometry is BoxCollider box) return (t.TransformPoint(box.center), t.rotation, box.size);
             var size = Vector3.one * (2f * Radius);
@@ -277,10 +316,10 @@ namespace DreamMachine.UnityBridge
             if (!(researchLoad.sqrMagnitude <= 16f && researchImpulse.sqrMagnitude <= .0025f))
                 throw new ArgumentOutOfRangeException(nameof(researchLoad));
             bool closing = Phase >= GripPhase.Close && Phase <= GripPhase.Lower || Phase == GripPhase.Transport;
-            TravelTarget = closing ? ClosedTravel : OpenTravel;
-            float z = Phase == GripPhase.Settle ? StartZ : ReachZ;
-            float y = Phase == GripPhase.Lift || Phase == GripPhase.Hold || Phase == GripPhase.Transport ? LiftY : PickupY;
-            float liftStep = Phase == GripPhase.Lift && GripUncertain ? .0025f : .007f;
+            TravelTarget = (closing ? ClosedTravel : OpenTravel) * _scale;
+            float z = Phase == GripPhase.Settle ? StartZ * _scale : _reachZ;
+            float y = Phase == GripPhase.Lift || Phase == GripPhase.Hold || Phase == GripPhase.Transport ? _liftY : _pickupY;
+            float liftStep = (Phase == GripPhase.Lift && GripUncertain ? .0025f : .007f) * _scale;
             if (_placement)
             {
                 var offset = GraspOffset;
@@ -288,13 +327,18 @@ namespace DreamMachine.UnityBridge
                 bool opening = Phase == GripPhase.Reposition && Tick - _phaseTick < 3;
                 if (!opening && !_emergencyLower)
                 {
-                    _lateralTarget = Mathf.MoveTowards(_lateralTarget, carrying ? PlacementX : offset.x, .004f);
-                    _forwardOffset = Mathf.MoveTowards(_forwardOffset, offset.z, .003f);
+                    _lateralTarget = Mathf.MoveTowards(_lateralTarget, carrying ? _radialGoal : offset.x, .004f * _scale);
+                    _forwardOffset = Mathf.MoveTowards(_forwardOffset, carrying && _household.HasValue ? _depthGoal : offset.z, .003f * _scale);
                 }
                 z += _forwardOffset;
                 y += offset.y;
-                if (_held && Phase == GripPhase.Lower) y = PickupY - .005f;
+                if (_held && Phase == GripPhase.Lower) y = (PickupY - .005f) * _scale + (_household?.Target.y ?? 0f);
                 if (_held && Phase == GripPhase.Release) y = _verticalTarget;
+                if (Phase == GripPhase.RestingObject)
+                {
+                    y = _liftY;
+                    z = StartZ * _scale;
+                }
                 if (_exploration != null && GripUncertain && (Phase == GripPhase.Lift || Phase == GripPhase.Transport))
                 {
                     y = _verticalTarget;
@@ -310,7 +354,7 @@ namespace DreamMachine.UnityBridge
             _verticalTarget = Mathf.MoveTowards(_verticalTarget, y, liftStep);
             var target = new Vector3(_lateralTarget, _verticalTarget, z);
             Array.Clear(_reading, 0, _reading.Length);
-            _supportImpulse = 0f; _supportMoment = Vector3.zero;
+            _supportImpulse = 0f; _shelfImpulse = 0f; _supportMoment = Vector3.zero;
             _otherContacts = 0;
             float cap = closing ? EffectiveGripCap : 3f;
             if (researchImpulse != Vector3.zero) _object.AddForce(researchImpulse, ForceMode.Impulse);
@@ -326,7 +370,7 @@ namespace DreamMachine.UnityBridge
                 Vector3 axis = _carriage.rotation * Vector3.right;
                 float wrist = Vector3.SignedAngle(_carriage.rotation * Vector3.forward, _palm.rotation * Vector3.forward, axis);
                 float wristSpeed = Vector3.Dot(_palm.angularVelocity - _carriage.angularVelocity, axis);
-                float torque = Mathf.Clamp(.24f * (PitchTarget - wrist) - .08f * wristSpeed, -.9f, .9f);
+                float torque = Mathf.Clamp((.24f * (PitchTarget - wrist) - .08f * wristSpeed) * _scale, -.9f * _scale, .9f * _scale);
                 TorquePair(_palm, _carriage, axis * torque);
                 DriveFinger(0, left, cap);
                 DriveFinger(1, right, cap);
@@ -348,6 +392,7 @@ namespace DreamMachine.UnityBridge
             MaxJointTravel = Mathf.Max(MaxJointTravel, Mathf.Abs(FingerTravel(0)), Mathf.Abs(FingerTravel(1)));
             Penetration = Mathf.Max(Overlap(_pads[0]), Overlap(_pads[1]), Overlap(_table), Overlap(_palmCollider),
                 Overlap(_shafts[0]), Overlap(_shafts[1]));
+            if (_shelf != null) Penetration = Mathf.Max(Penetration, Overlap(_shelf));
             PeakPenetration = Mathf.Max(PeakPenetration, Penetration);
             PeakClearance = Mathf.Max(PeakClearance, Clearance);
             Tick++;
@@ -376,8 +421,9 @@ namespace DreamMachine.UnityBridge
         }
 
         float WeightReference => _researchObject ? Mathf.Max(.10f, _measuredWeight) : MassKg * -Physics.gravity.y;
-        bool AtDestination => Mathf.Abs(SupportPoint.x - PlacementX) <= PlacementTolerance &&
-            Mathf.Abs(SupportPoint.z) <= PlacementHalfDepth;
+        bool AtDestination => Mathf.Abs(SupportPoint.x - _radialGoal) <= PlacementTolerance * _scale &&
+            Mathf.Abs(SupportPoint.z - _depthGoal) <= PlacementHalfDepth * _scale &&
+            (!_household.HasValue || (_household.Value.Target.y > 0f ? _shelfImpulse > 0f : _shelfImpulse == 0f));
 
         void Advance(int elapsed)
         {
@@ -387,7 +433,7 @@ namespace DreamMachine.UnityBridge
                     if (elapsed >= 18) Enter(GripPhase.Approach);
                     break;
                 case GripPhase.Approach:
-                    if (Mathf.Abs(_carriage.position.z - ReachZ) < .004f || elapsed >= 36) Enter(GripPhase.Close);
+                    if (Mathf.Abs(_carriage.position.z - _reachZ) < .004f * _scale || elapsed >= 36) Enter(GripPhase.Close);
                     break;
                 case GripPhase.Close:
                     if (_exploration != null)
@@ -414,13 +460,13 @@ namespace DreamMachine.UnityBridge
                     if (elapsed >= 10) Enter(GripPhase.Close);
                     break;
                 case GripPhase.Lift:
-                    if (Clearance >= GripCalibration.LiftClearance && OpposingContact && _otherContacts == 0)
+                    if (Clearance >= GripCalibration.LiftClearance * _scale && OpposingContact && _otherContacts == 0)
                         Enter(GripPhase.Hold);
                     else if (_exploration?.Lower == true) EmergencyLower();
                     else if (elapsed >= 28) Enter(GripPhase.Lower);
                     break;
                 case GripPhase.Hold:
-                    HeldTicks = Clearance >= GripCalibration.LiftClearance && OpposingContact && _otherContacts == 0
+                    HeldTicks = Clearance >= GripCalibration.LiftClearance * _scale && OpposingContact && _otherContacts == 0
                         ? HeldTicks + 1 : 0;
                     if (HeldTicks >= GripCalibration.HoldTicks) { _held = true; Enter(_placement ? GripPhase.Transport : GripPhase.Lower); }
                     else if (_exploration?.Lower == true) EmergencyLower();
@@ -428,7 +474,8 @@ namespace DreamMachine.UnityBridge
                     break;
                 case GripPhase.Transport:
                     if (_exploration?.Lower == true) EmergencyLower();
-                    else if ((Mathf.Abs(_carriage.position.x - PlacementX) < .006f &&
+                    else if ((Mathf.Abs(_carriage.position.x - _radialGoal) < .006f * _scale &&
+                        (!_household.HasValue || Mathf.Abs(_carriage.position.z - (_reachZ + _depthGoal)) < .008f * _scale) &&
                         Mathf.Abs(_carriage.linearVelocity.x) < .035f) || elapsed >= 28) Enter(GripPhase.Lower);
                     break;
                 case GripPhase.Lower:
@@ -446,7 +493,9 @@ namespace DreamMachine.UnityBridge
                 case GripPhase.Release:
                     bool released = !OpposingContact && _last[0].NormalForce < GripCalibration.ContactForce &&
                         _last[1].NormalForce < GripCalibration.ContactForce && SupportForce >= .5f * WeightReference &&
-                        _object.linearVelocity.sqrMagnitude < .0025f && Clearance < .004f;
+                        _object.linearVelocity.sqrMagnitude < .0025f &&
+                        (_household.HasValue && _held ? Mathf.Abs(_object.position.y - Radius - _household.Value.Target.y) < .006f
+                            : Clearance < .004f);
                     if (_placement && _held)
                         released &= AtDestination && new Vector2(_object.position.x - _releaseOrigin.x,
                             _object.position.z - _releaseOrigin.z).sqrMagnitude < .000324f;
@@ -456,13 +505,31 @@ namespace DreamMachine.UnityBridge
                         Outcome = !_held ? "hold-gate-failed" : _placement && !ControlledPlacement ? "placement-gate-failed" :
                             _releaseTicks < 5 ? "release-gate-failed" :
                             PeakPenetration > GripCalibration.MaximumPenetration ? "penetration-gate-failed" :
-                            MaxJointTravel > GuideLimit + .002f ? "joint-gate-failed" : "physical-lift-hold-release";
+                            MaxJointTravel > GuideLimit * _scale + .002f ? "joint-gate-failed" : "physical-lift-hold-release";
+                        if (_household.HasValue)
+                        {
+                            _pendingOutcome = Outcome == "physical-lift-hold-release" ? "physical-lift-hold-place-release" : Outcome;
+                            Outcome = "waiting-for-rest";
+                            Enter(GripPhase.RestingObject);
+                            break;
+                        }
                         if (Outcome == "physical-lift-hold-release")
                         {
                             if (_placement) Outcome = "physical-lift-hold-place-release";
                             Enter(GripPhase.Complete);
                         }
                         else Enter(GripPhase.Failed);
+                    }
+                    break;
+                case GripPhase.RestingObject:
+                    bool still = SupportForce >= .5f * WeightReference && !OpposingContact && _otherContacts == 0 &&
+                        _object.linearVelocity.sqrMagnitude <= .000144f && _object.angularVelocity.sqrMagnitude <= .0225f;
+                    _restedTicks = still ? _restedTicks + 1 : 0;
+                    if (_restedTicks >= 8)
+                    {
+                        Outcome = _pendingOutcome;
+                        if (Outcome == "physical-lift-hold-place-release" && !AtDestination) Outcome = "settled-outside-destination";
+                        Enter(Outcome == "physical-lift-hold-place-release" ? GripPhase.Complete : GripPhase.Failed);
                     }
                     break;
             }
@@ -492,7 +559,7 @@ namespace DreamMachine.UnityBridge
             _palm.AddForceAtPosition(-force, finger.position);
         }
 
-        static void GuideFinger(Rigidbody digit, Rigidbody palm, Vector3 origin)
+        static void GuideFinger(Rigidbody digit, Rigidbody palm, Vector3 origin, float scale)
         {
             var joint = digit.gameObject.AddComponent<ConfigurableJoint>();
             joint.connectedBody = palm;
@@ -501,7 +568,7 @@ namespace DreamMachine.UnityBridge
             joint.xMotion = ConfigurableJointMotion.Limited;
             joint.yMotion = joint.zMotion = joint.angularXMotion = joint.angularYMotion =
                 joint.angularZMotion = ConfigurableJointMotion.Locked;
-            joint.linearLimit = new SoftJointLimit { limit = GuideLimit, contactDistance = .001f };
+            joint.linearLimit = new SoftJointLimit { limit = GuideLimit * scale, contactDistance = .001f };
         }
 
         static void TorquePair(Rigidbody child, Rigidbody parent, Vector3 torque)
@@ -534,9 +601,10 @@ namespace DreamMachine.UnityBridge
                         _reading[side].Add(normal, Vector3.ProjectOnPlane(cp.impulse, cp.normal).magnitude,
                             Vector3.ProjectOnPlane(velocity, cp.normal).magnitude, cp.position);
                     }
-                    else if (other == _table.GetInstanceID())
+                    else if (other == _table.GetInstanceID() || (_shelf != null && other == _shelf.GetInstanceID()))
                     {
                         _supportImpulse += normal;
+                        if (_shelf != null && other == _shelf.GetInstanceID()) _shelfImpulse += normal;
                         if (_placement) _supportMoment += cp.position * normal;
                     }
                     else _otherContacts++;

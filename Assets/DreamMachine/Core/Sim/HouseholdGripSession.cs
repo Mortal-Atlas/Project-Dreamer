@@ -116,7 +116,8 @@ namespace DreamMachine.Sim
         public bool EnterPhysicalPractice()
         {
             var arthur = Find(HouseholdGripSession.Arthur);
-            if (arthur == null || Home == null || !Home.CanReserveForPractice() || PhysicalPractice?.AttemptRunning == true) return false;
+            if (arthur == null || Home == null || Home.BallTransferRunning || !Home.CanReserveForPractice() ||
+                PhysicalPractice?.AttemptRunning == true) return false;
             if (PhysicalPractice?.Active == true) return true;
             PhysicalPractice ??= new HouseholdGripSession(arthur);
             PhysicalPractice.Active = true;

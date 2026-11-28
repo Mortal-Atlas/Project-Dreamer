@@ -135,12 +135,14 @@ namespace DreamMachine.Sim
                 Refill(4, 6);
                 Refill(5, 8);
             }
+            int ballActor = _ballIntent?.Actor ?? -1;
             for (int index = 0; index < _people.Length; index++)
             {
                 Person p = _people[index];
                 p.Thirst = Math.Min(1f, p.Thirst + .0005f);
                 p.Eating = false;
                 if (index == SearchActor && _world.PhysicalPractice?.Active == true) continue;
+                if (ballActor == index) continue;
                 if (night && p.Activity != HomeActivity.Sleep)
                 {
                     if (p.Activity == HomeActivity.FindToy) InterruptSearch(index, tick);
@@ -222,7 +224,7 @@ namespace DreamMachine.Sim
             foreach (var candidate in Play)
             {
                 int item = candidate.Item;
-                if (!Available(index, item) || (item == ToyBin && _items[2].Value == 0)) continue;
+                if (item == BallItem && BallManaged || !Available(index, item) || (item == ToyBin && _items[2].Value == 0)) continue;
                 Item target = _items[item];
                 int preference = (p.Spec.BirthSeed + 3 * item) & 7;
                 float novelty = p.Practice[item] == 0 ? .30f : 0f;
@@ -349,6 +351,7 @@ namespace DreamMachine.Sim
                 {
                     case HomeActivity.Inspect: break;
                     case HomeActivity.Roll:
+                        if (BallManaged) { success = false; break; }
                         target.V = target.X >= .54f ? -.68f : .68f; changed = true; break;
                     case HomeActivity.Stack:
                         target.Value = target.Value == 2 ? 0 : target.Value + 1; changed = true; break;

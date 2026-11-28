@@ -159,7 +159,10 @@ namespace DreamMachine.Sim
             if (child == null) return null;
             if (PhysicalPractice?.Active == true && PhysicalPractice.Individual == id)
                 throw new InvalidOperationException("Return the learner to Living before resetting.");
+            if (Home?.BallIntent is BallTransferIntent intent && Home.PersonId(intent.Actor) == id)
+                throw new InvalidOperationException("Finish the live ball transfer before resetting.");
             var practiceMemory = PhysicalPractice?.Individual == id ? child.State.Library : null;
+            var ballMemory = Home?.BallManaged == true ? child.State.Library : null;
             BindChildState(child, AgentPersistentState.CreateNew(child.Spec));
             if (practiceMemory != null)
                 foreach (var attempt in PhysicalPractice.Records)
@@ -167,6 +170,11 @@ namespace DreamMachine.Sim
                     var record = practiceMemory.GetOrNull(attempt.MemoryId);
                     child.State.Library.RecordExperience(record.Id, record.Statement, record.Appendices[0].Evidence, attempt.End);
                 }
+            if (ballMemory != null)
+                foreach (var record in ballMemory.All())
+                    if (record.Source == "firsthand-ball-transfer" || record.Source == "firsthand-ball-observation")
+                        child.State.Library.RecordExperience(record.Id, record.Statement, record.Appendices[0].Evidence,
+                            record.Appendices[0].Timestamp, record.Source);
             child.SawParentPour = false;
             Home?.ReplaceLearner(child);
             return child;

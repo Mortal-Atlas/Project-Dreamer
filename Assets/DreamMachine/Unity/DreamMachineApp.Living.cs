@@ -51,8 +51,14 @@ namespace DreamMachine.UnityBridge
             Piece(_livingItems[0], PrimitiveType.Cube, "Picture card", new Vector3(0, .045f, 0), new Vector3(.34f, .08f, .23f), "#EBCFA2");
             Piece(_livingItems[0], PrimitiveType.Cylinder, "Printed moon", new Vector3(-.07f, .086f, 0), new Vector3(.10f, .004f, .10f), "#2E535B");
             Piece(_livingItems[0], PrimitiveType.Cube, "Printed house", new Vector3(.07f, .086f, 0), new Vector3(.07f, .004f, .09f), "#C46C55");
-            Piece(_livingItems[1], PrimitiveType.Sphere, "Ball", new Vector3(0, .125f, 0), Vector3.one * .25f, "#E3A540");
-            Piece(_livingItems[1], PrimitiveType.Sphere, "Ball seam", new Vector3(0, .125f, 0), new Vector3(.253f, .05f, .253f), "#F4D09F");
+            Piece(_livingItems[HouseholdLife.BallItem], PrimitiveType.Sphere, "Ball", Vector3.zero,
+                Vector3.one * (2f * HouseholdLife.BallRadius), "#E3A540");
+            Piece(_livingItems[HouseholdLife.BallItem], PrimitiveType.Sphere, "Ball seam", Vector3.zero,
+                new Vector3(.253f, .05f, .253f), "#F4D09F");
+            _ballShelf = Piece(root, PrimitiveType.Cube, "Ball transfer table", Vector3.zero,
+                new Vector3(2f * HouseholdLife.BallShelfHalfWidth, HouseholdLife.BallShelfTop, 2f * HouseholdLife.BallShelfHalfDepth),
+                "#486E77");
+            _ballShelf.gameObject.SetActive(false);
             Piece(_livingItems[2], PrimitiveType.Cube, "Block base", new Vector3(0, .075f, 0), Vector3.one * .15f, "#B77443");
             _stackA = Piece(_livingItems[2], PrimitiveType.Cube, "Block A", Vector3.zero, Vector3.one * .14f, "#BD6151");
             _stackB = Piece(_livingItems[2], PrimitiveType.Cube, "Block B", Vector3.zero, Vector3.one * .135f, "#E6BB73");
@@ -181,8 +187,9 @@ namespace DreamMachine.UnityBridge
             for (int i = 0; i < _livingItems.Length; i++)
             {
                 var item = life.ReadItem(i);
-                _livingItems[i].position = new Vector3(item.X, 0f, item.Z);
+                _livingItems[i].position = new Vector3(item.X, i == HouseholdLife.BallItem ? HouseholdLife.BallRadius : 0f, item.Z);
             }
+            DrawBall();
             int stack = life.ReadItem(2).Value;
             float blend = 1f - Mathf.Exp(-9f * dt);
             _stackA.localPosition = Vector3.Lerp(_stackA.localPosition, stack > 0 ? new Vector3(0, .22f, 0) : new Vector3(.18f, .07f, 0), blend);
@@ -202,12 +209,14 @@ namespace DreamMachine.UnityBridge
             }
             _storedToys.gameObject.SetActive(life.ReadItem(HouseholdLife.ToyBin).Value > 0);
             DrawLivingSearch(life, blend);
+            int ballActor = life.BallIntent?.Actor ?? -1;
             for (int i = 0; i < _livingActors.Length; i++)
             {
                 if (_livingActors[i] == null) _livingActors[i] = _actors[life.PersonId(i)];
                 Actor actor = _livingActors[i];
                 var state = life.ReadPerson(i);
-                bool practicing = i == HouseholdLife.SearchActor && _sim.PhysicalPractice?.Active == true;
+                bool ballPractice = ballActor == i;
+                bool practicing = ballPractice || i == HouseholdLife.SearchActor && _sim.PhysicalPractice?.Active == true;
                 bool sleeping = !practicing && state.Activity == HomeActivity.Sleep && state.Phase == HomePhase.Act;
                 Vector3 previous = actor.Pos;
                 actor.Pos = new Vector3(state.X, 0f, state.Z);
@@ -235,6 +244,7 @@ namespace DreamMachine.UnityBridge
                     if (_sim.TickCount - last.Tick <= 20 && last.Evidence != HomeEvidence.Replay)
                         attention = _livingItems[last.Target].position + Vector3.up * .13f;
                 }
+                if (ballPractice) attention = _livingItems[HouseholdLife.BallItem].position;
                 bool acting = state.Phase == HomePhase.Act && state.Activity != HomeActivity.Sleep && state.Activity != HomeActivity.Rest &&
                     state.Activity != HomeActivity.Inspect;
                 bool seated = practicing || state.Activity == HomeActivity.Rest && state.Item >= 0 && moved < .002f;
@@ -256,7 +266,7 @@ namespace DreamMachine.UnityBridge
             {
                 case HomeActivity.Open:
                 case HomeActivity.Close: return _lidGrip.position;
-                case HomeActivity.Roll: return center + Vector3.up * .19f + (origin - center).normalized * .09f;
+                case HomeActivity.Roll: return center + Vector3.up * .065f + (origin - center).normalized * .09f;
                 case HomeActivity.Stack: return _stackA.position + Vector3.up * .071f;
                 case HomeActivity.Drink: return center + Vector3.up * .19f + (origin - center).normalized * .1f;
                 case HomeActivity.Eat: return _food.position + Vector3.up * .05f;

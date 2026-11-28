@@ -346,15 +346,16 @@ namespace DreamMachine.Libraries
             return record;
         }
 
-        internal void RecordExperience(string id, string statement, string evidence, int timestamp)
+        internal void RecordExperience(string id, string statement, string evidence, int timestamp,
+            string source = "firsthand-supported-grip")
         {
             var record = new BeliefRecord
             {
-                Id = id, Kind = "Experience", Statement = statement, Source = "firsthand-supported-grip"
+                Id = id, Kind = "Experience", Statement = statement, Source = source
             };
             record.Appendices.Add(new AppendixEntry
             {
-                Timestamp = timestamp, Evidence = evidence, NewStatement = statement, Reason = "firsthand-supported-grip"
+                Timestamp = timestamp, Evidence = evidence, NewStatement = statement, Reason = source
             });
             _beliefs.Add(id, record);
         }
