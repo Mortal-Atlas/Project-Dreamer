@@ -1,5 +1,7 @@
 # Requirements traceability
 
+The [M01-M46 workstream register](MASTER_WORKSTREAM_TRACEABILITY.md) tracks the November 27 consolidated PDF. This register retains the detailed archival numbered evidence.
+
 The source is the [consolidated specification](MASTER_IMPLEMENTATION_SPECIFICATION.md). The inventory covers master requirements 1–186 and original Phase II requirements A.1–A.69. Each source link opens the acceptance criteria in that section. Dependencies show the principal gates for each workstream. An earlier milestone may already supply experimental evidence for a later requirement.
 
 **Verified** means the complete, applicable requirement shown in the row was observed. **Partial** means an implementation, policy, or recorded audit covers some of its criteria. **Experimental** is evidence from a bounded pilot. **Blocked** records a specific dependency in the evidence register. **Not started** means this audit identified no implementation that satisfies the core requirement. A dash means evidence or cost has yet to be established. Measurements apply only to the configuration stated in the evidence.
@@ -435,6 +437,13 @@ The clock checkpoint extends K evidence for §§5–7, 116, 124, 133 and 169. Pa
 | H2 sections 4-8 and 19. Named individual, shared clock, physical practice, return | Household state with actual H1 native substeps and supported station | Verified for Arthur on the familiar sphere | Two slip failures, successful hold/release, fresh retained success, return to Living on his existing identity. [H2 validation](PHYSICAL_DEVELOPMENT_H2.md) |
 | Sections 12-18 and 21. Evidence, browser, playback and restart | Version 6 world envelope, content-addressed tapes, firsthand Library III records | Verified for settled boundary and minimal tray | Save and restore, immutable playback and observed contact values. Arbitrary mid-contact restore, pressure and full browser comparisons remain open. [H2 persistence](PHYSICAL_DEVELOPMENT_H2.md#durable-evidence-and-playback) |
 | Sections 9-11, 20, 22-30. Context, broader libraries and other embodiments | H1 baseline and newly verified H2 world boundary | Partial | H3 comparison, Library I and II indexing, Alice, garment corrections and composition still require independent work. [Continuation](CONTINUATION_CHECKPOINT.md) |
+
+## Phase H3 comparative adaptive grasping
+
+| Requirement | Implementation and dependency | Status | Evidence |
+| --- | --- | --- | --- |
+| H3 sections 4-7, 15-17 and M06/M12/M45 | Matched native object presets, bounded pad-sensed response and controlled trials | Verified in isolation | Fixed 6/10, trained scalar 4/10, online feedback 3/10. Fresh/reset ablation reproduced feedback exactly. [Protocol, failure modes and raw compact telemetry](PHYSICAL_HAND_H3.md) |
+| H3 sections 8-14 and M02/M09/M15-M18 | Native object setup and force interface with learner-bound H2 settled evidence | Partially implemented | Shared fixture contract and actual H2 records. Household transporting, chairs, collision/material fidelity, Alice, generalized library indexing and creative tools remain dependent. [M01-M46 register](MASTER_WORKSTREAM_TRACEABILITY.md) |
 
 ## Physical development and motor vocabulary addendum
 

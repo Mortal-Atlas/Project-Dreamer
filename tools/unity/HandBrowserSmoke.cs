@@ -47,12 +47,15 @@ internal static class HandBrowserSmoke
         try
         {
             void Click(string text) => Object.FindObjectsByType<Button>(FindObjectsSortMode.None).Single(b => b.name == text).onClick.Invoke();
+            int holdTick = -1;
             void StepToEnd()
             {
                 for (int i = 0; i < 120 && !Read<NativeHandLab>(view, "_lab").Terminal; i++)
                 {
                     Click("Step");
                     typeof(HandLabView).GetMethod("Update", Fields).Invoke(view, null);
+                    var hand = Read<NativeHandLab>(view, "_lab");
+                    if (hand.Phase == GripPhase.Hold && hand.HeldTicks == 6) holdTick = hand.Tick;
                 }
                 typeof(HandLabView).GetMethod("Refresh", Fields).Invoke(view, null);
             }
@@ -74,10 +77,21 @@ internal static class HandBrowserSmoke
             watch.Stop();
             int bytes = Marshal.SizeOf(typeof(HandLabView).GetNestedType("Frame", BindingFlags.NonPublic));
             Debug.Log(FormattableString.Invariant($"H1_BROWSER refresh_ms={watch.Elapsed.TotalMilliseconds/120:F4} marshalled_frame_bytes={bytes}"));
-            Capture(view);
+            Capture(view, "phase-h3-fixed-playback");
             Click("Later attempt");
             if (Read<NativeHandLab>(view, "_lab").Tick != liveTick) throw new InvalidOperationException("Playback modified physics.");
-            Debug.Log("H1_BROWSER two physical attempts, synchronized tick 50 hold, passive playback and controls passed");
+            Click("Feedback grip");
+            holdTick = -1;
+            StepToEnd();
+            var feedback = Read<NativeHandLab>(view, "_lab");
+            int feedbackEnd = feedback.Tick;
+            if (feedback.Phase != GripPhase.Complete || feedback.GripCorrections == 0 || holdTick < 0)
+                throw new InvalidOperationException("Live contact-gated correction did not produce a measured hold.");
+            slider.value = holdTick;
+            if (!details.text.Contains("Contact-gated feedback") || !details.text.Contains("Hold") || feedback.Tick != feedbackEnd)
+                throw new InvalidOperationException("Feedback replay lost evidence or modified physics.");
+            Capture(view, "phase-h3-feedback-playback");
+            Debug.Log($"H3_BROWSER fixed success, weak failure, feedback success, {feedback.GripCorrections} corrections, passive replay");
             EditorApplication.ExitPlaymode();
         }
         catch (Exception error) { Debug.LogException(error); EditorApplication.Exit(1); }
@@ -85,7 +99,7 @@ internal static class HandBrowserSmoke
 
     static T Read<T>(HandLabView view, string field) => (T)typeof(HandLabView).GetField(field, Fields).GetValue(view);
 
-    static void Capture(HandLabView view)
+    static void Capture(HandLabView view, string name)
     {
         var camera = view.GetComponentInChildren<Camera>();
         var target = new RenderTexture(1280, 720, 24);
@@ -107,7 +121,7 @@ internal static class HandBrowserSmoke
             RenderTexture.active = target;
             texture.ReadPixels(new Rect(0, 0, 1280, 720), 0, 0);
             texture.Apply();
-            File.WriteAllBytes(Path.Combine(Application.persistentDataPath, "phase-h1-motor-browser.png"), texture.EncodeToPNG());
+            File.WriteAllBytes(Path.Combine(Application.persistentDataPath, name + ".png"), texture.EncodeToPNG());
         }
         finally
         {

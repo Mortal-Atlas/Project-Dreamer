@@ -28,11 +28,15 @@ namespace DreamMachine.UnityBridge
         struct Frame
         {
             public GripFrame Reading;
+            public float Cap;
+            public int Corrections;
             public Pose Palm, LeftShaft, LeftPad, RightShaft, RightPad, Object;
 
             public Frame(NativeHandLab lab)
             {
                 Reading = lab.ReadFrame();
+                Cap = lab.EffectiveGripCap;
+                Corrections = lab.GripCorrections;
                 Palm = PoseOf(lab, 1); LeftShaft = PoseOf(lab, 2); LeftPad = PoseOf(lab, 3);
                 RightShaft = PoseOf(lab, 4); RightPad = PoseOf(lab, 5); Object = PoseOf(lab, 6);
             }
@@ -47,9 +51,10 @@ namespace DreamMachine.UnityBridge
         {
             public readonly int Id;
             public readonly float Cap;
+            public readonly bool Feedback;
             public readonly List<Frame> Frames = new List<Frame>(96);
             public string Outcome = "in progress";
-            public Attempt(int id, float cap) { Id = id; Cap = cap; }
+            public Attempt(int id, float cap, bool feedback) { Id = id; Cap = cap; Feedback = feedback; }
         }
 
         void Start()
@@ -78,12 +83,14 @@ namespace DreamMachine.UnityBridge
             _workspace.RestoreVisibility();
         }
 
-        void Begin(float cap)
+        void Begin(float cap, bool feedback = false)
         {
             if (_live != null) Finish("interrupted by researcher");
             _lab?.Dispose();
-            _lab = new NativeHandLab(37, .080f, .028f, .75f, cap);
-            _live = new Attempt(++_nextId, cap);
+            const float radius = .028f;
+            var sphere = new HandObjectSetup(HandObjectShape.Sphere, Vector3.one * (2f * radius));
+            _lab = new NativeHandLab(37, .080f, radius, .75f, cap, objectSetup: sphere, contactGated: feedback);
+            _live = new Attempt(++_nextId, cap, feedback);
             _selected = -1;
             _clock.Paused = true;
             _clock.TakeSingleStep();
@@ -178,7 +185,7 @@ namespace DreamMachine.UnityBridge
         {
             _details = new GameObject("Evidence", typeof(RectTransform), typeof(Text)).GetComponent<Text>();
             _details.transform.SetParent(parent, false);
-            Position(_details.rectTransform, .06f, .37f, .94f, .96f);
+            Position(_details.rectTransform, .06f, .47f, .94f, .96f);
             _details.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             _details.fontSize = 18;
             _details.resizeTextForBestFit = true;
@@ -194,27 +201,30 @@ namespace DreamMachine.UnityBridge
                 Draw(VisibleFrame());
                 Refresh();
             });
-            Button(parent, "Standard grip", 0, 1, () => Begin(3.2f));
-            Button(parent, "Low grip", 1, 1, () => Begin(.18f));
-            Button(parent, "Run / pause", 2, 1, () => { if (_selected < 0) _clock.Paused = !_clock.Paused; });
+            Button(parent, "Standard grip", 0, 2, () => Begin(3.2f));
+            Button(parent, "Low grip", 1, 2, () => Begin(.18f));
+            Button(parent, "Feedback grip", 2, 2, () => Begin(.18f, feedback: true));
+            Button(parent, "Run / pause", 0, 1, () => { if (_selected < 0) _clock.Paused = !_clock.Paused; });
+            Button(parent, "Step", 1, 1, () => { if (_selected < 0) _clock.RequestSingleStep(); });
             Button(parent, "Earlier attempt", 0, 0, () => Select(-1));
             Button(parent, "Later attempt", 1, 0, () => Select(1));
-            Button(parent, "Step", 2, 0, () => { if (_selected < 0) _clock.RequestSingleStep(); });
         }
 
         void Refresh()
         {
             if (_details == null) return;
             var attempt = _selected >= 0 ? _attempts[_selected] : _live;
-            var f = VisibleFrame().Reading;
-            _details.text = $"Attempt {attempt.Id}  |  Engineered reference\n" +
+            var frame = VisibleFrame();
+            var f = frame.Reading;
+            string policy = attempt.Feedback ? "Contact-gated feedback" : attempt.Cap < 1f ? "Low-force control" : "Fixed reference";
+            _details.text = $"Attempt {attempt.Id}  |  {policy}\n" +
                 $"Individual  |  Unbound research fixture\n" +
                 $"Opposed grip  |  {f.Phase}  |  tick {f.Tick}  |  {attempt.Outcome}\n" +
-                $"Pad force {f.Left.NormalForce:F2} / {f.Right.NormalForce:F2} N  |  cap {attempt.Cap:F2} N\n" +
+                $"Pad force {f.Left.NormalForce:F2} / {f.Right.NormalForce:F2} N  |  cap {attempt.Cap:F2} to {frame.Cap:F2} N\n" +
                 $"Guide {1000f * f.LeftTravel:F1} / {1000f * f.RightTravel:F1} mm  |  target {1000f * f.TravelTarget:F1} mm\n" +
                 $"Command {f.LeftClosingForce:F2} / {f.RightClosingForce:F2} N  |  slip {(f.Left.Slip || f.Right.Slip ? "observed" : "clear")}\n" +
                 $"Lift {1000f * f.Clearance:F1} mm  |  held {f.HeldTicks * WorldSimulation.Dt:F2} s\n" +
-                "Adaptation, retention and transfer  |  No records in this tray";
+                $"Within-attempt corrections {frame.Corrections}  |  Research playback";
             _scrubber.interactable = _selected >= 0;
             _scrubber.maxValue = attempt.Frames.Count - 1;
             _scrubber.SetValueWithoutNotify(_selected < 0 ? attempt.Frames.Count - 1 : _cursor);
@@ -224,7 +234,7 @@ namespace DreamMachine.UnityBridge
         {
             var root = new GameObject("Attempt playback", typeof(RectTransform), typeof(Image), typeof(Slider));
             root.transform.SetParent(parent, false);
-            Position((RectTransform)root.transform, .06f, .28f, .94f, .32f);
+            Position((RectTransform)root.transform, .06f, .39f, .94f, .43f);
             root.GetComponent<Image>().color = new Color(.22f,.29f,.37f);
             var slider = root.GetComponent<Slider>();
             var handle = new GameObject("Tick", typeof(RectTransform), typeof(Image));
