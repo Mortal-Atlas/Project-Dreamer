@@ -3,6 +3,7 @@ param(
     [Parameter(Mandatory)][string]$ProjectPath,
     [Parameter(Mandatory)][ValidateSet('Development', 'HeldOut', 'Supplement')][string]$Phase,
     [Parameter(Mandatory)][string]$LogFile,
+    [ValidateSet('Visual', 'Seated')][string]$Study = 'Visual',
     [string]$Unity = 'C:\Program Files\Unity\Hub\Editor\6000.3.19f1\Editor\Unity.exe'
 )
 
@@ -18,6 +19,7 @@ $scope = @('Assets/DreamMachine', 'Assets/Settings', 'Assets/Scenes/DreamMachine
     'ProjectSettings/DynamicsManager.asset', 'ProjectSettings/TimeManager.asset', 'ProjectSettings/TagManager.asset',
     'ProjectSettings/QualitySettings.asset', 'ProjectSettings/GraphicsSettings.asset', 'ProjectSettings/ProjectVersion.txt',
     'Packages/manifest.json', 'Packages/packages-lock.json', 'tools/unity/VisualPlacementStudy.cs')
+if ($Study -eq 'Seated') { $scope += @('tools/unity/SeatedPlacementStudy.cs', 'tools/unity/Run-VisualPlacementAudit.ps1') }
 if ($Phase -ne 'Development' -and (git -C $source status --porcelain -- $scope)) {
     throw 'Commit the controller, configuration and study before running a scored cohort.'
 }
@@ -29,7 +31,7 @@ $lines = [System.Collections.Generic.List[string]]::new()
 $lines.Add('# Git ' + (git -C $source rev-parse HEAD))
 $lines.Add('# Phase ' + $Phase)
 foreach ($relative in $files) {
-    $destination = if ($relative -eq 'tools/unity/VisualPlacementStudy.cs') { 'Assets/Editor/VisualPlacementStudy.cs' } else { $relative }
+    $destination = if ($relative -like 'tools/unity/*.cs') { 'Assets/Editor/' + (Split-Path $relative -Leaf) } else { $relative }
     $from = Join-Path $source $relative
     $to = Join-Path $scratch $destination
     $expected = (Get-FileHash -LiteralPath $from -Algorithm SHA256).Hash
@@ -44,8 +46,9 @@ $lines.Add("$((Get-FileHash -LiteralPath (Join-Path $scratch $product) -Algorith
 [System.IO.File]::WriteAllLines($manifest, $lines)
 $env:DREAMER_H8_SOURCE_MANIFEST = $manifest
 $entry = if ($Phase -eq 'Development') { 'Develop' } else { $Phase }
+$method = if ($Study -eq 'Visual') { "VisualPlacementStudy.$entry" } else { "SeatedPlacementStudy.$entry" }
 try {
-    $process = Start-Process -FilePath $Unity -ArgumentList "-batchmode -force-d3d12 -projectPath `"$scratch`" -executeMethod VisualPlacementStudy.$entry -logFile `"$LogFile`"" -WindowStyle Hidden -PassThru
+    $process = Start-Process -FilePath $Unity -ArgumentList "-batchmode -force-d3d12 -projectPath `"$scratch`" -executeMethod $method -logFile `"$LogFile`"" -WindowStyle Hidden -PassThru
     $process.WaitForExit()
     if ($process.ExitCode -ne 0) { throw "Unity exited with code $($process.ExitCode). See $LogFile" }
     Write-Output "Verified audit $Phase finished. Manifest $manifest"

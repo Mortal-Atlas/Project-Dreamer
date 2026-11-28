@@ -6,7 +6,26 @@ using DreamMachine.Body;
 
 namespace DreamMachine.Sim
 {
-    public enum HouseholdGripPolicy : byte { Fixed, Light, Feedback, Articulated, CoordinatedPlacement, VisualCoordination }
+    public enum HouseholdGripPolicy : byte
+    {
+        Fixed, Light, Feedback, Articulated, CoordinatedPlacement, VisualCoordination,
+        H9Rigid, H9Passive, H9Reactive, H9Anticipatory
+    }
+
+    public static class HouseholdBallControl
+    {
+        public static SeatedSupportMode? SeatedMode(HouseholdGripPolicy policy) => policy switch
+        {
+            HouseholdGripPolicy.H9Rigid => SeatedSupportMode.Rigid,
+            HouseholdGripPolicy.H9Passive => SeatedSupportMode.Passive,
+            HouseholdGripPolicy.H9Reactive => SeatedSupportMode.Reactive,
+            HouseholdGripPolicy.H9Anticipatory => SeatedSupportMode.Anticipatory,
+            _ => null
+        };
+
+        public static bool UsesDepth(HouseholdGripPolicy policy) =>
+            policy == HouseholdGripPolicy.VisualCoordination || SeatedMode(policy).HasValue;
+    }
 
     public readonly struct HouseholdBallPose
     {
@@ -182,7 +201,7 @@ namespace DreamMachine.Sim
             var p = _people[intent.Actor];
             string memory = BallTransferMemoryId(_ballRecords.Count + 1);
             if (p.Child.State.Library.GetOrNull(memory) != null) throw new InvalidDataException("Duplicate ball transfer evidence.");
-            bool visual = intent.Policy == HouseholdGripPolicy.VisualCoordination;
+            bool visual = HouseholdBallControl.UsesDepth(intent.Policy);
             var sample = finalVision.GetValueOrDefault();
             bool measured = finalVision.HasValue && sample.Source == VisualEstimateSource.GeometryObservation &&
                 sample.ObservationTick >= 0 && sample.ObservationTick <= _world.TickCount - intent.Start &&

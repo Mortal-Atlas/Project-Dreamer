@@ -52,7 +52,10 @@ namespace DreamMachine.UnityBridge
         Quaternion _upperTarget, _forearmTarget, _wristTarget;
         float _previousContact;
         bool _touch, _obstacleTouch, _upperDistalTouch, _corrected;
-        public Vector3 Shoulder { get; }
+        static readonly Vector3 InitialShoulder = new Vector3(.104f, .462f, -.615f);
+        static readonly Vector3 TorsoOffset = new Vector3(-.155f, -.129f, -.047f);
+        public Vector3 Shoulder => Seated == null ? InitialShoulder : _torso.position - _torso.rotation * TorsoOffset;
+        public NativeSeatedSupport Seated { get; }
         public Vector3 Target { get; private set; }
         public Vector3 ProposedElbow { get; private set; }
         public bool WithinEnvelope { get; private set; }
@@ -77,20 +80,20 @@ namespace DreamMachine.UnityBridge
         bool _upperTouch, _forearmTouch, _handTouch;
 
         public NativeArticulatedArm(ArmBenchSetup settings, int seed, Vector3 start, Func<string, Vector3, float, Rigidbody> body,
-            PhysicsMaterial material, bool contactResponse = true)
+            PhysicsMaterial material, bool contactResponse = true, SeatedBenchSetup? seated = null)
         {
             // A documented uniform enlargement fits the existing 250 mm ball bench.
             var anatomy = new HumanoidAnatomy(seed).AtAge(settings.DevelopmentDays);
             _length = anatomy.UpperArm * 1.43f; _forearmLength = anatomy.Forearm * 1.43f;
-            Shoulder = new Vector3(.104f, .462f, -.615f);
             _yaw = settings.WristYaw;
             _initialPole = settings.HighElbow ? new Vector3(.70f, 1f, .08f) : new Vector3(1f, -.45f, -.10f);
             _contactResponse = contactResponse;
-            _torso = body(TorsoName, Shoulder + new Vector3(-.155f, -.129f, -.047f), 4f);
+            _torso = body(TorsoName, InitialShoulder + TorsoOffset, 4f);
             _torso.isKinematic = true;
             _torsoShape = _torso.gameObject.AddComponent<BoxCollider>();
             _torsoShape.size = new Vector3(.228f, .319f, .150f);
             Configure(_torsoShape, material);
+            if (seated.HasValue) Seated = new NativeSeatedSupport(seated.Value, anatomy, _torso, body, material);
             Target = start;
             var wrist = BuildCandidate(start, _initialPole);
             _upper = body(UpperName, Shoulder, .43f * _length / .32f);
@@ -122,15 +125,18 @@ namespace DreamMachine.UnityBridge
         }
         public bool IsMonitoredContact(int a, int b) =>
             a == _torsoId || b == _torsoId || a == _upperId || b == _upperId ||
+            (Seated != null && (Seated.Monitors(a) || Seated.Monitors(b))) ||
             (_obstacleId != 0 && (a == _obstacleId || b == _obstacleId));
 
         (Vector3 Elbow, Vector3 Wrist) BuildCandidate(Vector3 wrist, Vector3 pole)
         {
-            var p = SupportedArmReach.Propose(N(Shoulder), N(wrist), N(pole), _length, _forearmLength);
+            if (Seated != null) pole = _torso.rotation * pole;
+            var shoulder = Shoulder;
+            var p = SupportedArmReach.Propose(N(shoulder), N(wrist), N(pole), _length, _forearmLength);
             var elbow = U(p.Elbow);
             ProposedElbow = elbow;
             var endpoint = U(p.Wrist);
-            var upper = (elbow - Shoulder).normalized;
+            var upper = (elbow - shoulder).normalized;
             var lower = (endpoint - elbow).normalized;
             var normal = Vector3.Cross(upper, lower).normalized;
             _upperTarget = Quaternion.LookRotation(upper, Vector3.Cross(upper, normal));
@@ -190,6 +196,11 @@ namespace DreamMachine.UnityBridge
         public void ObserveContact(int first, int second, float impulse)
         {
             if (impulse <= 1e-6f) return;
+            if (Seated != null)
+            {
+                int armPiece = Seated.Monitors(first) ? second : Seated.Monitors(second) ? first : 0;
+                if (armPiece != 0) Seated.Contact(first, second, impulse, PhysicalCollider(armPiece));
+            }
             int otherUpper = first == _upperId ? second : second == _upperId ? first : 0;
             if (otherUpper != 0) _upperDistalTouch |= IsDistal(otherUpper);
             int obstructionContact = first == _obstacleId ? second : second == _obstacleId ? first : 0;
@@ -202,6 +213,15 @@ namespace DreamMachine.UnityBridge
             _upperTouch |= upper; _forearmTouch |= forearm; _handTouch |= hand;
             _touch = true;
             TorsoImpulse += impulse;
+        }
+
+        Collider PhysicalCollider(int id)
+        {
+            if (id == _torsoId) return _torsoShape;
+            if (id == _upperId) return _upperShape;
+            if (id == _forearmId) return _forearmShape;
+            foreach (var piece in _distal) if (piece.GetInstanceID() == id) return piece;
+            return null;
         }
 
         bool IsDistal(int id)

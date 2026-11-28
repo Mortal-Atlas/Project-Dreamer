@@ -20,18 +20,34 @@ internal static class HouseholdArmSmoke
     const string Key = "Dreamer.H6.Household";
     const BindingFlags Private = BindingFlags.NonPublic | BindingFlags.Instance;
     static string Primary => Path.Combine(Application.persistentDataPath, "world.checkpoint");
-    static bool Visual(string mode) => mode.StartsWith("h8-", StringComparison.Ordinal);
+    static bool Seated(string mode) => mode.StartsWith("h9-", StringComparison.Ordinal);
+    static bool Visual(string mode) => Seated(mode) || mode.StartsWith("h8-", StringComparison.Ordinal);
     static bool Coordinated(string mode) => Visual(mode) || mode.StartsWith("h7-", StringComparison.Ordinal);
-    static string Fixture(string mode) => Visual(mode) ? "phase-h8" : Coordinated(mode) ? "phase-h7" : "phase-h6";
+    static string Fixture(string mode) => Seated(mode) ? "phase-h9" : Visual(mode) ? "phase-h8" : Coordinated(mode) ? "phase-h7" : "phase-h6";
     static string Prefix(string mode) => Fixture(mode) + "-household-";
     static string Action(string mode) => Coordinated(mode) ? mode.Substring(3) : mode;
     static string Archive(string mode) => Path.Combine(Application.persistentDataPath, Prefix(mode) + Action(mode) + ".checkpoint");
-    static string RunMode(string mode) => Visual(mode) ? "h8-run" : Coordinated(mode) ? "h7-run" : "run";
+    static string RunMode(string mode) => Seated(mode) ? "h9-run" : Visual(mode) ? "h8-run" : Coordinated(mode) ? "h7-run" : "run";
     static string Trace(string mode) => Path.Combine(Application.persistentDataPath, Prefix(mode) + Action(mode) + "-trace.csv");
     static bool Restoring(string mode) => Action(mode).EndsWith("restart", StringComparison.Ordinal);
-    static string RestoreSource(string mode) => Action(mode) == "return-restart" ? (Visual(mode) ? "h8-return" : "h7-return") : RunMode(mode);
-    static HouseholdGripPolicy Policy(string mode) => Visual(mode) ? HouseholdGripPolicy.VisualCoordination :
+    static string RestoreSource(string mode) => Action(mode) == "return-restart" ? RunMode(mode).Replace("run", "return") : RunMode(mode);
+    static HouseholdGripPolicy Policy(string mode) => Seated(mode) ? Action(mode) switch
+    {
+        "rigid" => HouseholdGripPolicy.H9Rigid,
+        "passive" => HouseholdGripPolicy.H9Passive,
+        _ => HouseholdGripPolicy.H9Reactive
+    } : Visual(mode) ? HouseholdGripPolicy.VisualCoordination :
         Coordinated(mode) ? HouseholdGripPolicy.CoordinatedPlacement : HouseholdGripPolicy.Articulated;
+
+    static string PlacementButton(string mode) => Policy(mode) switch
+    {
+        HouseholdGripPolicy.H9Rigid => "H9 rigid torso",
+        HouseholdGripPolicy.H9Passive => "H9 compliant",
+        HouseholdGripPolicy.H9Reactive => "H9 reactive",
+        HouseholdGripPolicy.VisualCoordination => "Visual coordination",
+        HouseholdGripPolicy.CoordinatedPlacement => "Coordinated placement",
+        _ => "Articulated arm"
+    };
 
     static HouseholdArmSmoke()
     {
@@ -55,6 +71,14 @@ internal static class HouseholdArmSmoke
     public static void H8Restart() => Start("h8-restart");
     public static void H8Return() => Start("h8-return");
     public static void H8RestartReturn() => Start("h8-return-restart");
+    public static void H9Run() => Start("h9-run");
+    public static void H9ObserverClosed() => Start("h9-closed");
+    public static void H9Alice() => Start("h9-alice");
+    public static void H9Restart() => Start("h9-restart");
+    public static void H9Return() => Start("h9-return");
+    public static void H9RestartReturn() => Start("h9-return-restart");
+    public static void H9Rigid() => Start("h9-rigid");
+    public static void H9Passive() => Start("h9-passive");
 
     static void Start(string mode)
     {
@@ -130,10 +154,10 @@ internal static class HouseholdArmSmoke
             bool returning = Action(mode) == "return";
             int priorAttempts = home.BallTransferCount;
             if (Action(mode) == "alice" || returning) Click("Ball / switch learner");
-            Click(Visual(mode) ? "Visual coordination" : Coordinated(mode) ? "Coordinated placement" : "Articulated arm");
+            Click(PlacementButton(mode));
             var arm = Get<NativeHandLab>(app, "_practiceHand");
             if (arm == null || !arm.Articulated || arm.Coordinated != Coordinated(mode) || arm.VisualCoordination != Visual(mode) ||
-                !arm.FreeObject || !home.BallTransferRunning)
+                arm.Seated != Seated(mode) || !arm.FreeObject || !home.BallTransferRunning)
                 throw new InvalidOperationException("Expected the persistent free Ball and supported articulated chain.");
             var intent = home.BallIntent.Value;
             var otherSighting = home.ReadBallBelief(intent.Actor == 2 ? 3 : 2);
@@ -146,18 +170,21 @@ internal static class HouseholdArmSmoke
             arm.Profile = true;
             bool captured = false;
             float peakClearance = 0;
+            float peakTorso = 0f;
             using var trace = File.CreateText(Trace(mode));
             trace.WriteLine("learner,tick,phase,requested_wrist_m,proposed_elbow_m,actual_wrist_m,actual_elbow_m,ball_m,joint_degrees,joint_rad_s,actuator_torque_nm,torso_s,upper_to_hand_s,torso_depth_mm,left_n,right_n,support_n,clearance_m,corrections" +
                 (Coordinated(mode) ? ",tracking,estimated_ball_ms,steady_ticks,observation,drift_m" : "") +
-                (Visual(mode) ? ",hand_tick,ball_tick,hand_conf,ball_conf,correction_m" : ""));
+                (Visual(mode) ? ",hand_tick,ball_tick,hand_conf,ball_conf,correction_m" : "") +
+                (Seated(mode) ? ",torso_deg,head_m,eye_m,shoulder_m,anchor_n,seat_n,active_nm" : ""));
             long begin = Stopwatch.GetTimestamp();
             for (int i = 0; i < 700 && home.BallTransferRunning; i++)
             {
                 bool observeRelease = arm.Phase == GripPhase.Release && arm.PlacementTracked &&
                     arm.PlacementObservation != DreamMachine.Body.PlacementObservation.None;
-                if ((Coordinated(mode) ? observeRelease : arm.Phase == GripPhase.Hold) && !captured && Action(mode) == "run")
+                bool capture = Action(mode) == "run" || Action(mode) == "rigid" || Action(mode) == "passive";
+                if ((Coordinated(mode) ? observeRelease : arm.Phase == GripPhase.Hold) && !captured && capture)
                 {
-                    Capture(app, Prefix(mode) + (Coordinated(mode) ? "release" : "hold"));
+                    Capture(app, Prefix(mode) + (Action(mode) == "run" ? "" : Action(mode) + "-") + (Coordinated(mode) ? "release" : "hold"));
                     captured = true;
                 }
                 Step(app);
@@ -170,6 +197,13 @@ internal static class HouseholdArmSmoke
                 {
                     var eye = arm.VisualReading;
                     sample += FormattableString.Invariant($",{eye.Hand.ObservationTick},{eye.Ball.ObservationTick},{eye.Hand.Confidence:F4},{eye.Ball.Confidence:F4},{Vec(eye.Correction)}");
+                }
+                if (Seated(mode))
+                {
+                    var post = arm.ReadPosture();
+                    float tilt = Quaternion.Angle(Quaternion.identity, post.TorsoRotation);
+                    peakTorso = Mathf.Max(peakTorso, tilt);
+                    sample += FormattableString.Invariant($",{tilt:F4},{Vec(post.Head)},{Vec(post.Eye)},{Vec(post.Shoulder)},{Vec(post.SupportForce)},{post.SeatForce:F4},{Vec(post.Command)}");
                 }
                 trace.WriteLine(sample);
                 if (arm.Tick != world.TickCount - intent.Start) throw new InvalidOperationException("Clock divergence.");
@@ -191,6 +225,8 @@ internal static class HouseholdArmSmoke
                 throw new InvalidOperationException("The coordinated placement or its firsthand tracking evidence was missing.");
             if (Visual(mode) && !home.ReadBallBelief(intent.Actor == 2 ? 3 : 2).Equals(otherSighting))
                 throw new InvalidOperationException("The attempt changed another learner's visual knowledge.");
+            if (Seated(mode) && (Policy(mode) == HouseholdGripPolicy.H9Rigid ? peakTorso > .01f : peakTorso < 1f))
+                throw new InvalidOperationException("The seated torso did not have the selected physical freedom.");
             VerifyReplay(app, world, mode, Action(mode) == "run");
             byte[] checkpoint = world.CaptureCheckpoint();
             trace.Dispose();
@@ -205,7 +241,7 @@ internal static class HouseholdArmSmoke
             var final = arm.ReadArm();
             double scale = 1000d / Stopwatch.Frequency / arm.Tick;
             int tape = (int)new FileInfo(Path.Combine(Application.persistentDataPath, "motor-trajectories", record.Tape + ".h5")).Length;
-            Debug.Log(FormattableString.Invariant($"{Fixture(mode)}_HOUSE mode={mode} actor={actor} seed={owner.Spec.BirthSeed} tick={world.TickCount} outcome={record.Outcome} clearance_mm={1000 * peakClearance:F2} work_j={final.UpperWork+final.ElbowWork+final.WristWork:F4} torso_s={final.TorsoSeconds:F3} self_s={final.UpperDistalSeconds:F3} cpu_ms={ms:F3} physics_ms={arm.PhysicsCpuTicks*scale:F3} command_ms={arm.CommandCpuTicks*scale:F3} tracking_ms={arm.TrackingCpuTicks*scale:F3} visual_ms={arm.VisualCpuTicks*scale:F3} fusion_ms={arm.FusionCpuTicks*scale:F3} bytes={checkpoint.Length} tape={tape} hash={Digest(checkpoint)}"));
+            Debug.Log(FormattableString.Invariant($"{Fixture(mode)}_HOUSE mode={mode} actor={actor} seed={owner.Spec.BirthSeed} tick={world.TickCount} outcome={record.Outcome} clearance_mm={1000 * peakClearance:F2} work_j={final.UpperWork+final.ElbowWork+final.WristWork:F4} torso_s={final.TorsoSeconds:F3} self_s={final.UpperDistalSeconds:F3} peak_torso_deg={peakTorso:F3} cpu_ms={ms:F3} physics_ms={arm.PhysicsCpuTicks*scale:F3} command_ms={arm.CommandCpuTicks*scale:F3} posture_ms={arm.PostureCpuTicks*scale:F3} tracking_ms={arm.TrackingCpuTicks*scale:F3} visual_ms={arm.VisualCpuTicks*scale:F3} fusion_ms={arm.FusionCpuTicks*scale:F3} bytes={checkpoint.Length} tape={tape} hash={Digest(checkpoint)}"));
             EditorApplication.ExitPlaymode();
         }
         catch (Exception error) { Debug.LogException(error); EditorApplication.Exit(1); }
@@ -231,6 +267,11 @@ internal static class HouseholdArmSmoke
             if (frame.GetType().GetField("Vision")?.GetValue(frame) is not VisualPlacementReading reading ||
                 reading.Ball.ObservationTick < 0)
                 throw new InvalidOperationException("Recorded vision or its capture timestamp was missing.");
+            if (Seated(mode) &&
+                (frame.GetType().GetField("Posture")?.GetValue(frame) is not PostureReading body ||
+                 !Get<Transform[]>(app, "_postureParts").All(x => x.gameObject.activeSelf) ||
+                 Vector3.Distance(Get<Transform[]>(app, "_postureParts")[1].localPosition, body.Head) > .0001f))
+                throw new InvalidOperationException("Recorded head and pelvis could not be reconstructed.");
         }
         if (capture) Capture(app, Prefix(mode) + "replay");
         Click("Live view");

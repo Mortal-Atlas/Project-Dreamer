@@ -18,13 +18,15 @@ namespace DreamMachine.Tests
 
         static readonly string Trace = new string('a', 64);
 
-        [TestCase(VisualEstimateSource.Predicted, false)]
-        [TestCase(VisualEstimateSource.GeometryObservation, true)]
-        public void VisualTransferCommitsPhysicsAndOnlyTheActorsMeasuredSighting(VisualEstimateSource source, bool seen)
+        [TestCase(HouseholdGripPolicy.VisualCoordination, VisualEstimateSource.Predicted, false)]
+        [TestCase(HouseholdGripPolicy.VisualCoordination, VisualEstimateSource.GeometryObservation, true)]
+        [TestCase(HouseholdGripPolicy.H9Passive, VisualEstimateSource.Predicted, false)]
+        [TestCase(HouseholdGripPolicy.H9Reactive, VisualEstimateSource.GeometryObservation, true)]
+        public void VisualTransferCommitsPhysicsAndOnlyTheActorsMeasuredSighting(HouseholdGripPolicy policy, VisualEstimateSource source, bool seen)
         {
             var world = Create();
             var home = world.Home;
-            Assert.That(home.StartBallTransfer(2, HouseholdGripPolicy.VisualCoordination), Is.True);
+            Assert.That(home.StartBallTransfer(2, policy), Is.True);
             var intent = home.BallIntent.Value;
             var lastSeen = home.ReadBallBelief(2).LastSeen;
             world.Tick();

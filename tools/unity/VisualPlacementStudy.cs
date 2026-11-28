@@ -89,7 +89,7 @@ internal static class VisualPlacementStudy
         EditorApplication.EnterPlaymode();
     }
 
-    static void VerifySources(string cohort)
+    internal static void VerifySources(string cohort)
     {
         string manifest = Environment.GetEnvironmentVariable("DREAMER_H8_SOURCE_MANIFEST");
         if (string.IsNullOrWhiteSpace(manifest))

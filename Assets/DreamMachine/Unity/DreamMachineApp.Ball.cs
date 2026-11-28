@@ -13,7 +13,7 @@ namespace DreamMachine.UnityBridge
         int _ballActor = HouseholdLife.SearchActor;
         Vector3 _ballOrigin;
         Transform _ballShelf, _ballTargetMarker;
-        GameObject _sphereActions, _ballActions;
+        GameObject _sphereActions, _ballActions, _seatedActions;
 
         void OpenBallTab()
         {
@@ -38,6 +38,8 @@ namespace DreamMachine.UnityBridge
             }
             if (_sphereActions != null) _sphereActions.SetActive(!ball);
             if (_ballActions != null) _ballActions.SetActive(ball);
+            if (_seatedActions != null) _seatedActions.SetActive(ball);
+            if (_practiceText != null) _practiceText.rectTransform.anchorMin = new Vector2(.055f, ball ? .49f : .40f);
             RefreshPractice();
         }
 
@@ -69,7 +71,8 @@ namespace DreamMachine.UnityBridge
                 new Vector3(home.BallBenchX + HouseholdLife.BallShelfOffset, HouseholdLife.BallShelfTop, home.BallBenchZ) - _ballOrigin,
                 intent.TargetTop == 0f ? HouseholdLife.BallShelfTop : 0f);
             int seed = _sim.Find(home.PersonId(intent.Actor)).Spec.BirthSeed;
-            bool visual = policy == HouseholdGripPolicy.VisualCoordination;
+            var seated = HouseholdBallControl.SeatedMode(policy);
+            bool visual = HouseholdBallControl.UsesDepth(policy);
             bool coordinated = visual || policy == HouseholdGripPolicy.CoordinatedPlacement;
             bool articulated = coordinated || policy == HouseholdGripPolicy.Articulated;
             _practiceHand = new NativeHandLab(seed, HouseholdLife.BallMass, HouseholdLife.BallRadius, HouseholdLife.BallFriction,
@@ -77,7 +80,8 @@ namespace DreamMachine.UnityBridge
                     ? GripAcquisition.ReferenceCap : GripAcquisition.InitialCap, placement: true,
                 exploration: policy == HouseholdGripPolicy.Feedback ? GraspExploration.ForceOnly : GraspExploration.Off, household: setup,
                 articulated: articulated ? new ArmBenchSetup(true) : null, coordinated: coordinated,
-                visual: visual ? new VisualBenchSetup(VisualFeedback.Fused) : null);
+                visual: visual ? new VisualBenchSetup(VisualFeedback.Fused) : null,
+                seated: seated.HasValue ? new SeatedBenchSetup(seated.Value) : null);
             _practiceFrames.Add(new PracticeFrame(_practiceHand));
             _practiceStatus = "Researcher-assigned transfer. Use the Simulation controls to run or step.";
             DrawLiving(WorldSimulation.Dt);
@@ -205,6 +209,10 @@ namespace DreamMachine.UnityBridge
                 {
                     HouseholdGripPolicy.CoordinatedPlacement => "Coordinated placement",
                     HouseholdGripPolicy.VisualCoordination => "H8 visual coordination",
+                    HouseholdGripPolicy.H9Rigid => "H9 rigid torso",
+                    HouseholdGripPolicy.H9Passive => "H9 compliant torso",
+                    HouseholdGripPolicy.H9Reactive => "H9 reactive support",
+                    HouseholdGripPolicy.H9Anticipatory => "H9 anticipatory support",
                     _ => intention.Value.Policy.ToString()
                 };
                 _practiceText.text += $"Assigned destination  {intention.Value.TargetX:F2}, {intention.Value.TargetZ:F2}  |  {policy}\n";
@@ -216,7 +224,9 @@ namespace DreamMachine.UnityBridge
             if (pose?.Arm != null && !pose.Vision.HasValue)
                 _practiceText.text += $"Elbow {pose.Arm.Joints.y:F0}°  |  wrist error {Vector3.Distance(pose.Arm.Target, pose.Positions[1]) * 1000f:F0} mm\n" +
                     $"Torso contact {pose.Arm.ContactSeconds:F2} s  |  depth {pose.Arm.Penetration * 1000f:F1} mm\n";
-            if (pose?.Vision is VisualPlacementReading visual)
+            if (pose?.Posture is PostureReading posture && pose.Vision.HasValue)
+                _practiceText.text += FormatPosture(posture, pose.Vision.Value);
+            else if (pose?.Vision is VisualPlacementReading visual)
                 _practiceText.text += FormatVisual(visual, pose);
             else if (pose?.Placement != null)
             {
@@ -250,6 +260,15 @@ namespace DreamMachine.UnityBridge
                 $"Ball velocity {v.Ball.Velocity.Length():F2} m/s\n" +
                 $"Prediction error {v.Ball.PredictionError * 1000f:F0} mm  |  correction tick {v.CorrectionTick}\n" +
                 $"Correction {v.Correction.magnitude * 1000f:F0} mm  |  drift {pose.Placement.Drift * 1000f:F0} mm\n";
+        }
+
+        static string FormatPosture(PostureReading post, VisualPlacementReading visual)
+        {
+            string support = post.Mode == SeatedSupportMode.Rigid ? "fixed anchor" : $"{post.SupportForce.magnitude:F0} N pelvis anchor";
+            return $"Torso {Quaternion.Angle(Quaternion.identity, post.TorsoRotation):F1}°  |  head {Quaternion.Angle(Quaternion.identity, post.HeadRotation):F1}°  |  {support}\n" +
+                $"Seat {post.SeatForce:F1} N  |  active torque {post.Command.magnitude:F2} N·m\n" +
+                $"Shoulder (bench m)  {post.Shoulder.x:F2}, {post.Shoulder.y:F2}, {post.Shoulder.z:F2}\n" +
+                $"{EstimateText("Hand", visual.Hand)}\n{EstimateText("Ball", visual.Ball)}\n";
         }
 
         static string EstimateText(string label, VisualPoseEstimate estimate)

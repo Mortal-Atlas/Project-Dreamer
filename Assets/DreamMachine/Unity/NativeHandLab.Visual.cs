@@ -49,6 +49,7 @@ namespace DreamMachine.UnityBridge
             var anatomy = new HumanoidAnatomy(Seed).AtAge(arm.DevelopmentDays);
             var eye = _arm.Shoulder + new Vector3(-.245f - anatomy.ShoulderWidth * .16f,
                 .23f + anatomy.Head * .8f, .09f);
+            if (Seated) eye = _arm.Seated.RestEye;
             _depthSensor = new BenchDepthSensor(_physics, _palmCollider, _objectCollider,
                 _household.Value.Target.y > 0f ? _shelf : _table, Radius, .012f * _scale, eye, setup.ViewYaw);
             _visible = false;
@@ -64,7 +65,8 @@ namespace DreamMachine.UnityBridge
             if (Tick % _visualSetup.Period == 0)
             {
                 long captureStart = Profile ? Stopwatch.GetTimestamp() : 0;
-                _depthInbox.Enqueue(_depthSensor.Capture(Tick, occlusion));
+                Pose? eye = Seated ? new Pose(_arm.Seated.Eye, _arm.Seated.EyeRotation) : null;
+                _depthInbox.Enqueue(_depthSensor.Capture(Tick, occlusion, eye));
                 if (Profile) VisualCpuTicks += Stopwatch.GetTimestamp() - captureStart;
             }
 

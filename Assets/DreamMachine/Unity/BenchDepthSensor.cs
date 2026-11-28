@@ -32,7 +32,7 @@ namespace DreamMachine.UnityBridge
         { Hand = hand; Ball = ball; Surface = surface; }
     }
 
-    // Fixed aperture and nearest depth. Target handles label hits only and never supply ray directions.
+    // Calibrated aperture and nearest depth. Target handles label hits only.
     internal sealed class BenchDepthSensor
     {
         const int Columns = 29, Rows = 23;
@@ -58,14 +58,17 @@ namespace DreamMachine.UnityBridge
                         (2f * row / (Rows - 1) - 1f) * height, 1f).normalized;
         }
 
-        public BenchDepthFrame Capture(int tick, BenchOcclusion occlusion)
+        public BenchDepthFrame Capture(int tick, BenchOcclusion occlusion, Pose? physicalEye = null)
         {
             var hand = new DepthAccumulator();
             var ball = new DepthAccumulator();
             var surface = new DepthAccumulator();
+            var origin = physicalEye?.position ?? _eye;
+            var inverse = physicalEye.HasValue ? Quaternion.Inverse(physicalEye.Value.rotation) : Quaternion.identity;
             for (int i = 0; i < _rays.Length; i++)
             {
-                if (!_physics.Raycast(_eye, _rays[i], out RaycastHit hit, Range,
+                var direction = physicalEye.HasValue ? physicalEye.Value.rotation * _rays[i] : _rays[i];
+                if (!_physics.Raycast(origin, direction, out RaycastHit hit, Range,
                     Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)) continue;
                 bool alternate = ((i + i / Columns) & 1) == 0;
                 if (hit.collider == _ball && occlusion != BenchOcclusion.Ball && occlusion != BenchOcclusion.Both &&
@@ -77,7 +80,8 @@ namespace DreamMachine.UnityBridge
                 else if (hit.collider == _surface && occlusion != BenchOcclusion.Surface && hit.normal.y >= .98f)
                     surface.Add(hit.point, hit.distance);
             }
-            return new BenchDepthFrame(hand.Sample(tick, 8, .82f), ball.Sample(tick, 12, .97f), surface.Sample(tick, 14, .95f));
+            return new BenchDepthFrame(hand.Sample(tick, 8, .82f, physicalEye, inverse),
+                ball.Sample(tick, 12, .97f, physicalEye, inverse), surface.Sample(tick, 14, .95f, physicalEye, inverse));
         }
 
         struct DepthAccumulator
@@ -89,13 +93,16 @@ namespace DreamMachine.UnityBridge
             public void Add(Vector3 point, float distance)
             { _sum += point; _distance += distance; _count++; }
 
-            public DepthObservation Sample(int tick, int expected, float ceiling)
+            public DepthObservation Sample(int tick, int expected, float ceiling, Pose? view, Quaternion inverse)
             {
                 if (_count == 0) return new DepthObservation(default, tick, 0, 0f);
                 var point = _sum / _count;
+                if (view.HasValue) point = inverse * (point - view.Value.position);
+                point = new Vector3(Bin(point.x), Bin(point.y), Bin(point.z));
+                if (view.HasValue) point = view.Value.position + view.Value.rotation * point;
                 float confidence = ceiling * Mathf.Clamp01(_count / (float)expected) /
                     (1f + .23f * _distance / _count);
-                return new DepthObservation(new System.Numerics.Vector3(Bin(point.x), Bin(point.y), Bin(point.z)),
+                return new DepthObservation(new System.Numerics.Vector3(point.x, point.y, point.z),
                     tick, _count, confidence);
             }
 

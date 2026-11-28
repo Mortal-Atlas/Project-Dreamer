@@ -178,6 +178,9 @@ namespace DreamMachine.UnityBridge
         public bool HouseholdSettled => _household.HasValue && Terminal && _restedTicks >= 8;
         public bool Articulated => _arm != null;
         public ArmReading ReadArm() => _arm == null ? default : new ArmReading(_arm);
+        public bool Seated => _arm?.Seated != null;
+        public PostureReading ReadPosture() => Seated ? _arm.Seated.Read(_arm.Shoulder) : default;
+        public long PostureCpuTicks { get; private set; }
         public Vector3 ArmTorsoContactSeconds => _arm == null ? Vector3.zero :
             new Vector3(_arm.UpperTorsoSeconds, _arm.ForearmTorsoSeconds, _arm.HandTorsoSeconds);
         public (Vector3 Position, Quaternion Rotation, Vector3 Size) ReadArmPart(int index) => _arm.ReadPart(index);
@@ -188,7 +191,7 @@ namespace DreamMachine.UnityBridge
             float orientation = 0f, HandObjectSetup? objectSetup = null, bool contactGated = false,
             bool placement = false, GraspExploration exploration = GraspExploration.Off, Vector2 objectOffset = default,
             HouseholdHandSetup? household = null, ArmBenchSetup? articulated = null, bool coordinated = false,
-            VisualBenchSetup? visual = null)
+            VisualBenchSetup? visual = null, SeatedBenchSetup? seated = null)
         {
             if (!Application.isPlaying) throw new InvalidOperationException("Native contact callbacks require Play Mode.");
             _scale = household.HasValue ? HouseholdLife.BallRadius / .028f : 1f;
@@ -212,6 +215,8 @@ namespace DreamMachine.UnityBridge
                 throw new ArgumentException("Coordinated placement requires an articulated arm.", nameof(coordinated));
             if (visual.HasValue && !coordinated)
                 throw new ArgumentException("Visual coordination requires the supported placement controller.", nameof(visual));
+            if (seated.HasValue && !visual.HasValue)
+                throw new ArgumentException("The seated fixture requires the embodied depth sensor.", nameof(seated));
             _coordination = coordinated ? new PlacementCoordination() : null;
             _household = household;
             _researchObject = objectSetup.HasValue || household.HasValue;
@@ -255,7 +260,7 @@ namespace DreamMachine.UnityBridge
             var startPalm = articulated.HasValue ? _armRest : new Vector3(0, _pickupY, StartZ * _scale);
             if (articulated.HasValue)
             {
-                _arm = new NativeArticulatedArm(articulated.Value, seed, startPalm, Body, _padMaterial);
+                _arm = new NativeArticulatedArm(articulated.Value, seed, startPalm, Body, _padMaterial, seated: seated);
                 _palm = _carriage = _arm.Palm;
                 if (articulated.Value.Obstruction)
                     _arm.SetObstacle(Box(New("Reach probe obstruction", new Vector3(.085f, .302f, -.262f)),
@@ -365,6 +370,14 @@ namespace DreamMachine.UnityBridge
 
         public void Step(Vector3 researchLoad, Vector3 researchImpulse) => Step(researchLoad, researchImpulse, null, null, 0f);
 
+        public void StepWithPosturalImpulse(Vector3 researchLoad, Vector3 torsoAngularImpulse)
+        {
+            if (!Seated || !(torsoAngularImpulse.sqrMagnitude <= .16f))
+                throw new ArgumentOutOfRangeException(nameof(torsoAngularImpulse));
+            if (!Terminal) _arm.Seated.Disturb(torsoAngularImpulse);
+            Step(researchLoad, Vector3.zero);
+        }
+
         public void StepReachProbe(Vector3 target, float yaw, float wristLoad = 0f)
         {
             if (_arm == null || !float.IsFinite(target.sqrMagnitude) || target.sqrMagnitude > 4f ||
@@ -458,6 +471,12 @@ namespace DreamMachine.UnityBridge
                     TorquePair(_palm, _carriage, axis * torque);
                 }
                 else _arm.Drive(PhysicsDt);
+                if (Seated)
+                {
+                    long postureStart = Profile ? Stopwatch.GetTimestamp() : 0;
+                    _arm.Seated.Drive(PhysicsDt, target, _held && closing ? WeightReference : 0f);
+                    if (Profile) PostureCpuTicks += Stopwatch.GetTimestamp() - postureStart;
+                }
                 DriveFinger(0, left, cap, openOnly);
                 DriveFinger(1, right, cap, openOnly);
                 if (_researchObject) DigitEffort += (Mathf.Abs(_closingForce[0]) + Mathf.Abs(_closingForce[1])) * PhysicsDt;
@@ -468,6 +487,7 @@ namespace DreamMachine.UnityBridge
                 _physics.Simulate(PhysicsDt);
                 if (Profile) PhysicsCpuTicks += Stopwatch.GetTimestamp() - physicsStart;
                 _arm?.EndSubstep(PhysicsDt);
+                _arm?.Seated?.EndSubstep(PhysicsDt);
                 if (_placement && _arm == null)
                 {
                     float turn = Vector3.SignedAngle(_carriage.rotation * Vector3.forward, _palm.rotation * Vector3.forward, axis);
@@ -486,6 +506,7 @@ namespace DreamMachine.UnityBridge
             PeakPenetration = Mathf.Max(PeakPenetration, Penetration);
             PeakClearance = Mathf.Max(PeakClearance, Clearance);
             Tick++;
+            _arm?.Seated?.Sample(WorldSimulation.Dt);
             if (reachProbe.HasValue) return;
             bool suspended = Phase == GripPhase.Lift || Phase == GripPhase.Hold || Phase == GripPhase.Transport;
             if (suspended && (_last[0].Slip || _last[1].Slip)) SlipTicks++;

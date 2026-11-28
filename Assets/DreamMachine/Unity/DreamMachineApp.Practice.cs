@@ -16,6 +16,7 @@ namespace DreamMachine.UnityBridge
         Transform _practiceRoot;
         GameObject _sphereSupport, _ballSupport;
         readonly Transform[] _armParts = new Transform[3];
+        Transform[] _postureParts;
         Transform _armTarget;
         readonly Transform[] _practiceParts = new Transform[7];
         readonly Transform[] _practiceContacts = new Transform[2];
@@ -61,6 +62,11 @@ namespace DreamMachine.UnityBridge
                 ("Light grip", () => BeginBallTransfer(HouseholdGripPolicy.Light)),
                 ("Grip feedback", () => BeginBallTransfer(HouseholdGripPolicy.Feedback)), ("Inspect sighting", () => LookForBall(false)),
                 ("Search nearby", () => LookForBall(true)));
+            _seatedActions = AddPracticeRow(area, .40f, .48f,
+                ("H9 rigid torso", () => BeginBallTransfer(HouseholdGripPolicy.H9Rigid)),
+                ("H9 compliant", () => BeginBallTransfer(HouseholdGripPolicy.H9Passive)),
+                ("H9 reactive", () => BeginBallTransfer(HouseholdGripPolicy.H9Reactive)),
+                ("H9 anticipatory", () => BeginBallTransfer(HouseholdGripPolicy.H9Anticipatory)));
             AddPracticeRow(area, .09f, .19f, ("Earlier attempt", () => SelectPracticeRecord(-1)),
                 ("Later attempt", () => SelectPracticeRecord(1)), ("Live view", StopPracticeReplay));
             AddPracticeRow(area, 0f, .09f, ("Play / pause", () => _practicePlaying = _practiceReplay != null && !_practicePlaying),
@@ -282,6 +288,7 @@ namespace DreamMachine.UnityBridge
             var pose = _practiceReplay != null ? _practiceReplay[_practiceFrameIndex] :
                 _practiceFrames.Count == 0 ? null : _practiceFrames[_practiceFrames.Count - 1];
             var arm = pose?.Arm;
+            DrawPosturalParts(pose?.Posture);
             bool hasArm = arm != null;
             foreach (var part in _armParts) part.gameObject.SetActive(hasArm);
             _armTarget.gameObject.SetActive(hasArm);
@@ -324,6 +331,27 @@ namespace DreamMachine.UnityBridge
             }
             PaintPracticeContact(0, pose.LeftPoint, pose.LeftForce);
             PaintPracticeContact(1, pose.RightPoint, pose.RightForce);
+        }
+
+        void DrawPosturalParts(PostureReading? reading)
+        {
+            if (!reading.HasValue)
+            {
+                if (_postureParts != null) foreach (var part in _postureParts) part.gameObject.SetActive(false);
+                return;
+            }
+            var value = reading.Value;
+            _postureParts ??= new[]
+            {
+                Piece(_practiceRoot, PrimitiveType.Cube, "Bench pelvis", Vector3.zero, NativeSeatedSupport.PelvisSize, "#546F83"),
+                Piece(_practiceRoot, PrimitiveType.Sphere, "Physical head", Vector3.zero, Vector3.one, "#D7AD85"),
+                Piece(_practiceRoot, PrimitiveType.Cube, "Seat proxy", Vector3.zero, NativeSeatedSupport.SeatSize, "#624D43")
+            };
+            foreach (var part in _postureParts) part.gameObject.SetActive(true);
+            _postureParts[0].localPosition = value.Pelvis;
+            _postureParts[1].SetLocalPositionAndRotation(value.Head, value.HeadRotation);
+            _postureParts[1].localScale = Vector3.one * value.HeadDiameter;
+            _postureParts[2].localPosition = value.Pelvis + NativeSeatedSupport.SeatOffset;
         }
 
         void PaintPracticeContact(int side, Vector3 point, float force)
@@ -373,7 +401,7 @@ namespace DreamMachine.UnityBridge
             using var stream = new MemoryStream();
             using var writer = new BinaryWriter(stream);
             var first = _practiceFrames[0];
-            int version = ball ? (first.Vision.HasValue ? 6 : first.Placement != null ? 5 : first.Arm != null ? 4 : 3) : 2;
+            int version = ball ? (first.Posture.HasValue ? 7 : first.Vision.HasValue ? 6 : first.Placement != null ? 5 : first.Arm != null ? 4 : 3) : 2;
             writer.Write(version);
             writer.Write(_practiceFrames.Count);
             foreach (var frame in _practiceFrames) frame.Write(writer, version);
@@ -395,13 +423,13 @@ namespace DreamMachine.UnityBridge
         static PracticeFrame[] ReadPracticeTape(string hash, bool ball = false)
         {
             var path = PracticePath(hash, ball);
-            if (!File.Exists(path) || new FileInfo(path).Length > (ball ? 1250000 : 100000))
+            if (!File.Exists(path) || new FileInfo(path).Length > (ball ? 1600000 : 100000))
                 throw new InvalidDataException("Missing or oversized grip trajectory.");
             byte[] bytes = File.ReadAllBytes(path);
             if (PracticeHash(bytes) != hash) throw new InvalidDataException("Grip trajectory checksum failed.");
             using var reader = new BinaryReader(new MemoryStream(bytes, false));
             int version = reader.ReadInt32();
-            if (ball ? version < 3 || version > 6 : version != 1 && version != 2) throw new InvalidDataException("Unsupported grip trajectory.");
+            if (ball ? version < 3 || version > 7 : version != 1 && version != 2) throw new InvalidDataException("Unsupported grip trajectory.");
             int count = reader.ReadInt32();
             if (count <= 0 || count > (ball ? BallFrameLimit : 240)) throw new InvalidDataException("Invalid grip trajectory frame count.");
             var frames = new PracticeFrame[count];
@@ -422,6 +450,7 @@ namespace DreamMachine.UnityBridge
             public readonly PracticeArmFrame Arm;
             public readonly PracticePlacementFrame Placement;
             public readonly VisualPlacementReading? Vision;
+            public readonly PostureReading? Posture;
             public readonly bool Slip;
             public readonly Vector3 LeftPoint, RightPoint;
 
@@ -437,6 +466,7 @@ namespace DreamMachine.UnityBridge
                 if (lab.Articulated) Arm = new PracticeArmFrame(lab);
                 if (lab.Coordinated) Placement = new PracticePlacementFrame(lab);
                 if (lab.VisualCoordination) Vision = lab.VisualReading;
+                if (lab.Seated) Posture = lab.ReadPosture();
                 for (int i = 0; i < Positions.Length; i++)
                 {
                     var part = lab.ReadPart(i);
@@ -465,6 +495,11 @@ namespace DreamMachine.UnityBridge
                 if (version >= 6)
                     Vision = new VisualPlacementReading(ReadEstimate(reader), ReadEstimate(reader), ReadEstimate(reader),
                         ReadVector(reader), ReadVector(reader), reader.ReadInt32(), reader.ReadSingle(), (BenchOcclusion)reader.ReadByte());
+                if (version >= 7)
+                    Posture = new PostureReading((SeatedSupportMode)reader.ReadByte(), ReadVector(reader), ReadVector(reader), ReadRotation(reader),
+                        ReadVector(reader), ReadVector(reader), ReadVector(reader), ReadVector(reader), ReadVector(reader), ReadRotation(reader),
+                        ReadVector(reader), ReadVector(reader), reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(),
+                        reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
             }
 
             public void Write(BinaryWriter output, int version)
@@ -493,7 +528,25 @@ namespace DreamMachine.UnityBridge
                     WriteVector(output, visual.ProprioceptiveWrist); WriteVector(output, visual.Correction);
                     output.Write(visual.CorrectionTick); output.Write(visual.ExpectedContactSeconds); output.Write((byte)visual.Occlusion);
                 }
+                if (version >= 7)
+                {
+                    var post = Posture.Value;
+                    output.Write((byte)post.Mode);
+                    WriteVector(output, post.TorsoAngular); WriteVector(output, post.Head); WriteRotation(output, post.HeadRotation);
+                    WriteVector(output, post.Eye); WriteVector(output, post.HeadAngular); WriteVector(output, post.HeadAcceleration);
+                    WriteVector(output, post.Shoulder); WriteVector(output, post.Pelvis); WriteRotation(output, post.TorsoRotation);
+                    WriteVector(output, post.SupportForce); WriteVector(output, post.Command);
+                    output.Write(post.HeadDiameter); output.Write(post.Work); output.Write(post.Effort); output.Write(post.ContactSeconds);
+                    output.Write(post.ContactImpulse); output.Write(post.Penetration);
+                    output.Write(post.SeatForce); output.Write(post.SeatSeconds); output.Write(post.SeatImpulse);
+                }
             }
+
+            static Quaternion ReadRotation(BinaryReader input) =>
+                new Quaternion(input.ReadSingle(), input.ReadSingle(), input.ReadSingle(), input.ReadSingle());
+
+            static void WriteRotation(BinaryWriter output, Quaternion value)
+            { output.Write(value.x); output.Write(value.y); output.Write(value.z); output.Write(value.w); }
 
             static VisualPoseEstimate ReadEstimate(BinaryReader input)
             {
