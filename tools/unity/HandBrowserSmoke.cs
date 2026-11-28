@@ -16,6 +16,7 @@ using Debug = UnityEngine.Debug;
 internal static class HandBrowserSmoke
 {
     const string Key = "Dreamer.HandBrowser";
+    const string PlacementKey = "Dreamer.HandBrowser.H4";
     const BindingFlags Fields = BindingFlags.Instance | BindingFlags.NonPublic;
 
     static HandBrowserSmoke()
@@ -23,10 +24,14 @@ internal static class HandBrowserSmoke
         if (SessionState.GetBool(Key, false)) EditorApplication.playModeStateChanged += Play;
     }
 
-    public static void Run()
+    public static void Run() => Start(false);
+    public static void RunH4() => Start(true);
+
+    static void Start(bool placement)
     {
         if (Application.productName != "Dreamer Audit Isolated Smoke") throw new InvalidOperationException("Scratch project required.");
         SessionState.SetBool(Key, true);
+        SessionState.SetBool(PlacementKey, placement);
         EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
         PlayerPrefs.DeleteKey("DreamMachine.Workspace.v1.embodiment.hand-attempts");
         new GameObject("Supported hand laboratory").AddComponent<HandLabView>();
@@ -36,7 +41,8 @@ internal static class HandBrowserSmoke
     static void Play(PlayModeStateChange state)
     {
         if (state == PlayModeStateChange.EnteredPlayMode) EditorApplication.update += Poll;
-        if (state == PlayModeStateChange.EnteredEditMode) { SessionState.EraseBool(Key); EditorApplication.Exit(0); }
+        if (state == PlayModeStateChange.EnteredEditMode)
+        { SessionState.EraseBool(Key); SessionState.EraseBool(PlacementKey); EditorApplication.Exit(0); }
     }
 
     static void Poll()
@@ -48,14 +54,16 @@ internal static class HandBrowserSmoke
         {
             void Click(string text) => Object.FindObjectsByType<Button>(FindObjectsSortMode.None).Single(b => b.name == text).onClick.Invoke();
             int holdTick = -1;
+            int loadTick = -1, repositionTick = -1;
             void StepToEnd()
             {
-                for (int i = 0; i < 120 && !Read<NativeHandLab>(view, "_lab").Terminal; i++)
+                for (int i = 0; i < 235 && !Read<NativeHandLab>(view, "_lab").Terminal; i++)
                 {
                     Click("Step");
                     typeof(HandLabView).GetMethod("Update", Fields).Invoke(view, null);
                     var hand = Read<NativeHandLab>(view, "_lab");
                     if (hand.Phase == GripPhase.Hold && hand.HeldTicks == 6) holdTick = hand.Tick;
+                    if (hand.Phase == GripPhase.Reposition) repositionTick = hand.Tick;
                 }
                 typeof(HandLabView).GetMethod("Refresh", Fields).Invoke(view, null);
             }
@@ -65,6 +73,12 @@ internal static class HandBrowserSmoke
             Click("Low grip");
             StepToEnd();
             if (!details.text.Contains("hold-gate-failed")) throw new InvalidOperationException("The failed record is missing.");
+            if (SessionState.GetBool(PlacementKey, false))
+            {
+                VerifyH4();
+                EditorApplication.ExitPlaymode();
+                return;
+            }
             int liveTick = Read<NativeHandLab>(view, "_lab").Tick;
             Click("Earlier attempt");
             var slider = Read<Slider>(view, "_scrubber");
@@ -93,6 +107,48 @@ internal static class HandBrowserSmoke
             Capture(view, "phase-h3-feedback-playback");
             Debug.Log($"H3_BROWSER fixed success, weak failure, feedback success, {feedback.GripCorrections} corrections, passive replay");
             EditorApplication.ExitPlaymode();
+
+            void VerifyH4()
+            {
+                Click("Tactile placement");
+                StepToEnd();
+                var sphere = Read<NativeHandLab>(view, "_lab");
+                if (sphere.Phase != GripPhase.Complete || !sphere.ControlledPlacement || !sphere.Settled || sphere.GripCorrections <= 0)
+                    throw new InvalidOperationException("Live placement did not transfer the object onto the target surface.");
+                Capture(view, "phase-h4-controlled-placement");
+                Click("Next object");
+                Click("Tactile placement");
+                StepToEnd();
+                var loaded = Read<NativeHandLab>(view, "_lab");
+                int loadedEnd = loaded.Tick;
+                // Scrub the native source recording and select the first applied-load frame.
+                var playback = Read<Slider>(view, "_scrubber");
+                for (int i = 0; i < loadedEnd; i++)
+                {
+                    playback.value = i;
+                    if (!details.text.Contains("Added load 0.40 N")) continue;
+                    loadTick = i;
+                    break;
+                }
+                if (loadTick < 0 || loaded.Tick != loadedEnd || !loaded.Terminal)
+                    throw new InvalidOperationException("Loaded replay lacked an event or stepped physics.");
+                Capture(view, "phase-h4-applied-load");
+                Click("Next object");
+                Click("Tactile placement");
+                StepToEnd();
+                var box = Read<NativeHandLab>(view, "_lab");
+                if (box.Repositions <= 0 || repositionTick < 0 || !box.Terminal)
+                    throw new InvalidOperationException("Displaced box never produced a physical reposition.");
+                playback.value = repositionTick;
+                if (!details.text.Contains("Reposition")) throw new InvalidOperationException("Reposition playback missing.");
+                Capture(view, "phase-h4-tactile-reposition");
+                Click("Next object");
+                Click("Tactile placement");
+                StepToEnd();
+                var capsule = Read<NativeHandLab>(view, "_lab");
+                if (!capsule.Terminal) throw new InvalidOperationException("Capsule trial exceeded its bound.");
+                Debug.Log($"H4_BROWSER weak failure, sphere placement, {loadTick}, loaded {loaded.Outcome}, box {box.Repositions} reposition(s) {box.Outcome}, capsule {capsule.Outcome}, passive replay");
+            }
         }
         catch (Exception error) { Debug.LogException(error); EditorApplication.Exit(1); }
     }

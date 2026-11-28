@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using DreamMachine.Body;
 using DreamMachine.Sim;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -15,6 +16,7 @@ namespace DreamMachine.UnityBridge
         readonly List<Attempt> _attempts = new List<Attempt>(MaximumAttempts);
         readonly Transform[] _parts = new Transform[7];
         readonly Transform[] _contacts = new Transform[2];
+        readonly Transform[] _objects = new Transform[3];
         readonly Material[] _colors = new Material[4];
         readonly TimeGovernor _clock = new TimeGovernor { Paused = true };
         NativeHandLab _lab;
@@ -22,21 +24,26 @@ namespace DreamMachine.UnityBridge
         TrayWorkspace _workspace;
         Text _details;
         Slider _scrubber;
+        Transform _destination;
         int _nextId, _selected = -1, _cursor;
+        int _scenario, _liftStart;
         float _nextRefresh;
+        static readonly string[] Scenarios = { "sphere", "added load", "displaced box", "capsule" };
 
         struct Frame
         {
             public GripFrame Reading;
-            public float Cap;
-            public int Corrections;
+            public float Cap, Load, SupportX;
+            public int Corrections, Repositions;
+            public bool Placed;
             public Pose Palm, LeftShaft, LeftPad, RightShaft, RightPad, Object;
 
-            public Frame(NativeHandLab lab)
+            public Frame(NativeHandLab lab, float load = 0f)
             {
                 Reading = lab.ReadFrame();
                 Cap = lab.EffectiveGripCap;
                 Corrections = lab.GripCorrections;
+                Repositions = lab.Repositions; Load = load; SupportX = lab.SupportX; Placed = lab.ControlledPlacement;
                 Palm = PoseOf(lab, 1); LeftShaft = PoseOf(lab, 2); LeftPad = PoseOf(lab, 3);
                 RightShaft = PoseOf(lab, 4); RightPad = PoseOf(lab, 5); Object = PoseOf(lab, 6);
             }
@@ -52,9 +59,17 @@ namespace DreamMachine.UnityBridge
             public readonly int Id;
             public readonly float Cap;
             public readonly bool Feedback;
+            public readonly bool Placement;
+            public readonly int Scenario;
+            public readonly HandObjectShape Shape;
+            public readonly Vector3 Size;
             public readonly List<Frame> Frames = new List<Frame>(96);
             public string Outcome = "in progress";
-            public Attempt(int id, float cap, bool feedback) { Id = id; Cap = cap; Feedback = feedback; }
+            public Attempt(int id, float cap, bool feedback, bool placement, int scenario, HandObjectSetup setup)
+            {
+                Id = id; Cap = cap; Feedback = feedback; Placement = placement; Scenario = scenario;
+                Shape = setup.Shape; Size = setup.Size;
+            }
         }
 
         void Start()
@@ -73,8 +88,14 @@ namespace DreamMachine.UnityBridge
             var palette = new[] { new Color(.25f,.32f,.40f), new Color(.42f,.76f,.74f), new Color(.99f,.55f,.21f),
                 new Color(.96f,.83f,.39f) };
             for (int i = 0; i < palette.Length; i++) _colors[i] = new Material(shader) { color = palette[i] };
-            for (int i = 0; i < _parts.Length; i++) _parts[i] = Shape(i == 6, i == 6 ? 2 : i == 0 ? 0 : 1);
-            for (int i = 0; i < _contacts.Length; i++) _contacts[i] = Shape(true, 3);
+            for (int i = 0; i < 6; i++) _parts[i] = Shape(PrimitiveType.Cube, i == 0 ? 0 : 1);
+            _objects[0] = Shape(PrimitiveType.Sphere, 2);
+            _objects[1] = Shape(PrimitiveType.Cube, 2);
+            _objects[2] = Shape(PrimitiveType.Capsule, 2);
+            _destination = Shape(PrimitiveType.Cube, 3);
+            _destination.position = new Vector3(NativeHandLab.PlacementX, .0005f, 0f);
+            _destination.localScale = new Vector3(2f * NativeHandLab.PlacementTolerance, .001f, 2f * NativeHandLab.PlacementHalfDepth);
+            for (int i = 0; i < _contacts.Length; i++) _contacts[i] = Shape(PrimitiveType.Sphere, 3);
             Begin(3.2f);
             _workspace = new TrayWorkspace("DreamMachine.Workspace.v1.");
             _workspace.Register(Tray, "Motor attempts", new Vector2(236f, 205f),
@@ -83,22 +104,34 @@ namespace DreamMachine.UnityBridge
             _workspace.RestoreVisibility();
         }
 
-        void Begin(float cap, bool feedback = false)
+        void Begin(float cap, bool feedback = false, bool placement = false)
         {
             if (_live != null) Finish("interrupted by researcher");
             _lab?.Dispose();
-            const float radius = .028f;
-            var sphere = new HandObjectSetup(HandObjectShape.Sphere, Vector3.one * (2f * radius));
-            _lab = new NativeHandLab(37, .080f, radius, .75f, cap, objectSetup: sphere, contactGated: feedback);
-            _live = new Attempt(++_nextId, cap, feedback);
+            int scenario = placement ? _scenario : 0;
+            float radius = scenario == 1 ? .031f : scenario == 3 ? .0255f : .028f;
+            var setup = scenario switch
+            {
+                2 => new HandObjectSetup(HandObjectShape.Box, new Vector3(.045f, .042f, .052f)),
+                3 => new HandObjectSetup(HandObjectShape.Capsule, new Vector3(2f * radius, .071f, 2f * radius)),
+                _ => new HandObjectSetup(HandObjectShape.Sphere, Vector3.one * (2f * radius))
+            };
+            float mass = scenario == 1 ? .091f : scenario == 3 ? .113f : .080f;
+            float friction = scenario == 1 ? .43f : scenario == 3 ? .40f : .75f;
+            _lab = new NativeHandLab(37, mass, radius, friction, cap, orientation: scenario == 2 ? 16f : 0f,
+                objectSetup: setup, contactGated: feedback, placement: placement,
+                exploration: placement ? GraspExploration.Tactile : GraspExploration.Off,
+                objectOffset: scenario == 2 ? new Vector2(.019f, .022f) : Vector2.zero);
+            _live = new Attempt(++_nextId, cap, feedback, placement, scenario, setup);
             _selected = -1;
+            _liftStart = -1;
             _clock.Paused = true;
             _clock.TakeSingleStep();
             _clock.Accumulator = 0;
             _live.Frames.Add(new Frame(_lab));
-            for (int i = 0; i < _parts.Length; i++) _parts[i].localScale = _lab.ReadPart(i).Size;
+            for (int i = 0; i < 6; i++) _parts[i].localScale = _lab.ReadPart(i).Size;
             _parts[0].position = _lab.ReadPart(0).Position;
-            Draw(_live.Frames[0]);
+            Draw(_live.Frames[0], _live);
             Refresh();
         }
 
@@ -122,10 +155,14 @@ namespace DreamMachine.UnityBridge
                 int count = _clock.TakeSingleStep() ? 1 : _clock.Plan(Time.unscaledDeltaTime, WorldSimulation.Dt, 4);
                 for (int i = 0; i < count && _live != null; i++)
                 {
-                    _lab.Step();
-                    var frame = new Frame(_lab);
+                    if (_lab.Phase == GripPhase.Lift && _liftStart < 0) _liftStart = _lab.Tick;
+                    int liftAge = _liftStart < 0 ? -1 : _lab.Tick - _liftStart;
+                    float load = _live.Scenario == 1 && liftAge >= 9 && liftAge < 15 &&
+                        (_lab.Phase == GripPhase.Lift || _lab.Phase == GripPhase.Hold) ? .40f : 0f;
+                    _lab.Step(Vector3.down * load, Vector3.zero);
+                    var frame = new Frame(_lab, load);
                     _live.Frames.Add(frame);
-                    Draw(frame);
+                    Draw(frame, _live);
                     if (_lab.Terminal) Finish(_lab.Outcome);
                     else if (_live.Frames.Count >= MaximumFrames) Finish("recording window exhausted");
                 }
@@ -143,18 +180,24 @@ namespace DreamMachine.UnityBridge
             _clock.Paused = true;
             _selected = index;
             _cursor = 0;
-            Draw(VisibleFrame());
+            Draw(VisibleFrame(), VisibleAttempt());
             Refresh();
         }
 
-        Frame VisibleFrame()
-        {
-            if (_selected >= 0) return _attempts[_selected].Frames[_cursor];
-            return _live.Frames[_live.Frames.Count - 1];
-        }
+        Attempt VisibleAttempt() => _selected >= 0 ? _attempts[_selected] : _live;
+        Frame VisibleFrame() => VisibleAttempt().Frames[_selected >= 0 ? _cursor : _live.Frames.Count - 1];
 
-        void Draw(Frame frame)
+        void Draw(Frame frame, Attempt attempt)
         {
+            int shape = (int)attempt.Shape;
+            if (_parts[6] != _objects[shape])
+            {
+                for (int i = 0; i < _objects.Length; i++) _objects[i].gameObject.SetActive(i == shape);
+                _parts[6] = _objects[shape];
+            }
+            _parts[6].localScale = attempt.Shape == HandObjectShape.Capsule
+                ? new Vector3(attempt.Size.x, .5f * attempt.Size.y, attempt.Size.z) : attempt.Size;
+            _destination.gameObject.SetActive(attempt.Placement);
             Move(1, frame.Palm); Move(2, frame.LeftShaft); Move(3, frame.LeftPad);
             Move(4, frame.RightShaft); Move(5, frame.RightPad); Move(6, frame.Object);
             Contact(0, frame.Reading.Left); Contact(1, frame.Reading.Right);
@@ -170,9 +213,9 @@ namespace DreamMachine.UnityBridge
             marker.localScale = Vector3.one * Mathf.Clamp(.004f + sample.NormalForce * .0018f, .004f, .013f);
         }
 
-        Transform Shape(bool sphere, int color)
+        Transform Shape(PrimitiveType primitive, int color)
         {
-            var part = GameObject.CreatePrimitive(sphere ? PrimitiveType.Sphere : PrimitiveType.Cube);
+            var part = GameObject.CreatePrimitive(primitive);
             part.transform.SetParent(transform, false);
             var collider = part.GetComponent<Collider>();
             collider.enabled = false;
@@ -198,7 +241,7 @@ namespace DreamMachine.UnityBridge
             {
                 if (_selected < 0) return;
                 _cursor = Mathf.RoundToInt(value);
-                Draw(VisibleFrame());
+                Draw(VisibleFrame(), VisibleAttempt());
                 Refresh();
             });
             Button(parent, "Standard grip", 0, 2, () => Begin(3.2f));
@@ -206,17 +249,20 @@ namespace DreamMachine.UnityBridge
             Button(parent, "Feedback grip", 2, 2, () => Begin(.18f, feedback: true));
             Button(parent, "Run / pause", 0, 1, () => { if (_selected < 0) _clock.Paused = !_clock.Paused; });
             Button(parent, "Step", 1, 1, () => { if (_selected < 0) _clock.RequestSingleStep(); });
+            Button(parent, "Tactile placement", 2, 1, () => Begin(GripAcquisition.InitialCap, placement: true));
             Button(parent, "Earlier attempt", 0, 0, () => Select(-1));
             Button(parent, "Later attempt", 1, 0, () => Select(1));
+            Button(parent, "Next object", 2, 0, () => { _scenario = (_scenario + 1) % Scenarios.Length; Refresh(); });
         }
 
         void Refresh()
         {
             if (_details == null) return;
-            var attempt = _selected >= 0 ? _attempts[_selected] : _live;
+            var attempt = VisibleAttempt();
             var frame = VisibleFrame();
             var f = frame.Reading;
-            string policy = attempt.Feedback ? "Contact-gated feedback" : attempt.Cap < 1f ? "Low-force control" : "Fixed reference";
+            string policy = attempt.Placement ? $"Tactile placement / {Scenarios[attempt.Scenario]}" :
+                attempt.Feedback ? "Contact-gated feedback" : attempt.Cap < 1f ? "Low-force control" : "Fixed reference";
             _details.text = $"Attempt {attempt.Id}  |  {policy}\n" +
                 $"Individual  |  Unbound research fixture\n" +
                 $"Opposed grip  |  {f.Phase}  |  tick {f.Tick}  |  {attempt.Outcome}\n" +
@@ -224,7 +270,9 @@ namespace DreamMachine.UnityBridge
                 $"Guide {1000f * f.LeftTravel:F1} / {1000f * f.RightTravel:F1} mm  |  target {1000f * f.TravelTarget:F1} mm\n" +
                 $"Command {f.LeftClosingForce:F2} / {f.RightClosingForce:F2} N  |  slip {(f.Left.Slip || f.Right.Slip ? "observed" : "clear")}\n" +
                 $"Lift {1000f * f.Clearance:F1} mm  |  held {f.HeldTicks * WorldSimulation.Dt:F2} s\n" +
-                $"Within-attempt corrections {frame.Corrections}  |  Research playback";
+                $"Corrections {frame.Corrections}  |  Repositions {frame.Repositions}  |  Queued {Scenarios[_scenario]}\n" +
+                (attempt.Placement ? $"Added load {frame.Load:F2} N  |  support {f.SupportForce:F2} N at {frame.SupportX * 1000f:F0} mm  |  placed {(frame.Placed ? "yes" : "pending")}" :
+                    "Research playback");
             _scrubber.interactable = _selected >= 0;
             _scrubber.maxValue = attempt.Frames.Count - 1;
             _scrubber.SetValueWithoutNotify(_selected < 0 ? attempt.Frames.Count - 1 : _cursor);
