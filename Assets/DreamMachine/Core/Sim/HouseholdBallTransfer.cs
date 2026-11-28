@@ -2,10 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using DreamMachine.World;
+using DreamMachine.Body;
 
 namespace DreamMachine.Sim
 {
-    public enum HouseholdGripPolicy : byte { Fixed, Light, Feedback, Articulated }
+    public enum HouseholdGripPolicy : byte { Fixed, Light, Feedback, Articulated, CoordinatedPlacement }
 
     public readonly struct HouseholdBallPose
     {
@@ -161,7 +162,8 @@ namespace DreamMachine.Sim
             return true;
         }
 
-        public BallTransferRecord CompleteBallTransfer(HouseholdBallPose actual, bool success, int corrections, string outcome, string tape)
+        public BallTransferRecord CompleteBallTransfer(HouseholdBallPose actual, bool success, int corrections, string outcome,
+            string tape, PlacementObservation releaseObservation = PlacementObservation.None)
         {
             if (!_ballIntent.HasValue) throw new InvalidOperationException("No live ball transfer.");
             var intent = _ballIntent.Value;
@@ -174,6 +176,8 @@ namespace DreamMachine.Sim
             bool seen = BallInSight(p, actual, intent.TargetX, intent.TargetZ, .65f);
             string observed = seen ? FormattableString.Invariant($"Saw resulting area at ({QuantizeBallSight(actual.X):F3}, {QuantizeBallSight(actual.Z):F3}).")
                 : "No final position sighting.";
+            if (intent.Policy == HouseholdGripPolicy.CoordinatedPlacement && releaseObservation != PlacementObservation.None)
+                observed += " Settled bench tracking: " + releaseObservation + ".";
             p.Child.State.Library.RecordExperience(memory, "Supported household ball transfer",
                 FormattableString.Invariant($"{BallId}. Started from a sighting at ({intent.X:F3}, {intent.Z:F3}). Researcher goal ({intent.TargetX:F3}, {intent.TargetZ:F3}). Engineered {intent.Policy} guide. {outcome}. Corrections {corrections}. {observed} Trace {tape}."),
                 _world.TickCount, "firsthand-ball-transfer");

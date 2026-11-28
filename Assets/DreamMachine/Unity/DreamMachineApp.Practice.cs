@@ -52,7 +52,8 @@ namespace DreamMachine.UnityBridge
             rect.anchorMax = new Vector2(.945f, .96f);
             rect.offsetMin = rect.offsetMax = Vector2.zero;
             AddPracticeRow(area, .30f, .39f, ("Sphere practice", () => SetBallTab(false)), ("Ball / switch learner", OpenBallTab),
-                ("Articulated arm", () => { SetBallTab(true); BeginBallTransfer(HouseholdGripPolicy.Articulated); }));
+                ("Articulated arm", () => { SetBallTab(true); BeginBallTransfer(HouseholdGripPolicy.Articulated); }),
+                ("Coordinated placement", () => { SetBallTab(true); BeginBallTransfer(HouseholdGripPolicy.CoordinatedPlacement); }));
             _sphereActions = AddPracticeRow(area, .19f, .29f, ("Enter station", EnterPractice), ("Try grasp", BeginPracticeAttempt),
                 ("Return to Living", LeavePractice));
             _ballActions = AddPracticeRow(area, .19f, .29f, ("Transfer ball", () => BeginBallTransfer(HouseholdGripPolicy.Fixed)),
@@ -370,7 +371,8 @@ namespace DreamMachine.UnityBridge
         {
             using var stream = new MemoryStream();
             using var writer = new BinaryWriter(stream);
-            int version = ball ? (_practiceFrames[0].Arm != null ? 4 : 3) : 2;
+            var first = _practiceFrames[0];
+            int version = ball ? (first.Placement != null ? 5 : first.Arm != null ? 4 : 3) : 2;
             writer.Write(version);
             writer.Write(_practiceFrames.Count);
             foreach (var frame in _practiceFrames) frame.Write(writer, version);
@@ -398,7 +400,7 @@ namespace DreamMachine.UnityBridge
             if (PracticeHash(bytes) != hash) throw new InvalidDataException("Grip trajectory checksum failed.");
             using var reader = new BinaryReader(new MemoryStream(bytes, false));
             int version = reader.ReadInt32();
-            if (ball ? version != 3 && version != 4 : version != 1 && version != 2) throw new InvalidDataException("Unsupported grip trajectory.");
+            if (ball ? version < 3 || version > 5 : version != 1 && version != 2) throw new InvalidDataException("Unsupported grip trajectory.");
             int count = reader.ReadInt32();
             if (count <= 0 || count > (ball ? BallFrameLimit : 240)) throw new InvalidDataException("Invalid grip trajectory frame count.");
             var frames = new PracticeFrame[count];
@@ -417,6 +419,7 @@ namespace DreamMachine.UnityBridge
             public readonly Vector3 LinearVelocity, AngularVelocity;
             public readonly int Tick, Corrections;
             public readonly PracticeArmFrame Arm;
+            public readonly PracticePlacementFrame Placement;
             public readonly bool Slip;
             public readonly Vector3 LeftPoint, RightPoint;
 
@@ -430,6 +433,7 @@ namespace DreamMachine.UnityBridge
                 Support = f.SupportForce; Cap = lab.EffectiveGripCap; Tick = f.Tick; Corrections = lab.GripCorrections;
                 LinearVelocity = f.ObjectVelocity; AngularVelocity = lab.ObjectAngularVelocity;
                 if (lab.Articulated) Arm = new PracticeArmFrame(lab);
+                if (lab.Coordinated) Placement = new PracticePlacementFrame(lab);
                 for (int i = 0; i < Positions.Length; i++)
                 {
                     var part = lab.ReadPart(i);
@@ -454,6 +458,7 @@ namespace DreamMachine.UnityBridge
                     LinearVelocity = ReadVector(reader); AngularVelocity = ReadVector(reader);
                 }
                 if (version >= 4) Arm = new PracticeArmFrame(reader);
+                if (version >= 5) Placement = new PracticePlacementFrame(reader);
             }
 
             public void Write(BinaryWriter output, int version)
@@ -474,10 +479,35 @@ namespace DreamMachine.UnityBridge
                     WriteVector(output, LinearVelocity); WriteVector(output, AngularVelocity);
                 }
                 if (version >= 4) Arm.Write(output);
+                if (version >= 5) Placement.Write(output);
             }
 
             internal static Vector3 ReadVector(BinaryReader reader) => new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
             internal static void WriteVector(BinaryWriter output, Vector3 v) { output.Write(v.x); output.Write(v.y); output.Write(v.z); }
+        }
+
+        sealed class PracticePlacementFrame
+        {
+            public readonly float PalmSpeed, PalmSpin, EstimatedSpeed, Drift;
+            public readonly int StableTicks;
+            public readonly bool Tracked;
+            public readonly PlacementObservation Observation;
+            public PracticePlacementFrame(NativeHandLab lab)
+            {
+                PalmSpeed = lab.PalmVelocity.magnitude; PalmSpin = lab.PalmAngularVelocity.magnitude;
+                EstimatedSpeed = lab.EstimatedBallSpeed; Drift = lab.ReleaseDrift;
+                StableTicks = lab.StableSupportTicks; Tracked = lab.PlacementTracked; Observation = lab.PlacementObservation;
+            }
+            public PracticePlacementFrame(BinaryReader input)
+            {
+                PalmSpeed = input.ReadSingle(); PalmSpin = input.ReadSingle(); EstimatedSpeed = input.ReadSingle(); Drift = input.ReadSingle();
+                StableTicks = input.ReadInt32(); Tracked = input.ReadBoolean(); Observation = (PlacementObservation)input.ReadByte();
+            }
+            public void Write(BinaryWriter output)
+            {
+                output.Write(PalmSpeed); output.Write(PalmSpin); output.Write(EstimatedSpeed); output.Write(Drift);
+                output.Write(StableTicks); output.Write(Tracked); output.Write((byte)Observation);
+            }
         }
 
         sealed class PracticeArmFrame

@@ -69,11 +69,13 @@ namespace DreamMachine.UnityBridge
                 new Vector3(home.BallBenchX + HouseholdLife.BallShelfOffset, HouseholdLife.BallShelfTop, home.BallBenchZ) - _ballOrigin,
                 intent.TargetTop == 0f ? HouseholdLife.BallShelfTop : 0f);
             int seed = _sim.Find(home.PersonId(intent.Actor)).Spec.BirthSeed;
+            bool coordinated = policy == HouseholdGripPolicy.CoordinatedPlacement;
+            bool articulated = coordinated || policy == HouseholdGripPolicy.Articulated;
             _practiceHand = new NativeHandLab(seed, HouseholdLife.BallMass, HouseholdLife.BallRadius, HouseholdLife.BallFriction,
-                policy == HouseholdGripPolicy.Fixed || policy == HouseholdGripPolicy.Articulated
+                policy == HouseholdGripPolicy.Fixed || articulated
                     ? GripAcquisition.ReferenceCap : GripAcquisition.InitialCap, placement: true,
                 exploration: policy == HouseholdGripPolicy.Feedback ? GraspExploration.ForceOnly : GraspExploration.Off, household: setup,
-                articulated: policy == HouseholdGripPolicy.Articulated ? new ArmBenchSetup(true) : null);
+                articulated: articulated ? new ArmBenchSetup(true) : null, coordinated: coordinated);
             _practiceFrames.Add(new PracticeFrame(_practiceHand));
             _practiceStatus = "Researcher-assigned transfer. Use the Simulation controls to run or step.";
             DrawLiving(WorldSimulation.Dt);
@@ -102,7 +104,7 @@ namespace DreamMachine.UnityBridge
                 var q = hand.ObjectRotation.normalized;
                 var actual = new HouseholdBallPose(p.x, p.y, p.z, q.x, q.y, q.z, q.w);
                 _sim.Home.CompleteBallTransfer(actual, hand.Phase == GripPhase.Complete,
-                    hand.GripCorrections + hand.ReadArm().Corrections, hand.Outcome, tape);
+                    hand.GripCorrections + hand.ReadArm().Corrections, hand.Outcome, tape, hand.PlacementObservation);
                 _practiceStatus = hand.Outcome;
                 hand.Dispose();
                 _practiceHand = null;
@@ -194,7 +196,11 @@ namespace DreamMachine.UnityBridge
                 _practiceText.text += $"Recorded preview  |  {author}  |  frame {_practiceFrameIndex}\n";
             }
             var intention = ball ?? record?.Intent;
-            if (intention.HasValue) _practiceText.text += $"Assigned destination  {intention.Value.TargetX:F2}, {intention.Value.TargetZ:F2}  |  {intention.Value.Policy}\n";
+            if (intention.HasValue)
+            {
+                string policy = intention.Value.Policy == HouseholdGripPolicy.CoordinatedPlacement ? "Coordinated placement" : intention.Value.Policy.ToString();
+                _practiceText.text += $"Assigned destination  {intention.Value.TargetX:F2}, {intention.Value.TargetZ:F2}  |  {policy}\n";
+            }
             var pose = _practiceReplay != null ? _practiceReplay[_practiceFrameIndex] : _practiceFrames.Count > 0 ? _practiceFrames[^1] : null;
             if (pose != null)
                 _practiceText.text += $"{pose.Phase} at tick {pose.Tick}  |  pads {pose.LeftForce:F2} / {pose.RightForce:F2} N\n" +
@@ -202,6 +208,13 @@ namespace DreamMachine.UnityBridge
             if (pose?.Arm != null)
                 _practiceText.text += $"Elbow {pose.Arm.Joints.y:F0}°  |  wrist error {Vector3.Distance(pose.Arm.Target, pose.Positions[1]) * 1000f:F0} mm\n" +
                     $"Torso contact {pose.Arm.ContactSeconds:F2} s  |  depth {pose.Arm.Penetration * 1000f:F1} mm\n";
+            if (pose?.Placement != null)
+            {
+                var placement = pose.Placement;
+                string movement = placement.Tracked ? $"Ball {placement.EstimatedSpeed:F2} m/s" : "Ball occluded";
+                _practiceText.text += $"Palm {placement.PalmSpeed:F2} m/s, {placement.PalmSpin:F2} rad/s  |  {movement}\n" +
+                    $"Steady support {placement.StableTicks}/5  |  drift {placement.Drift * 1000f:F0} mm  |  {placement.Observation}\n";
+            }
             if (record.HasValue) _practiceText.text += $"{record.Value.Outcome}  |  {record.Value.MemoryId}\n";
             _practiceText.text += _practiceStatus ?? "Choose a learner, transfer the ball or inspect a sighting.";
         }
