@@ -1,0 +1,10 @@
+cohort,case,seed,articulated,pole,disturbance_n,applied_ticks,ticks,phase,outcome,opposed,lift,held_ticks,placement,settled,ball_m,peak_pad_n,slip_ticks,torso_s,torso_depth_mm,upper_distal_s,elbow_limit_excursions,corrections,actuator_work_j,arm_work_j,controller_us,physics_us
+heldout,arthur-reference,303,False,False,0.000,0,100,Complete,physical-lift-hold-place-release,True,True,12,True,True,-0.30810;0.17500;0.00590,3.2641,0,0.0000,0.000,0.0000,0,0,16.468890,0.000000,28.42,488.08
+heldout,arthur-load,303,False,False,0.300,5,100,Complete,physical-lift-hold-place-release,True,True,12,True,True,-0.30808;0.17500;0.00590,3.2641,0,0.0000,0.000,0.0000,0,0,16.472650,0.000000,29.17,507.31
+heldout,alice-reference,404,False,False,0.000,0,100,Complete,physical-lift-hold-place-release,True,True,12,True,True,-0.30810;0.17500;0.00590,3.2641,0,0.0000,0.000,0.0000,0,0,16.468890,0.000000,29.56,527.14
+heldout,arthur-reference,303,True,False,0.000,0,271,Failed,hold-gate-failed,True,False,0,False,True,1.01231;0.12500;0.93083,4.8438,0,0.0000,0.000,0.0000,0,0,2.600693,7.491013,43.59,473.45
+heldout,arthur-load,303,True,False,0.300,0,271,Failed,hold-gate-failed,True,False,0,False,True,1.01231;0.12500;0.93083,4.8438,0,0.0000,0.000,0.0000,0,0,2.600693,7.491013,42.45,458.32
+heldout,alice-reference,404,True,False,0.000,0,259,Failed,hold-gate-failed,True,False,0,False,True,0.73823;0.12500;0.83358,4.8099,0,0.0000,0.000,0.0000,0,0,2.591746,7.844667,44.31,477.79
+heldout,arthur-alternate,303,True,True,0.000,0,187,Failed,release-gate-failed,True,True,12,True,True,-0.17658;0.17500;0.00342,5.2582,0,0.0000,0.000,0.0000,0,0,3.557558,30.254280,43.38,502.32
+heldout,arthur-alternate-load,303,True,True,0.300,5,181,Failed,release-gate-failed,True,True,12,True,True,-0.19805;0.17500;0.00429,5.2582,0,0.0000,0.000,0.0000,0,0,3.525882,29.516080,44.54,506.74
+heldout,alice-alternate,404,True,True,0.000,0,168,Failed,settled-outside-destination,True,True,12,True,True,-0.07398;0.12500;-0.23084,5.2420,0,0.0000,0.000,0.0000,0,0,3.011606,20.157720,46.16,541.37

@@ -1,0 +1,75 @@
+# Isolated Unity observer experiment
+
+## H9 dynamic seated posture
+
+Use [the audited launcher](Run-VisualPlacementAudit.ps1) with **-Study Seated** and the guarded scratch project. Run **-Phase Development**, then **-Phase HeldOut** after freezing the source. **HouseholdArmSmoke.H9Run**, **H9ObserverClosed**, **H9Alice**, **H9Restart**, **H9Return**, **H9RestartReturn**, **H9Rigid** and **H9Passive** exercise the rendered household and archives in separate processes. [H9 protocol](../../docs/DYNAMIC_SEATED_SUPPORT_H9.md)
+
+## H8 embodied depth comparison
+
+Use [the audited launcher](Run-VisualPlacementAudit.ps1) with the guarded scratch project and the chosen phase. It verifies native source and relevant configuration before both development and held-out execution. The isolated product receives the complete traces and an input manifest. For the household, use **HouseholdArmSmoke.H8Run**, **H8ObserverClosed**, **H8Alice**, **H8Restart**, **H8Return** and **H8RestartReturn** in separate processes. Keep the owner’s saves and private captures outside the experiment. [H8 protocol and evidence](../../docs/VISUAL_COORDINATION_H8.md)
+
+## H6 articulated reach and household transfer
+
+Copy **ArticulatedArmStudy.cs** and **HouseholdArmSmoke.cs** to **Assets/Editor** in the guarded scratch project. In separate Unity 6000.3.19f1 DX12 processes run **ArticulatedArmStudy.Develop**, **ArticulatedArmStudy.Final** and **ArticulatedArmStudy.BodyClearance**. Keep the full native CSVs in the scratch product. The bench records **H6_REACH**, **H6_TRANSFER** and **H6_ARM_COMPLETE**.
+
+Run **HouseholdArmSmoke.Run**, **HouseholdArmSmoke.ObserverClosed**, **HouseholdArmSmoke.Alice** and **HouseholdArmSmoke.Restart** in separate processes. Restart reads the first H6 world archive and confirms the visible Ball, memory and replay. Compare the Run and ObserverClosed checkpoint and trace hashes. These commands use the guarded product’s own primary world checkpoint. **H6_HOUSE**, **H6_RESTART** and **H6_RENDER** summarize the observed results. Private rendered captures remain local. [Protocol and results](../../docs/ARTICULATED_UPPER_BODY_H6.md)
+
+## H5 household ball verification
+
+Copy **HouseholdBallSmoke.cs** to **Assets/Editor** in the product named **Dreamer Audit Isolated Smoke**. The harness verifies the product name and writes that scratch product’s primary world checkpoint. Preserve the scratch checkpoint before reusing it for other studies. The harness creates a **world.checkpoint.before-h5** backup on the first H5 run when a prior primary exists.
+
+Use separate Unity 6000.3.19f1 DX12 processes with **-executeMethod** and the following entry points in order.
+
+1. **HouseholdBallSmoke.Run**
+2. **HouseholdBallSmoke.Unobserved**
+3. **HouseholdBallSmoke.Failure**
+4. **HouseholdBallSmoke.Restart**
+5. **HouseholdBallSmoke.RestartFailure**
+6. **HouseholdBallSmoke.Feedback**
+
+The two restart commands use saved H5 checkpoint archives. Compare the Run and Unobserved CSV and checkpoint hashes. Inspect **H5_ATTEMPT**, **H5_TIMING**, **H5_OBSERVATION**, **H5_SAVE**, and **H5_RESTORE** in the logs. Keep full native traces, checkpoint files, motion tapes and private rendered captures local. [H5 protocol and results](../../docs/HOUSEHOLD_TRANSFER_H5.md)
+
+## Earlier experiments
+
+`ClockSmoke.cs` exercises the same embedded world with and without observer controls. Use a disposable Git checkout or project copy. Set its Unity product name to `Dreamer Audit Isolated Smoke`, then copy the script to `Assets/Editor/ClockSmoke.cs` in that copy. The script intentionally overwrites checkpoint and workspace data in that exact isolated product's persistent directory. Never reuse a directory with data you intend to keep.
+
+Run separate Unity 6000.3.19f1 processes for each condition and seed:
+
+```text
+-batchmode -force-d3d12 -projectPath <copy> -executeMethod ClockSmoke.Control
+-batchmode -force-d3d12 -projectPath <copy> -executeMethod ClockSmoke.Observed
+```
+
+Add `-dreamerSeed101` to both commands for the second seed. Pass separate `-logFile` values. The harness steps from tick 690 to 1140, compares save and restore within each process, and prints a digest of all serialized fields. The observed run also reconstructs a workspace from its independent preferences. Compare `CLOCK_SMOKE` digests within each seed. The digest is labeled `learner` for continuity with the initial smoke. It includes the full embedded world checkpoint. Kernel regression tests provide named field assertions after restore. Camera screenshots depend on the batch graphics target.
+
+For the elbow fixture, copy `ElbowSmoke.cs` to `Assets/Editor/ElbowSmoke.cs` in the same disposable project and use `-executeMethod ElbowSmoke.Run`. It replaces only the isolated elbow checkpoint and its matching workspace preference. Verify the `ELBOW_SMOKE` completion line. The experiment compares the visible Unity path to an unobserved model every tick and exercises Save, Restore and Close.
+
+For Phase A.2, copy `NativeElbowSmoke.cs` and `NativeContactStudy.cs` into the same scratch project's `Assets/Editor`. Run `-batchmode -force-d3d12 -executeMethod NativeElbowSmoke.Run`, then start a separate Unity process with `-batchmode -nographics -executeMethod NativeContactStudy.Reload`. Use separate logs and the same isolated product name. The first command replaces the isolated native fixture checkpoint, traces and training outputs in its persistent data directory. The second uses the saved models and probes from that directory. Look for `NATIVE_SMOKE`, `CONTACT_SCORE` and `CONTACT_RELOAD`. [Protocol and observed results](../../docs/NATIVE_ELBOW_LAB.md)
+
+For Phase B, copy `PredictiveMotorStudy.cs` and `PredictiveTraySmoke.cs` to the same scratch Assets/Editor directory. Keep the generated Phase A.2 native-contact dataset. Run separate DX12 graphics batch processes using `-executeMethod PredictiveMotorStudy.Run`, `-executeMethod PredictiveMotorStudy.Reload`, and `-executeMethod PredictiveTraySmoke.Run`. The first command writes results, trace and continuation probes. The second reconstructs and verifies the learned continuation. The final command uses an isolated copy of the saved run in the actual tray. [Study results](../../docs/PREDICTIVE_MOTOR_PHASE_B.md)
+
+For Phase B.1, also copy `ForceMotorStudy.cs`. Run separate DX12 batch processes with `-executeMethod ForceMotorStudy.Run`, `-executeMethod ForceMotorStudy.Reload`, and `-executeMethod PredictiveTraySmoke.ForceAware`. The first run evaluates the frozen impulse model and only executes force-aware torque if it passes the development gate. The second checks the saved continuation. The last copies the isolated checkpoint to the force tray slot and tests the visible and closed lifecycle. [Fixed gates and results](../../docs/FORCE_AWARE_PHASE_B1.md)
+
+For Phase C.0, copy `FamilyEmbodimentSmoke.cs` to `Assets/Editor` in the isolated project. Run `-executeMethod FamilyEmbodimentSmoke.Before` against baseline commit `4f03b84`, and `-executeMethod FamilyEmbodimentSmoke.After` against the candidate, each with `-batchmode -force-d3d12`. The script clears only its explicitly guarded scratch project household files and preference to start equivalent trials. Keep the owner's project and product directory out of these runs. This captures actual startup, tray actions and body positions in the real family scene. [Phase C.0 protocol](../../docs/FUNCTIONAL_EMBODIMENT_C0.md)
+
+For Phase C.1, copy `LowerBodyStudy.cs` and `LowerBodyTraySmoke.cs` into the same isolated project's `Assets/Editor`. In separate Unity 6000.3.19f1 processes use `-batchmode -force-d3d12 -executeMethod LowerBodyStudy.Run` and `-batchmode -force-d3d12 -executeMethod LowerBodyTraySmoke.Run`, with separate log paths. Check `LOWER_BODY_GATE` for each seed, `LOWER_BODY_REPEAT` for the matched run, `LOWER_BODY_PERTURBATION` for the disturbance cases and `LOWER_BODY_TRAY` for the pause, step, export and passive dismissal check. The results, complete trajectories and 1280×720 screenshot are written to the scratch product's persistent data directory. Run `dotnet run --project dotnet/DreamMachine.Cli -c Release -- --lower-body` for the static analytical reference. [Phase C.1 gates](../../docs/LOWER_BODY_C1.md)
+
+For Phase C.1.1, copy `LowerBodyLateralStudy.cs` and the current `LowerBodyTraySmoke.cs` into the guarded scratch project's `Assets/Editor`. With separate DX12 processes and logs, run `-executeMethod LowerBodyLateralStudy.Development`, `-executeMethod LowerBodyLateralStudy.Final`, and `-executeMethod LowerBodyTraySmoke.Run`. The study reports `C11_LOAD`, `C11_TAP`, `C11_SWING` and `C11_CLOCK`. Preserve each condition's result files under the scratch product before rerunning. The tray produces `phase-c11-observatory.png` and verifies schema 2 export. Use `ClockSmoke.Control` and `ClockSmoke.Observed` in separate scratch processes to compare household checkpoint digests. [Phase C.1.1 protocol](../../docs/LOWER_BODY_C11.md)
+
+For Phase C.1.2, copy `LowerBodyDynamicStudy.cs` and the current tray smoke harness into the guarded scratch project. Run separate DX12 processes for `LowerBodyDynamicStudy.Development`, `LowerBodyDynamicStudy.Final` and `LowerBodyTraySmoke.Run`. Look for `C12_TRIAL`, `C12_CLOCK` and `LOWER_BODY_TRAY`. The current tray writes `phase-c12-observatory.png` and validates schema 3. The full summary and time-series files are under the scratch product's persistent data folder. Preserve outputs before rerunning. [Phase C.1.2 protocol](../../docs/LOWER_BODY_C12.md)
+
+For the playable household, copy `HouseholdLivingSmoke.cs` to `Assets/Editor` in the same guarded scratch project. Run `HouseholdLivingSmoke.Before` and `HouseholdLivingSmoke.Run` in separate DX12 processes with separate logs. The Before method selects the legacy presentation and the Run method checks living mode, fixed-tick activity, evidence, migration and restoration. Look for `HOUSEHOLD_BEFORE`, `HOUSEHOLD_EVIDENCE`, `HOUSEHOLD_CHANGE` and `HOUSEHOLD_SMOKE`. Copy the screenshots out of the scratch persistent data directory. Run `.NET --benchmark --living` via the CLI to measure numerical performance. [Playable household report](../../docs/PLAYABLE_HOUSEHOLD.md)
+
+The current L.2 smoke also cycles person and tick-day history, validates exact observed/control state, records a sorting action with the tray focused on its actor, and reports independent fit evidence under `HOUSEHOLD_COMPETENCE`. Its current outputs use the `household-l2-` prefix. Keep a known L.1 synthetic version 2 file independently for migration testing. The smoke exercises the stock procedural presentation. [L.2 verification](../../docs/ACTIVE_LEARNING_L2.md#native-verification-and-continuation) · [Private VRM workflow](../../docs/ASSET_AND_LICENSE_REGISTRY.md#manual-unity-package-manager-steps)
+
+For L.3, privately copy the four verified VRMs to `Assets/DreamMachineLocalAvatars/<Name>.vrm` and `PrivateAvatarSmoke.cs` to `Assets/Editor` in the guarded scratch project. Use separate DX12 batch runs for `PrivateAvatarSmoke.Mature`, `PrivateAvatarSmoke.Newborn` and `PrivateAvatarSmoke.Growth`. Each uses a synthetic seed-37 checkpoint and measures visible binding alongside exact headless continuation. Keep the resulting `household-private-*.png` captures inside the ignored local assets folder. The preview menu can independently create an isolated private Merlin scene from the stock bind pose. [L.3 results](../../docs/ACTIVE_LEARNING_L3.md)
+
+L.4 adds `PrivateAvatarSmoke.Toddler` and measures the palm near the moving lid and the head toward the pillow. Use `DREAMER_AVATAR_CAPTURE_TAG` to name before and after captures. Use `HouseholdLivingSmoke.Run` to exercise and export active observation records. It includes raw packed geometry evidence in the CSV. Keep all avatar imagery private. [L.4 results](../../docs/ACTIVE_PERCEPTION_L4.md)
+
+For C.1.3, use the same guarded scratch procedure and the `LowerBodyDynamicStudy.RecoveryDevelopment`, `LowerBodyDynamicStudy.RecoveryHeldOut` and `LowerBodyDynamicStudy.RecoveryVisual` entry points. Look for `C13_TRIAL`, `C13_COMPLETE` and `C13_VISUAL`. The study exports schema 4 to the scratch product. Phase L.5 uses `HouseholdLivingSmoke.RunSpatial` and keeps household screenshots local because they can show private avatars. [Physical study](../../docs/LOWER_BODY_C13.md) [Spatial study](../../docs/SPATIAL_LEARNING_L5.md)
+
+For C.1.4 and H1, copy the corresponding study scripts into the guarded scratch editor. Run `PreliftStabilizationStudy.Development`, `PreliftStabilizationStudy.HeldOut`, `LowerBodyDynamicStudy.PreliftVisual`, `BodyIntegrityStudy.Run` (edit mode with `-quit`), `NativeHandStudy.Development`, `NativeHandStudy.HeldOut`, `HandBrowserSmoke.Run`, and then `HandAcquisitionStudy.Train` and `HandAcquisitionStudy.Retained` in separate processes. All images remain local. [Prelift](../../docs/LOWER_BODY_C14.md) [Hand results](../../docs/PHYSICAL_HAND_H1.md)
+
+For H3, copy `AdaptiveGripStudy.cs` and the updated `HandBrowserSmoke.cs` into the guarded scratch project. Run `AdaptiveGripStudy.Development` before `AdaptiveGripStudy.HeldOut` in separate editor processes. The second process reads the trained policy checkpoints. `HandBrowserSmoke.Run` verifies the live feedback condition and passive replay. [H3 report](../../docs/PHYSICAL_HAND_H3.md)
+
+For H4, copy the current `TactilePlacementStudy.cs` and `HandBrowserSmoke.cs` into the guarded scratch project. Use separate DX12 processes with `-executeMethod TactilePlacementStudy.Diagnose`, `TactilePlacementStudy.Development` and `TactilePlacementStudy.HeldOut`. HeldOut requires the three development research archives and checks their learner identities and lived evidence. Keep full trajectories and archives in the scratch product. `HandBrowserSmoke.RunH4` verifies live load, repositioning, reliable placement and passive playback, and writes guarded H4 captures. `HouseholdPracticeSmoke.Restore` exercises the original H2 settled-restoration path from its scratch checkpoint. [H4 report](../../docs/PHYSICAL_PLACEMENT_H4.md)

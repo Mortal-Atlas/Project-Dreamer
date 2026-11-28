@@ -346,6 +346,30 @@ namespace DreamMachine.Libraries
             return record;
         }
 
+        internal void RecordExperience(string id, string statement, string evidence, int timestamp,
+            string source = "firsthand-supported-grip")
+        {
+            var record = new BeliefRecord
+            {
+                Id = id, Kind = "Experience", Statement = statement, Source = source
+            };
+            record.Appendices.Add(new AppendixEntry
+            {
+                Timestamp = timestamp, Evidence = evidence, NewStatement = statement, Reason = source
+            });
+            _beliefs.Add(id, record);
+        }
+
+        /// <summary>Append a completed physical research trial to this individual's lived evidence.</summary>
+        public void RecordSupportedGraspObservation(int attempt, int completedTick, string outcome, string traceReference)
+        {
+            if (attempt <= 0 || completedTick <= 0 || string.IsNullOrWhiteSpace(outcome) ||
+                string.IsNullOrWhiteSpace(traceReference))
+                throw new ArgumentException("A completed trial and its recorded trajectory are required.");
+            RecordExperience("motor:h4:grip:" + attempt, "Supported grasp and placement attempt " + attempt,
+                $"Native outcome {outcome}. Trace {traceReference}.", completedTick);
+        }
+
         public float Rate(string id)
         {
             BeliefRecord record = GetOrNull(id);

@@ -12,20 +12,20 @@ For Antigravity/Gemini, point it at this file or paste it at the start of a chat
 Night is when they dream and lock in what they learned. It's a testbed for your
 Dreaming Machines / Ten Lens paper.
 
-**Where things stand right now (Nov 25, 2026):**
-- The original sim is on GitHub on the branch `cursor/dream-machine-unity6-54e5`.
-  It is NOT in `main` until you open and merge that pull request.
-- It's on Unity 6.3 (6000.3.19f1). 23 tests pass, ~75.9k ticks/sec for the family.
-- Nobody has pressed Play in the real editor yet, so tell us if anything looks pink or broken.
+**Current work:** Phase C starts with the family's standing and walking reference,
+then isolates lower-body support and balance experiments. Use the
+[continuation checkpoint](docs/CONTINUATION_CHECKPOINT.md) for current commits,
+measured results, and outstanding verification.
 
-**How to see it:** open the project in Unity 6.3 → open
-`Assets/Scenes/DreamMachine.unity` → press Play.
+**How to see it:** open the project in Unity 6.3 (6000.3.19f1) → open
+`Assets/Scenes/DreamMachine.unity` → press Play. Use **Simulation** to show
+the clock controls and **Reset layout** to recover their default placement.
 
 **Your daily loop:**
 1. `git pull` before you start.
 2. New feature? Make a branch: `git checkout -b feature/short-name`
 3. Commit small and often, push, open a pull request.
-4. Tests pass → merge into `main` → everyone runs `git pull`.
+4. Tests pass → leave the PR for owner review. Merge only with explicit owner authorization.
 
 **Who does what:**
 - Coder 1: builds features + answers tool/setup questions.
@@ -98,3 +98,8 @@ controls events.
 4. Commit with a clear message, push, open a PR into `main`.
 5. In the PR, say what changed, test + benchmark results, and anything you
    couldn't verify (e.g., not run in the Unity editor).
+
+
+### Deterministic Experiment & Validation Commands
+- Core .NET + Phase B.2 tests: `dotnet test dotnet/DreamMachine.Core.Tests -c Release --no-restore --nologo`
+- Phase B.2 validation output: `dotnet test dotnet/DreamMachine.Core.Tests -c Release --no-restore --nologo --filter PhaseB2ValidationTests --logger "console;verbosity=detailed"`

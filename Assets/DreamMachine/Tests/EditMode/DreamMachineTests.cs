@@ -19,6 +19,839 @@ using NUnit.Framework;
 
 namespace DreamMachine.Tests
 {
+    public class GroundedGaitTests
+    {
+        [Test]
+        public void IsolatedSupportReferenceRedistributesWeightAndRejectsTheSwingFoot()
+        {
+            var d = new HumanoidAnatomy(101).AtAge(6f);
+            const float mass = 10f, weight = mass * 9.80665f;
+            var centered = LowerBodyReference.Evaluate(d, 0, false, 0, 0, mass);
+            Assert.IsTrue(centered.LoadInsideSupport);
+            Assert.AreEqual(weight / 2f, centered.LeftVerticalNewtons, 0.0001f);
+            var shifted = LowerBodyReference.Evaluate(d, 0, false, -d.HipWidth / 4f, 0, mass);
+            Assert.AreEqual(weight * 0.75f, shifted.LeftVerticalNewtons, 0.0001f);
+            float distance = GroundedGait.Stride(d) * 0.125f;
+            var stance = LowerBodyReference.Evaluate(d, distance, true, d.HipWidth / 2f, 0, mass);
+            Assert.IsTrue(stance.LoadInsideSupport);
+            Assert.AreEqual(weight, stance.RightVerticalNewtons, 0.0001f);
+            var swing = LowerBodyReference.Evaluate(d, distance, true, -d.HipWidth / 2f, 0, mass);
+            Assert.IsFalse(swing.LoadInsideSupport);
+            Assert.AreEqual(0, swing.LeftVerticalNewtons + swing.RightVerticalNewtons);
+        }
+
+        [Test]
+        public void StandingGeometryKeepsBothFeetLevelAcrossSeedsAndGrowth()
+        {
+            for (int seed = 0; seed < 64; seed++)
+            foreach (float stage in new[] { 0f, 1f, 3f, 6f })
+            {
+                var d = new HumanoidAnatomy(seed).AtAge(stage);
+                var atRest = GroundedGait.Sample(d, 0f, false, true);
+                var later = GroundedGait.Sample(d, 33f, false, false);
+                Assert.AreEqual(atRest.Hip, later.Hip);
+                Assert.That(atRest.Knee, Is.InRange(0f, 0.1222f), "neutral knee must stay below 7 degrees");
+                Assert.That(d.PelvisHeight - GroundedGait.PelvisHeight(d, false), Is.InRange(0f, 0.002f));
+                AssertGeometry(d, atRest, false);
+                for (int i = 0; i < 16; i++)
+                {
+                    float distance = GroundedGait.Stride(d) * i / 16f;
+                    var left = GroundedGait.Sample(d, distance, true, true);
+                    var right = GroundedGait.Sample(d, distance, true, false);
+                    Assert.AreNotEqual(left.Supports, right.Supports);
+                    AssertGeometry(d, left, true);
+                    AssertGeometry(d, right, true);
+                }
+            }
+        }
+
+        [Test]
+        public void StraightGaitPlantsTheSupportFootAndClampsObstructedRootTravel()
+        {
+            var d = new HumanoidAnatomy(101).AtAge(6f);
+            float stride = GroundedGait.Stride(d);
+            var first = GroundedGait.Sample(d, stride * 0.1f, true, false);
+            var later = GroundedGait.Sample(d, stride * 0.3f, true, false);
+            Assert.That(first.Forward + stride * 0.1f, Is.EqualTo(later.Forward + stride * 0.3f).Within(0.00001f));
+            Assert.That(YardClearance.MotionFraction(0, 1, 0, -4, 0.12f), Is.InRange(0.36f, 0.38f), "house collision");
+            Assert.That(YardClearance.MotionFraction(-4.25f, -3f, 0, 3, 0.12f), Is.InRange(0.35f, 0.37f), "prop collision");
+            Assert.AreEqual(1f, YardClearance.MotionFraction(7, 6, 0.2f, 0.2f, 0.12f));
+            Assert.AreEqual(1f, YardClearance.MotionFraction(-4.25f, -1.3f, 0f, 0.1f, 0.12f), "legacy overlap can retreat");
+        }
+
+        static void AssertGeometry(HumanoidDimensions d, GroundedGait.Leg leg, bool moving)
+        {
+            double down = d.Thigh * Math.Cos(leg.Hip) + d.Shin * Math.Cos(leg.Hip + leg.Knee);
+            double front = -d.Thigh * Math.Sin(leg.Hip) - d.Shin * Math.Sin(leg.Hip + leg.Knee);
+            Assert.That(GroundedGait.PelvisHeight(d, moving) - down - d.AnkleHeight,
+                Is.EqualTo(leg.Lift).Within(0.00001f));
+            Assert.That(front, Is.EqualTo(leg.Forward).Within(0.00001f));
+            Assert.That(leg.Hip + leg.Knee + leg.Ankle, Is.EqualTo(0f).Within(0.00001f));
+            Assert.That(leg.Knee, Is.InRange(0f, 1.0f));
+        }
+    }
+
+    public class ElbowLabTests
+    {
+        [Test]
+        public void ImpulseForecastIgnoresQueryLabelAndForceFallbackPersists()
+        {
+            var previous = new ElbowLab.StepSample(1, 0.9, 0, 0.1, 999, 999,
+                new ElbowLab.Proprioception(0.25, 2, 1.5, -0.3));
+            var data = new List<ImpulsePredictor.Example>();
+            for (int i = 0; i < 10; i++) data.Add(new ImpulsePredictor.Example(previous, 0.9, 0.2 + i * 0.01));
+            var model = new ImpulsePredictor(data).Calibrate(data);
+            var p = model.Predict(new ImpulsePredictor.Example(previous, 0.9, 0));
+            Assert.AreEqual(p, model.Predict(new ImpulsePredictor.Example(previous, 0.9, 100)));
+            var force = new ForceResidual(true);
+            var ungated = new ForceResidual(false);
+            for (int n = 0; n < 4; n++)
+            {
+                force.Before(previous, 0.9, p.Impulse, 0.4);
+                ungated.Before(previous, 0.9, p.Impulse, 0.4);
+            }
+            Assert.That(Math.Abs(force.PreviousCorrection), Is.LessThan(Math.Abs(ungated.PreviousCorrection)));
+            var impact = new ElbowLab.StepSample(2, 0.9, 0.25, 0.8, 0, 0, previous.Feedback);
+            force.After(impact, 0.9, p.Impulse, p.Uncertainty);
+            Assert.AreEqual(ForceFallback.PeakImpulse, force.Fallback);
+            Assert.AreEqual(2, force.FallbackTick);
+            using var memory = new MemoryStream();
+            using var writer = new BinaryWriter(memory);
+            model.Write(writer);
+            force.Write(writer);
+            memory.Position = 0;
+            using var reader = new BinaryReader(memory);
+            Assert.AreEqual(p, ImpulsePredictor.Read(reader).Predict(data[0]));
+            var copy = ForceResidual.Read(reader);
+            Assert.AreEqual(force.SignedError, copy.SignedError);
+            Assert.AreEqual(ForceFallback.PeakImpulse, copy.Fallback);
+            Assert.AreEqual(0, copy.Before(previous, 0.9, p.Impulse, p.Uncertainty));
+        }
+
+        [Test]
+        public void PredictiveCorrectionAndLearningAreBoundedAndPersisted()
+        {
+            var predictor = new ContactPredictor();
+            var adaptive = new PredictiveMotor(MotorCondition.Adaptive, predictor);
+            var frozen = new PredictiveMotor(MotorCondition.Frozen, predictor);
+            var engineered = new PredictiveMotor(MotorCondition.Engineered, predictor);
+            var sensed = new ElbowLab.StepSample(1, 1, 0, 0.2, 0, 0,
+                new ElbowLab.Proprioception(0.1, 2, 1, -0.5));
+            var first = adaptive.Before(sensed, 1);
+            Assert.AreEqual(0, engineered.Before(sensed, 1).Correction);
+            Assert.That(first.Correction, Is.Negative);
+            for (int i = 0; i < 20; i++)
+            {
+                var prediction = adaptive.Before(sensed, 1);
+                Assert.That(Math.Abs(prediction.Correction), Is.LessThanOrEqualTo(PredictiveMotor.MaximumCorrection));
+                Assert.AreEqual(0.5, adaptive.After(prediction.Probability, sensed));
+                frozen.After(prediction.Probability, sensed);
+            }
+            Assert.AreEqual(1, adaptive.Gain);
+            Assert.AreEqual(0.75, frozen.Gain);
+            Assert.AreEqual(20, adaptive.Updates);
+            using var stream = new MemoryStream();
+            using var writer = new BinaryWriter(stream);
+            adaptive.WriteState(writer);
+            stream.Position = 0;
+            using var reader = new BinaryReader(stream);
+            var restored = PredictiveMotor.ReadState(reader, predictor);
+            Assert.AreEqual(adaptive.Before(sensed, 1), restored.Before(sensed, 1));
+            var forceful = new ElbowLab.StepSample(2, 1, 0.1, 2, 0, 0, sensed.Feedback);
+            restored.After(0.5, forceful);
+            Assert.IsTrue(restored.Stopped);
+            Assert.Throws<InvalidOperationException>(() => restored.Before(sensed, 1));
+        }
+
+        [Test]
+        public void TrainedContactProbabilitySurvivesReloadWithoutPrivilegedObjectData()
+        {
+            ElbowLab lab = Create(0.28, 0.20);
+            var rows = new List<ContactPredictor.Example>();
+            for (int i = 0; i < 15; i++)
+            {
+                var previous = lab.Latest;
+                rows.Add(new ContactPredictor.Example(previous, 0.9, lab.Step(0.9).NormalImpulse > 0));
+            }
+            var predictor = new ContactPredictor();
+            predictor.Train(rows, 200);
+            var probe = rows[3];
+            double expected = predictor.Predict(probe.Previous, probe.Requested);
+            Assert.AreNotEqual(0.5, expected);
+            var changed = new ElbowLab.StepSample(probe.Previous.Tick, 0, probe.Previous.PreviousAngle,
+                probe.Previous.NormalImpulse, 999, -999, probe.Previous.Feedback);
+            Assert.AreEqual(expected, predictor.Predict(changed, probe.Requested));
+            string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".predictor");
+            try
+            {
+                predictor.Save(path, "son", "numerical trial fixture", "unit test");
+                Assert.AreEqual(expected, ContactPredictor.Load(path, "son").Predict(changed, probe.Requested), 1e-12);
+                Assert.Throws<InvalidDataException>(() => ContactPredictor.Load(path, "daughter"));
+            }
+            finally { File.Delete(path); }
+        }
+
+        static ElbowLab Create(double x, double y, double mass = 0.25, double friction = 0.4) =>
+            new ElbowLab(new ElbowLab.Settings(-1.1, 1.3, 0, mass, friction, x, y, 80), "son");
+
+        [Test]
+        public void FreeMotionTracksTheJointWithoutFalseTactileSignals()
+        {
+            ElbowLab lab = Create(1, 1);
+            for (int i = 0; i < 35; i++)
+            {
+                ElbowLab.StepSample sample = lab.Step(0.9);
+                Assert.AreEqual(lab.Angle, sample.Feedback.Angle);
+                Assert.AreEqual(lab.Velocity, sample.Feedback.Velocity);
+                Assert.That(Math.Abs(sample.Feedback.Effort), Is.LessThanOrEqualTo(2));
+                Assert.AreEqual(0, sample.NormalImpulse);
+                Assert.AreEqual(0, sample.Feedback.Resistance);
+                for (int j = 0; j < ElbowLab.ReceptorCount; j++) Assert.AreEqual(0, lab.ReadRegion(j).Force);
+            }
+            Assert.That(lab.Angle, Is.EqualTo(0.9).Within(0.02));
+            Assert.AreEqual(1, lab.X);
+        }
+
+        [Test]
+        public void ContactDisplacesThePuckAndLocalizesToNeighboringRegions()
+        {
+            ElbowLab front = Create(0.28, 0.20);
+            ElbowLab back = Create(0.28, -0.20);
+            var a = FirstContact(front, 0.9);
+            var b = FirstContact(back, -0.9);
+            Assert.That(a.Feedback.Resistance, Is.LessThan(0));
+            Assert.That(b.Feedback.Resistance, Is.GreaterThan(0));
+            Assert.That(a.ObjectDeltaY, Is.GreaterThan(0));
+            Assert.That(b.ObjectDeltaY, Is.LessThan(0));
+            Assert.That(front.ReadRegion(4).Force, Is.GreaterThan(front.ReadRegion(0).Force));
+            Assert.That(back.ReadRegion(0).Force, Is.GreaterThan(back.ReadRegion(4).Force));
+            Assert.That(front.ReadRegion(3).Force, Is.GreaterThan(0));
+            Assert.IsTrue(ElbowLab.AreNeighbors(3, 4));
+        }
+
+        [Test]
+        public void MassPositionAndFrictionAffectObservedInteraction()
+        {
+            ElbowLab light = Create(0.28, 0.20, 0.1), heavy = Create(0.28, 0.20, 0.9);
+            Assert.That(FirstContact(light, 0.9).ObjectDeltaY, Is.GreaterThan(FirstContact(heavy, 0.9).ObjectDeltaY));
+            Assert.That(FirstContact(Create(0.30, 0.12), 0.9).Tick,
+                Is.LessThan(FirstContact(Create(0.28, 0.20), 0.9).Tick));
+            var smooth = Create(0.28, 0.20, friction: 0);
+            var rough = Create(0.28, 0.20, friction: 0.8);
+            FirstContact(smooth, 0.9);
+            FirstContact(rough, 0.9);
+            Assert.AreEqual(0, smooth.Spin);
+            Assert.That(Math.Abs(rough.Spin), Is.GreaterThan(0));
+        }
+
+        [Test]
+        public void DiskRestorePreservesExactContactTraceAndPendingCommand()
+        {
+            ElbowLab control = Create(0.28, 0.20), observed = Create(0.28, 0.20);
+            while (control.Tick < 22)
+            {
+                control.Step(0.9);
+                observed.Step(0.9);
+                for (int i = 0; i < ElbowLab.ReceptorCount; i++) observed.ReadRegion(i);
+            }
+            observed.RequestTarget(-0.55);
+            control.RequestTarget(-0.55);
+            string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".elbow");
+            try
+            {
+                observed.SaveCheckpoint(path);
+                observed = ElbowLab.LoadCheckpoint(path);
+                Assert.AreEqual("son", observed.IndividualId);
+                Assert.AreEqual(-0.55, observed.RequestedTarget);
+                while (!control.Finished)
+                {
+                    control.Step();
+                    observed.Step();
+                    Assert.AreEqual(control.Angle, observed.Angle, "joint angle");
+                    Assert.AreEqual(control.X, observed.X, "puck X");
+                    Assert.AreEqual(control.Spin, observed.Spin, "puck spin");
+                    CollectionAssert.AreEqual(control.CaptureCheckpoint(), observed.CaptureCheckpoint());
+                }
+                byte[] bad = File.ReadAllBytes(path);
+                bad[bad.Length - 1] ^= 1;
+                File.WriteAllBytes(path, bad);
+                Assert.Throws<InvalidDataException>(() => ElbowLab.LoadCheckpoint(path));
+                Assert.Throws<InvalidDataException>(() => observed.SaveCheckpoint(path));
+                CollectionAssert.AreEqual(bad, File.ReadAllBytes(path));
+            }
+            finally { File.Delete(path); }
+        }
+
+        static ElbowLab.StepSample FirstContact(ElbowLab lab, double target)
+        {
+            while (!lab.Finished)
+            {
+                ElbowLab.StepSample sample = lab.Step(target);
+                if (sample.NormalImpulse > 0) return sample;
+            }
+            Assert.Fail("Expected contact in the configured movement.");
+            return default;
+        }
+    }
+
+    public class WorldCheckpointTests
+    {
+        [Test]
+        public void TruncatedEnvelopeAndMissingPayloadAreRejectedWithoutChangingBackup()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            string path = Path.Combine(directory, "world");
+            try
+            {
+                var world = WorldSimulation.Create(PopulationConfig.CreateDefault(), QualityPreset.Phone, 7);
+                world.SaveCheckpoint(path);
+                byte[] valid = File.ReadAllBytes(path);
+                world.Tick();
+                world.SaveCheckpoint(path);
+                foreach (int length in new[] { 0, 1, 58, valid.Length - 1 })
+                {
+                    byte[] truncated = new byte[length];
+                    Array.Copy(valid, truncated, length);
+                    File.WriteAllBytes(path, truncated);
+                    Assert.Throws<InvalidDataException>(() => WorldSimulation.LoadPrimaryCheckpoint(path));
+                    Assert.Throws<InvalidDataException>(() => world.SaveCheckpoint(path));
+                    CollectionAssert.AreEqual(truncated, File.ReadAllBytes(path));
+                    CollectionAssert.AreEqual(valid, File.ReadAllBytes(path + ".previous"));
+                }
+                byte[] badManifest = (byte[])valid.Clone();
+                badManifest[1] = (byte)'X';
+                Assert.Throws<InvalidDataException>(() => WorldSimulation.RestoreCheckpoint(badManifest));
+            }
+            finally
+            {
+                if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            }
+        }
+
+        [Test]
+        public void WindowsShareLockPreventsReplacementAndPreservesBothGenerations()
+        {
+            if (Environment.OSVersion.Platform != PlatformID.Win32NT) Assert.Ignore("Windows share-mode test.");
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            string path = Path.Combine(directory, "world");
+            try
+            {
+                var world = WorldSimulation.Create(PopulationConfig.CreateDefault(), QualityPreset.Phone, 7);
+                world.SaveCheckpoint(path);
+                byte[] prior = File.ReadAllBytes(path);
+                world.Tick();
+                world.SaveCheckpoint(path);
+                byte[] current = File.ReadAllBytes(path);
+                world.Tick();
+                using (var locked = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+                    Assert.Catch<IOException>(() => world.SaveCheckpoint(path));
+                CollectionAssert.AreEqual(current, File.ReadAllBytes(path));
+                CollectionAssert.AreEqual(prior, File.ReadAllBytes(path + ".previous"));
+                Assert.That(Directory.GetFiles(directory, "*.pending"), Is.Empty);
+                Assert.AreEqual(1, WorldSimulation.LoadPrimaryCheckpoint(path).TickCount);
+            }
+            finally
+            {
+                if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            }
+        }
+
+        [TestCase(7)]
+        [TestCase(18)]
+        [TestCase(101)]
+        public void FileRoundTripContinuesAcrossNightAndDay(int seed)
+        {
+            string path = Path.GetTempFileName();
+            File.Delete(path);
+            try
+            {
+                var continuous = WorldSimulation.Create(PopulationConfig.CreateDefault(), QualityPreset.Phone, seed);
+                continuous.RunTicks(690);
+                continuous.Elements.Pour(13, 0.6f);
+                continuous.SaveCheckpoint(path);
+                WorldSimulation restarted = WorldSimulation.LoadCheckpoint(path);
+                AssertEquivalent(continuous, restarted);
+                for (int i = 0; i < 450; i++)
+                {
+                    continuous.Tick();
+                    restarted.Tick();
+                    if (i % 37 == 0 || i == 449) AssertEquivalent(continuous, restarted);
+                }
+                Assert.AreEqual(1, restarted.DayIndex);
+                Assert.IsFalse(restarted.IsNight);
+            }
+            finally { File.Delete(path); }
+        }
+
+        static void AssertEquivalent(WorldSimulation expected, WorldSimulation actual)
+        {
+            Assert.AreEqual(expected.TickCount, actual.TickCount, "clock tick");
+            Assert.AreEqual(expected.SimSeconds, actual.SimSeconds, "clock seconds");
+            CollectionAssert.AreEqual(expected.Elements.Water, actual.Elements.Water, "environment water");
+            CollectionAssert.AreEqual(expected.Elements.Temperature, actual.Elements.Temperature, "environment temperature");
+            foreach (SimChild learner in expected.Children)
+            {
+                SimChild restored = actual.Find(learner.Spec.Id);
+                Assert.AreEqual(learner.State.Generation, restored.State.Generation, learner.Spec.Id + " generation");
+                Assert.AreEqual(learner.Body.AgeDays, restored.Body.AgeDays, learner.Spec.Id + " age");
+                Assert.AreEqual(learner.X, restored.X, learner.Spec.Id + " X");
+                Assert.AreEqual(learner.Z, restored.Z, learner.Spec.Id + " Z");
+                CollectionAssert.AreEqual(learner.State.Walker.Genome, restored.State.Walker.Genome, learner.Spec.Id + " motor genome");
+                CollectionAssert.AreEqual(learner.Wetware.Snapshot().Weights, restored.Wetware.Snapshot().Weights,
+                    learner.Spec.Id + " wetware weights");
+                Assert.AreEqual(learner.State.ToJson(), restored.State.ToJson(), learner.Spec.Id + " persisted observations and memory");
+            }
+            CollectionAssert.AreEqual(expected.CaptureCheckpoint(), actual.CaptureCheckpoint(), "full checkpoint fields");
+        }
+
+        [Test]
+        public void InterruptedOrInvalidPublicationPreservesRecoverableFiles()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            string path = Path.Combine(directory, "world");
+            try
+            {
+                Assert.IsNull(WorldSimulation.LoadCheckpoint(path));
+                WorldSimulation world = WorldSimulation.Create(PopulationConfig.CreateDefault(), QualityPreset.Phone, 7);
+                world.SaveCheckpoint(path);
+                byte[] first = File.ReadAllBytes(path);
+                File.WriteAllBytes(path + ".interrupted.pending", new byte[] { 1 });
+                AssertEquivalent(world, WorldSimulation.LoadCheckpoint(path));
+                world.RunTicks(7);
+                world.SaveCheckpoint(path);
+                CollectionAssert.AreEqual(first, File.ReadAllBytes(path + ".previous"));
+                AssertEquivalent(world, WorldSimulation.LoadCheckpoint(path));
+
+                byte[] corrupt = File.ReadAllBytes(path);
+                corrupt[corrupt.Length - 1] ^= 1;
+                File.WriteAllBytes(path, corrupt);
+                Assert.Throws<InvalidDataException>(() => WorldSimulation.LoadCheckpoint(path));
+                Assert.Throws<InvalidDataException>(() => world.SaveCheckpoint(path));
+                CollectionAssert.AreEqual(corrupt, File.ReadAllBytes(path));
+                CollectionAssert.AreEqual(first, File.ReadAllBytes(path + ".previous"));
+
+                byte[] incompatible = (byte[])first.Clone();
+                incompatible[1 + "DreamMachine.World".Length] = 99;
+                Assert.Throws<InvalidDataException>(() => WorldSimulation.RestoreCheckpoint(incompatible));
+                File.Delete(path);
+                Assert.Throws<InvalidDataException>(() => WorldSimulation.LoadPrimaryCheckpoint(path));
+                Assert.Throws<InvalidDataException>(() => world.SaveCheckpoint(path));
+            }
+            finally
+            {
+                if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            }
+        }
+
+        [Test]
+        public void ExplicitResetPersistsLedgerAndPassiveCaptureDoesNotAppend()
+        {
+            var world = WorldSimulation.Create(PopulationConfig.CreateDefault(), QualityPreset.Phone, 7);
+            world.RunTicks(20);
+            world.CaptureCheckpoint();
+            Assert.That(world.ReadInterventions(), Is.Empty);
+            world.ResetLearnerForResearch("son", "Reset trial baseline");
+            var copied = WorldSimulation.RestoreCheckpoint(world.CaptureCheckpoint());
+            ResearchIntervention entry = copied.ReadInterventions()[0];
+            Assert.AreEqual("son", entry.EntityId);
+            Assert.AreEqual(20, entry.Tick);
+            Assert.AreEqual("reset-learner", entry.Kind);
+            Assert.AreEqual("Reset trial baseline", entry.Reason);
+            Assert.AreNotEqual(entry.Previous, entry.Result);
+            AssertEquivalent(world, copied);
+        }
+    }
+
+    public class SimulationClockTests
+    {
+        [Test]
+        public void PausedCatchupRetainsDebtAndOnlyOneExplicitStepRuns()
+        {
+            var world = WorldSimulation.Create(PopulationConfig.CreateDefault(), QualityPreset.Phone, 7);
+            var expected = WorldSimulation.Create(PopulationConfig.CreateDefault(), QualityPreset.Phone, 7);
+            var governor = new TimeGovernor { CatchingUp = true, Paused = true, Accumulator = 0.025f };
+            string before = world.StateHash().ToString();
+            Assert.AreEqual(0, governor.Plan(1f, WorldSimulation.Dt, 64));
+            Assert.AreEqual(before, world.StateHash().ToString());
+            governor.RequestSingleStep();
+            if (governor.TakeSingleStep()) world.Tick();
+            expected.Tick();
+            Assert.AreEqual(expected.StateHash(), world.StateHash());
+            Assert.AreEqual(1, world.TickCount);
+            Assert.AreEqual(WorldSimulation.Dt, world.SimSeconds);
+            Assert.IsTrue(governor.Paused);
+            Assert.IsTrue(governor.CatchingUp);
+            Assert.IsFalse(governor.TakeSingleStep());
+            Assert.AreEqual(0.025f, governor.Accumulator);
+            governor.Paused = false;
+            Assert.AreEqual(64, governor.Plan(1f, WorldSimulation.Dt, 64));
+        }
+    }
+
+    public class AgentSaveFileTests
+    {
+        [Test]
+        public void AtomicReplacementRestoresLatestBodyAndIgnoresInterruptedWrite()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            string path = Path.Combine(directory, "son.json");
+            try
+            {
+                Assert.IsNull(AgentSaveFile.Load(path));
+                PersonSpec spec = PopulationConfig.CreateDefault().Find("son");
+                AgentPersistentState state = AgentPersistentState.CreateNew(spec);
+                AgentSaveFile.Save(path, state);
+                Assert.AreEqual(0, AgentSaveFile.Load(path).Physiology.AgeDays);
+                state.Physiology.AgeDays = 2.5f;
+                AgentSaveFile.Save(path, state);
+                Assert.That(Directory.GetFiles(directory), Is.EquivalentTo(new[] { path }));
+                File.WriteAllText(path + ".interrupted.pending", "{");
+                var world = WorldSimulation.Create(PopulationConfig.CreateDefault(), QualityPreset.Phone, 7,
+                    person => AgentSaveFile.Load(Path.Combine(directory, person.Id + ".json")));
+                Assert.AreEqual(spec.BirthSeed, world.Find("son").State.BirthSeed);
+                Assert.AreEqual(2.5f, world.Find("son").State.Physiology.AgeDays);
+                Assert.AreEqual(0f, world.Find("daughter").State.Physiology.AgeDays);
+            }
+            finally
+            {
+                if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            }
+        }
+
+        [TestCase("{")]
+        [TestCase("null")]
+        [TestCase("{\"agentId\":\"son\",\"displayName\":\"Arthur\",\"birthSeed\":303,\"generation\":0,\"day\":0,\"ageDays\":-1}")]
+        public void InvalidSaveStaysOnDisk(string contents)
+        {
+            string path = Path.GetTempFileName();
+            try
+            {
+                File.WriteAllText(path, contents);
+                Assert.Throws<InvalidDataException>(() => AgentSaveFile.Load(path));
+                Assert.AreEqual(contents, File.ReadAllText(path));
+            }
+            finally { File.Delete(path); }
+        }
+
+        [Test]
+        public void RestoreRejectsAnotherIndividualOrBirthSeed()
+        {
+            PopulationConfig population = PopulationConfig.CreateDefault();
+            AgentPersistentState saved = AgentPersistentState.CreateNew(population.Find("daughter"));
+            Assert.Throws<InvalidDataException>(() => WorldSimulation.Create(population, QualityPreset.Phone, 7,
+                spec => spec.Id == "son" ? saved : null));
+            saved.AgentId = "son";
+            Assert.Throws<InvalidDataException>(() => WorldSimulation.Create(population, QualityPreset.Phone, 7,
+                spec => spec.Id == "son" ? saved : null));
+        }
+    }
+
+    public class HumanoidAnatomyTests
+    {
+        [Test]
+        public void BirthSeedAndAgeDetermineDistinctSegmentProportions()
+        {
+            var profile = new HumanoidAnatomy(12);
+            var newborn = profile.AtAge(0);
+            var adult = profile.AtAge(HumanoidAnatomy.AdultAgeDays);
+            Assert.AreEqual(adult, new HumanoidAnatomy(12).AtAge(6));
+            Assert.AreNotEqual(adult, new HumanoidAnatomy(125).AtAge(6));
+            Assert.AreEqual(adult, profile.AtAge(200));
+            Assert.That(newborn.Head / newborn.Height, Is.InRange(0.23f, 0.26f));
+            Assert.That(adult.Head / adult.Height, Is.InRange(0.12f, 0.14f));
+            Assert.AreEqual(adult.Height, adult.PelvisHeight + adult.Torso + adult.Neck + adult.Head, 0.0001f);
+            Assert.Greater(adult.Forearm / newborn.Forearm, adult.Head / newborn.Head);
+
+            for (int seed = 0; seed < 64; seed++)
+            {
+                var anatomy = new HumanoidAnatomy(seed);
+                var last = anatomy.AtAge(0);
+                for (int step = 1; step <= 96; step++)
+                {
+                    var next = anatomy.AtAge(step / 16f);
+                    Assert.Greater(next.Height, last.Height);
+                    Assert.Greater(next.GripReach, last.GripReach);
+                    Assert.Greater(next.Torso, 0f);
+                    last = next;
+                }
+            }
+        }
+
+        [Test]
+        public void SleepStagesGrowReachAndChangeTheSameMotorCommandOutcome()
+        {
+            Assert.AreEqual(0f, WorldSimulation.AnatomyAge(0.60f));
+            Assert.That(WorldSimulation.AnatomyAge(0.85f), Is.InRange(0.4f, 0.6f));
+            Assert.AreEqual(1f, WorldSimulation.AnatomyAge(1.60f));
+            var profile = new HumanoidAnatomy(75);
+            var newborn = profile.AtAge(0);
+            var adult = profile.AtAge(6);
+            Assert.IsFalse(newborn.WithinGripReach(0.35f));
+            Assert.IsTrue(adult.WithinGripReach(0.35f));
+            newborn.GripPosition(-(float)Math.PI / 2f, 0f, out float childDown, out float childForward);
+            adult.GripPosition(-(float)Math.PI / 2f, 0f, out float adultDown, out float adultForward);
+            Assert.AreEqual(0f, childDown, 0.00001f);
+            Assert.AreEqual(0f, adultDown, 0.00001f);
+            Assert.AreEqual(newborn.GripReach, childForward, 0.00001f);
+            Assert.AreEqual(adult.GripReach, adultForward, 0.00001f);
+        }
+
+        [Test]
+        public void CheckpointRestoresSeededMatureBodyIntoTheKernelAndReadsLegacySaves()
+        {
+            var population = PopulationConfig.CreateDefault();
+            PersonSpec son = population.Find("son");
+            var state = AgentPersistentState.CreateNew(son);
+            state.Physiology.AgeDays = 3.82f;
+            state.Physiology.RecomputeGrowth();
+            var restored = AgentPersistentState.FromJson(state.ToJson(), false);
+            var legacy = state.ToData();
+            legacy.Remove("anatomyVersion");
+            var previousFormat = AgentPersistentState.FromJson(MiniJson.Stringify(legacy), false);
+            var world = WorldSimulation.Create(population, QualityPreset.Phone, 7, spec => spec.Id == son.Id ? restored : null);
+            SimChild child = world.Find(son.Id);
+            float age = WorldSimulation.AnatomyAge(state.Physiology.AgeDays);
+            Assert.AreSame(restored, child.State);
+            Assert.AreEqual(state.Physiology.AgeDays, child.Body.AgeDays);
+            Assert.AreEqual(state.Anatomy.AtAge(age), child.State.Anatomy.AtAge(age));
+            Assert.AreEqual(previousFormat.Anatomy.AtAge(age), child.State.Anatomy.AtAge(age));
+            Assert.AreEqual(state.Anatomy.NewbornHeight, world.ResetChild(son.Id).State.Anatomy.AtAge(0).Height);
+            Assert.AreEqual(0f, child.Body.AgeDays);
+        }
+    }
+
+    public class PilotLibraryArchiveTests
+    {
+        string _root;
+
+        [SetUp]
+        public void SetUp() => _root = Path.Combine(Path.GetTempPath(), "dreamer-archive-" + Guid.NewGuid().ToString("N"));
+
+        [TearDown]
+        public void TearDown()
+        {
+            if (Directory.Exists(_root)) Directory.Delete(_root, true);
+        }
+
+        [Test]
+        public void LibrariesExposeRealHistoryAndNavigateAcrossShelves()
+        {
+            var archive = new PilotLibraryArchive(_root, reserve: 0);
+            PilotVolume volume = archive.Capture(12, true, true);
+            var acquired = archive.Search(volume.Id, LibraryShelf.Knowledge);
+            var hypotheses = archive.Search(volume.Id, LibraryShelf.Possibility, "hypothesis");
+            var teacher = archive.Search(volume.Id, LibraryShelf.LivedMemory, "teacher");
+            Assert.IsNotEmpty(acquired);
+            Assert.AreEqual(1, hypotheses.Count);
+            Assert.AreEqual(1, teacher.Count);
+            StringAssert.Contains("probabilityOfEffect", archive.Read(volume.Id, acquired[0].Id));
+
+            LibraryBook hypothesis = hypotheses[0];
+            LibraryBook replay = archive.GetBook(volume.Id, hypothesis.Links[0]);
+            StringAssert.StartsWith("Replay", replay.Title);
+            Assert.AreEqual(LibraryShelf.LivedMemory, replay.Shelf);
+            StringAssert.StartsWith("Probe", archive.ReferencedBy(volume.Id, hypothesis.Id)[0].Title);
+            Assert.AreEqual(LatchRoomSimulation.TeacherTick, teacher[0].Tick);
+
+            PilotVolume empty = archive.Capture(13, true, true, 0);
+            Assert.Throws<KeyNotFoundException>(() => archive.Read(empty.Id, teacher[0].Id));
+            Assert.AreEqual(PilotLibraryArchive.PageSize, archive.Search(volume.Id, LibraryShelf.LivedMemory).Count);
+            Assert.IsNotEmpty(archive.Search(volume.Id, LibraryShelf.LivedMemory, after: 40));
+        }
+
+        [Test]
+        public void RestorationReplaysTheSameStateAndContinuesAfterBrowsing()
+        {
+            var archive = new PilotLibraryArchive(_root, reserve: 0);
+            PilotVolume volume = archive.Capture(12, true, true, LatchRoomSimulation.WakeTick);
+            var restored = archive.Restore(volume.Id);
+            Assert.AreEqual(LatchRoomSimulation.WakeTick, restored.TickCount);
+            foreach (LibraryBook book in archive.Search(volume.Id, LibraryShelf.Knowledge)) archive.Read(volume.Id, book.Id);
+            restored.RunTicks(LatchRoomSimulation.EndTick);
+            var original = new LatchRoomSimulation(12, true, true);
+            original.RunTicks(LatchRoomSimulation.EndTick);
+            CollectionAssert.AreEqual(original.Trace, restored.Trace);
+            CollectionAssert.AreEqual(original.LivedMemory, restored.LivedMemory);
+        }
+
+        [Test]
+        public void DuplicateBodiesUseOneBlobAndRejectedCapturePreservesPriorRecords()
+        {
+            var archive = new PilotLibraryArchive(_root, reserve: 0);
+            PilotVolume first = archive.Capture(50, false, false, 1);
+            LibraryStorage before = archive.Storage();
+            Assert.AreEqual(first.Id, archive.Capture(50, false, false, 1).Id);
+            archive.Capture(51, false, false, 1);
+            LibraryStorage shared = archive.Storage();
+            Assert.AreEqual(before.Blobs, shared.Blobs);
+            Assert.AreEqual(before.Books * 2, shared.Books);
+
+            var full = new PilotLibraryArchive(_root, shared.PhysicalBytes, 0);
+            Assert.Throws<IOException>(() => full.Capture(52, true, true));
+            Assert.AreEqual(shared.PhysicalBytes, full.Storage().PhysicalBytes);
+            Assert.IsNotEmpty(full.Read(first.Id, 1));
+        }
+
+        [Test]
+        public void InterruptedCatalogIsInvisibleAndCorruptedBodiesReportFailure()
+        {
+            var archive = new PilotLibraryArchive(_root, reserve: 0);
+            PilotVolume volume = archive.Capture(1, false, false, 1);
+            File.WriteAllText(Path.Combine(_root, "volumes", "interrupted.pending"), "incomplete");
+            Assert.AreEqual(1, archive.Volumes().Count);
+            foreach (string blob in Directory.GetFiles(Path.Combine(_root, "blobs")))
+                File.WriteAllText(blob, "bad gzip");
+            Assert.Throws<InvalidDataException>(() => archive.Read(volume.Id, 1));
+        }
+    }
+
+    public class DiscoveryRoomTests
+    {
+        [Test]
+        public void FixedTicksPreserveQuestionsAcrossNightAndKeepProbesOutOfTraining()
+        {
+            var room = new DiscoveryRoom(14, 9, true, true);
+            room.RunTicks(LatchRoomSimulation.NightTick);
+            var question = room.Questions[0];
+            int evidenceBeforeSleep = question.Evidence.Count;
+            room.RunTicks(LatchRoomSimulation.WakeTick - LatchRoomSimulation.NightTick);
+            Assert.AreSame(question, room.Questions[0]);
+            Assert.AreEqual(evidenceBeforeSleep, question.Evidence.Count);
+
+            while (room.TickCount < DiscoveryRoom.EndTick - 1) room.RunTicks(1);
+            Assert.AreEqual(18, room.Attempts.Count);
+            Assert.IsNull(room.Transferred);
+            bool followedRehearsal = false;
+            foreach (DiscoveryAttempt attempt in room.Attempts)
+            {
+                Assert.AreNotEqual(DiscoveryRoom.HeldOutCue, attempt.Cue);
+                if (!attempt.ReplaySource.HasValue) continue;
+                var remembered = room.Attempts[attempt.ReplaySource.Value - 1];
+                Assert.Less(remembered.Tick, LatchRoomSimulation.NightTick);
+                Assert.Greater(attempt.Tick, LatchRoomSimulation.WakeTick);
+                Assert.AreEqual(remembered.Control, attempt.Control);
+                Assert.AreEqual(remembered.Cue, attempt.Cue);
+                Assert.AreNotEqual(remembered.Movement, attempt.Movement);
+                followedRehearsal = true;
+            }
+            Assert.IsTrue(followedRehearsal);
+            room.RunTicks(1);
+            Assert.IsNotNull(room.Retained);
+            Assert.IsNotNull(room.Transferred);
+            Assert.AreEqual(18, room.Attempts.Count);
+        }
+
+        [Test]
+        public void BatchedRunsMatchAndAblationsKeepTheSameOpportunities()
+        {
+            var full = new DiscoveryRoom(51, 8, true, true);
+            var batched = new DiscoveryRoom(51, 8, true, true);
+            var baseline = new DiscoveryRoom(51, 8, false, false);
+            full.RunTicks(DiscoveryRoom.EndTick);
+            baseline.RunTicks(DiscoveryRoom.EndTick);
+            while (batched.TickCount < DiscoveryRoom.EndTick) batched.RunTicks(37);
+
+            CollectionAssert.AreEqual(full.Attempts, batched.Attempts);
+            Assert.AreEqual(full.Transferred, batched.Transferred);
+            Assert.AreEqual(full.Attempts.Count, baseline.Attempts.Count);
+            for (int i = 0; i < full.Attempts.Count; i++)
+            {
+                var a = full.Attempts[i];
+                var b = baseline.Attempts[i];
+                Assert.AreEqual(a.Tick, b.Tick);
+                Assert.AreEqual(a.Cue, b.Cue);
+                if (a.Control == b.Control && a.Movement == b.Movement) Assert.AreEqual(a.Effect, b.Effect);
+            }
+        }
+
+        [Test]
+        public void MaximumTrainingBudgetKeepsProbabilitiesFinite()
+        {
+            var room = new DiscoveryRoom(75, DiscoveryRoom.MaximumAttemptsPerDay, false, false);
+            room.RunTicks(DiscoveryRoom.EndTick);
+            Assert.AreEqual(2 * DiscoveryRoom.MaximumAttemptsPerDay, room.Attempts.Count);
+            foreach (DiscoveryQuestion question in room.Questions)
+            {
+                double total = question.NoiseProbability;
+                for (int model = 0; model < DiscoveryQuestion.MechanismCount; model++)
+                    total += question.MechanismProbability(model);
+                Assert.AreEqual(1d, total, 1e-12);
+            }
+        }
+    }
+
+    public class LatchRoomTests
+    {
+        [Test]
+        public void SameSeedAndSettingsProduceIdenticalTraceInDifferentBatches()
+        {
+            var whole = new LatchRoomSimulation(12, true, true);
+            var batched = new LatchRoomSimulation(12, true, true);
+            whole.RunTicks(LatchRoomSimulation.EndTick);
+            while (batched.TickCount < LatchRoomSimulation.EndTick) batched.RunTicks(17);
+            batched.RunTicks(17);
+
+            Assert.AreEqual(whole.TickCount, batched.TickCount);
+            Assert.AreEqual(whole.Trace, batched.Trace);
+            Assert.AreEqual(whole.LivedMemory, batched.LivedMemory);
+        }
+
+        [Test]
+        public void DreamComesFromOwnFeedbackAndNextDayProbeTestsIt()
+        {
+            var room = new LatchRoomSimulation(12, true, true);
+            room.RunTicks(LatchRoomSimulation.NightTick);
+            int wakingMemories = room.LivedMemory.Count;
+            room.RunTicks(LatchRoomSimulation.WakeTick - LatchRoomSimulation.NightTick);
+
+            Assert.AreEqual(wakingMemories, room.LivedMemory.Count);
+            RoomEvent idea = Find(room.Trace, RoomEventKind.Hypothesis);
+            RoomEvent replay = room.Trace[idea.ParentId.Value - 1];
+            RoomEvent memory = room.Trace[replay.ParentId.Value - 1];
+            RoomEvent feedback = room.Trace[memory.ParentId.Value - 1];
+            Assert.AreEqual(RoomEventKind.Feedback, feedback.Kind);
+            Assert.AreEqual(RoomEventKind.Memory, memory.Kind);
+            Assert.Less(memory.Tick, LatchRoomSimulation.NightTick);
+            Assert.AreNotEqual(memory.Action, idea.Action);
+
+            room.RunTicks(LatchRoomSimulation.EndTick - LatchRoomSimulation.WakeTick);
+            RoomEvent probe = Find(room.Trace, RoomEventKind.Probe);
+            Assert.AreEqual(idea.Id, probe.ParentId);
+            Assert.AreEqual(idea.Action, probe.Action);
+            Assert.AreEqual(LatchRoomSimulation.WakeTick, probe.Tick);
+            Assert.IsTrue(room.LivedMemory[room.LivedMemory.Count - 1].Transfer);
+        }
+
+        [Test]
+        public void ExperimentalSwitchesChangePolicyWithoutChangingOpportunitiesOrDemonstration()
+        {
+            var baseline = new LatchRoomSimulation(12, false, false);
+            var integrated = new LatchRoomSimulation(12, true, true);
+            baseline.RunTicks(LatchRoomSimulation.EndTick);
+            integrated.RunTicks(LatchRoomSimulation.EndTick);
+
+            Assert.AreEqual(baseline.LivedMemory.Count, integrated.LivedMemory.Count);
+            foreach (RoomEvent entry in baseline.Trace)
+            {
+                Assert.AreNotEqual(RoomEventKind.Question, entry.Kind);
+                Assert.AreNotEqual(RoomEventKind.Hypothesis, entry.Kind);
+            }
+            Assert.AreEqual(1, Find(integrated.Trace, RoomEventKind.Question).Tick);
+            RoomEvent baselineTeacher = Find(baseline.Trace, RoomEventKind.TeacherDemonstration);
+            RoomEvent integratedTeacher = Find(integrated.Trace, RoomEventKind.TeacherDemonstration);
+            Assert.AreEqual(baselineTeacher.Tick, integratedTeacher.Tick);
+            Assert.AreEqual(baselineTeacher.Action, integratedTeacher.Action);
+            Assert.AreEqual(baselineTeacher.Effect, integratedTeacher.Effect);
+        }
+
+        static RoomEvent Find(IReadOnlyList<RoomEvent> trace, RoomEventKind kind)
+        {
+            foreach (RoomEvent entry in trace)
+                if (entry.Kind == kind) return entry;
+            throw new AssertionException("Missing room event " + kind);
+        }
+    }
+
     public class SeedAndAtlasTests
     {
         [Test]
@@ -565,6 +1398,27 @@ namespace DreamMachine.Tests
     public class TimeFidelityTests
     {
         [Test]
+        public void RunBudget_MeasuresTheWholeBatchAndPreservesTickState()
+        {
+            PopulationConfig population = PopulationConfig.CreateDefault();
+            WorldSimulation budgeted = WorldSimulation.Create(population, QualityPreset.Laptop, 5);
+            WorldSimulation replay = WorldSimulation.Create(population, QualityPreset.Laptop, 5);
+            const double budgetMs = 20;
+            const int hardCap = 100000;
+            budgeted.RunTicks(256);
+            replay.RunTicks(256);
+
+            SimProfile profile = budgeted.RunBudget(hardCap, budgetMs, 0.016f, 1000f, false, 0f);
+
+            Assert.Greater(profile.Ticks, 0);
+            Assert.Less(profile.Ticks, hardCap);
+            Assert.GreaterOrEqual(profile.Ticks / (double)profile.TicksPerSecond * 1000, budgetMs - 0.01);
+            replay.RunTicks(profile.Ticks);
+            Assert.AreEqual(replay.TickCount, budgeted.TickCount);
+            Assert.AreEqual(replay.StateHash(), budgeted.StateHash());
+        }
+
+        [Test]
         public void FastForward_MatchesOneByOne_AndJumpIsJustMoreTicks()
         {
             PopulationConfig pop = PopulationConfig.CreateDefault();
@@ -608,6 +1462,29 @@ namespace DreamMachine.Tests
             Assert.Greater(planned, 1);
         }
     }
+
+#if UNITY_EDITOR
+    public class DreamMachineSceneTests
+    {
+        [Test]
+        public void MainCamera_HasNormalizedRotationInEditMode()
+        {
+            var scene = UnityEditor.SceneManagement.EditorSceneManager.OpenPreviewScene("Assets/Scenes/DreamMachine.unity");
+            try
+            {
+                var camera = Array.Find(scene.GetRootGameObjects(), root => root.CompareTag("MainCamera"));
+                Assert.IsNotNull(camera);
+                Assert.IsNotNull(camera.GetComponent<UnityEngine.Camera>());
+                var rotation = camera.transform.localRotation;
+                Assert.AreEqual(1f, UnityEngine.Quaternion.Dot(rotation, rotation), 0.000001f);
+            }
+            finally
+            {
+                UnityEditor.SceneManagement.EditorSceneManager.ClosePreviewScene(scene);
+            }
+        }
+    }
+#endif
 
     public class MiniJsonTests
     {

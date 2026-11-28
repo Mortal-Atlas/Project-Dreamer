@@ -1,0 +1,3 @@
+scenario,learner,prior_xz_m,prior_tick,prior_still_seen_during_movement,narrow_miss,wider_xz_m,seen_tick,uncertain
+run,son,-0.868/1.886,100,False,True,-0.524/1.884,203,False
+unobserved,son,-0.868/1.886,100,False,True,-0.524/1.884,203,False

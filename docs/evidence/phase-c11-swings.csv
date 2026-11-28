@@ -1,0 +1,7 @@
+seed,controller,stance,outcome,reason,max_clearance_m,max_forward_m,bilateral_ticks_next_40,first_fall_tick
+606,FrontalPose,0,Aborted,stance-contact-lost,0.001474,0.000000,11,326
+606,FrontalPose,1,Aborted,stance-contact-lost,0.001115,0.000000,11,326
+707,FrontalPose,0,Aborted,stance-contact-lost,0.002463,0.001386,11,326
+707,FrontalPose,1,Aborted,stance-contact-lost,0.001977,0.000536,11,326
+808,FrontalPose,0,Aborted,stance-contact-lost,0.004507,0.001643,18,333
+808,FrontalPose,1,Aborted,stance-contact-lost,0.003978,0.001453,20,-1

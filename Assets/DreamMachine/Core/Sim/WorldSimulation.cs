@@ -46,7 +46,7 @@ namespace DreamMachine.Sim
     /// One fixed-step tick of the whole household.
     /// Fast-forward calls this same method. It never coarsens the step.
     /// </summary>
-    public sealed class WorldSimulation
+    public sealed partial class WorldSimulation
     {
         public const float Dt = 0.05f;
         public const float DayLength = 52f;
@@ -63,11 +63,19 @@ namespace DreamMachine.Sim
         public PopulationConfig Population;
         public readonly List<SimChild> Children = new List<SimChild>();
         public readonly List<PhysiologySample> PhysiologyLog = new List<PhysiologySample>();
+        public HouseholdLife Home { get; private set; }
         readonly float[] _parentA = new float[10];
         readonly float[] _parentB = new float[10];
         readonly float[] _wetIn = new float[4];
-        readonly Stopwatch _clock = new Stopwatch();
         int _lastLoggedDay = -1;
+
+        public bool EnableHouseholdLife()
+        {
+            if (!Population.IsHousehold || Population.People.Count != 4 || Population.Find("father") == null ||
+                Population.Find("mother") == null || Find("son") == null || Find("daughter") == null) return false;
+            if (Home == null) Home = new HouseholdLife(this);
+            return true;
+        }
 
         public bool IsNight
         {
@@ -94,9 +102,12 @@ namespace DreamMachine.Sim
             if (stage == LifeStage.Toddler) return 0.2f;
             if (stage == LifeStage.Child) return 1f;
             if (stage == LifeStage.Teen) return 3f;
-            if (stage == LifeStage.Adult) return 6f;
+            if (stage == LifeStage.Adult) return HumanoidAnatomy.AdultAgeDays;
             return 0f;
         }
+
+        public static float AnatomyAge(float chronologicalDays) =>
+            HumanoidAnatomy.SleepAge(chronologicalDays, AwakeLength / DayLength);
 
         public static int GridFor(QualityPreset preset)
         {
@@ -106,6 +117,10 @@ namespace DreamMachine.Sim
         }
 
         public static WorldSimulation Create(PopulationConfig population, QualityPreset preset, int worldSeed)
+            => Create(population, preset, worldSeed, null);
+
+        public static WorldSimulation Create(PopulationConfig population, QualityPreset preset, int worldSeed,
+            Func<PersonSpec, AgentPersistentState> restore)
         {
             var world = new WorldSimulation();
             world.Population = population;
@@ -118,17 +133,51 @@ namespace DreamMachine.Sim
                 PersonSpec spec = babies[i];
                 var child = new SimChild();
                 child.Spec = spec;
-                child.State = AgentPersistentState.CreateNew(spec);
-                child.Body = child.State.Physiology;
-                child.Mind = new AgentMind(spec.BirthSeed, MindCondition.Full);
-                child.Mind.Library = child.State.Library;
-                child.Wetware = new HebbianWetware(4, 3, spec.BirthSeed);
-                child.State.Walker.RecordRolloutRom = false;
+                AgentPersistentState saved = restore?.Invoke(spec);
+                if (saved != null && (saved.AgentId != spec.Id || saved.BirthSeed != spec.BirthSeed))
+                    throw new System.IO.InvalidDataException("Save identity or birth seed does not match " + spec.Id + ".");
+                BindChildState(child, saved ?? AgentPersistentState.CreateNew(spec));
                 child.X = spec.Id == "daughter" ? 0.7f : -0.7f;
                 child.Z = 0.4f;
                 world.Children.Add(child);
             }
             return world;
+        }
+
+        static void BindChildState(SimChild child, AgentPersistentState state)
+        {
+            child.State = state;
+            child.Body = state.Physiology;
+            child.Mind = new AgentMind(child.Spec.BirthSeed, MindCondition.Full) { Library = state.Library };
+            child.Wetware = new HebbianWetware(4, 3, child.Spec.BirthSeed);
+            state.Walker.RecordRolloutRom = false;
+        }
+
+        public SimChild ResetChild(string id)
+        {
+            SimChild child = Find(id);
+            if (child == null) return null;
+            if (PhysicalPractice?.Active == true && PhysicalPractice.Individual == id)
+                throw new InvalidOperationException("Return the learner to Living before resetting.");
+            if (Home?.BallIntent is BallTransferIntent intent && Home.PersonId(intent.Actor) == id)
+                throw new InvalidOperationException("Finish the live ball transfer before resetting.");
+            var practiceMemory = PhysicalPractice?.Individual == id ? child.State.Library : null;
+            var ballMemory = Home?.BallManaged == true ? child.State.Library : null;
+            BindChildState(child, AgentPersistentState.CreateNew(child.Spec));
+            if (practiceMemory != null)
+                foreach (var attempt in PhysicalPractice.Records)
+                {
+                    var record = practiceMemory.GetOrNull(attempt.MemoryId);
+                    child.State.Library.RecordExperience(record.Id, record.Statement, record.Appendices[0].Evidence, attempt.End);
+                }
+            if (ballMemory != null)
+                foreach (var record in ballMemory.All())
+                    if (record.Source == "firsthand-ball-transfer" || record.Source == "firsthand-ball-observation")
+                        child.State.Library.RecordExperience(record.Id, record.Statement, record.Appendices[0].Evidence,
+                            record.Appendices[0].Timestamp, record.Source);
+            child.SawParentPour = false;
+            Home?.ReplaceLearner(child);
+            return child;
         }
 
         public SimChild Find(string id)
@@ -142,10 +191,9 @@ namespace DreamMachine.Sim
 
         public void Tick()
         {
-            long t0 = _clock.ElapsedTicks;
             Elements.Step(Dt);
-            long t1 = _clock.ElapsedTicks;
             bool night = IsNight;
+            Home?.Step(night);
             FamilyRoutine routine = PopulationConfig.RoutineAt(SimSeconds, DayLength, AwakeLength);
             string parentClip = ClipFor(routine, night);
             PersonSpec father = Population.Find("father");
@@ -158,7 +206,6 @@ namespace DreamMachine.Sim
             {
                 StepChild(Children[i], night, routine);
             }
-            long t2 = _clock.ElapsedTicks;
             SimSeconds += Dt;
             TickCount++;
             int day = DayIndex;
@@ -170,36 +217,33 @@ namespace DreamMachine.Sim
                     PhysiologyLog.Add(PhysiologySample.From(Children[i], day, night ? "night" : "awake"));
                 }
             }
-            _clock.Stop();
         }
 
         public int RunTicks(int count)
         {
-            _clock.Restart();
             int n = 0;
             while (n < count)
             {
                 Tick();
                 n++;
             }
-            _clock.Stop();
             return n;
         }
 
         public SimProfile RunBudget(int hardCap, double budgetMs, float realDt, float requestedScale, bool catchUp, float catchAge)
         {
             var profile = new SimProfile();
-            _clock.Restart();
+            var clock = Stopwatch.StartNew();
             int n = 0;
-            while (n < hardCap && _clock.Elapsed.TotalMilliseconds < budgetMs)
+            while (n < hardCap && clock.Elapsed.TotalMilliseconds < budgetMs)
             {
                 if (catchUp && MinAgeDays() >= catchAge) break;
                 Tick();
                 n++;
             }
-            _clock.Stop();
+            clock.Stop();
             profile.Ticks = n;
-            double seconds = _clock.Elapsed.TotalSeconds;
+            double seconds = clock.Elapsed.TotalSeconds;
             profile.TicksPerSecond = seconds > 0 ? (float)(n / seconds) : 0f;
             profile.AchievedScale = realDt > 0.000001f ? (float)((n * Dt) / realDt) : 0f;
             if (!catchUp && requestedScale > 0f && profile.AchievedScale > requestedScale)
@@ -304,7 +348,7 @@ namespace DreamMachine.Sim
             child.Wetware.Step(Dt, _wetIn);
             float[] brain = child.Wetware.Readout();
             bool meal = routine == FamilyRoutine.MorningMeal || routine == FamilyRoutine.EveningMeal;
-            bool eat = meal && child.Body.Hunger > 0.35f && !night;
+            bool eat = Home != null ? Home.Ate(child.Spec.Id) : meal && child.Body.Hunger > 0.35f && !night;
             PersonSpec same = Population.PrimaryRoleModel(child.Spec);
             PersonSpec other = Population.OtherParent(child.Spec);
             var input = new PhysInput
@@ -332,14 +376,14 @@ namespace DreamMachine.Sim
                 if (burn >= 0) Elements.Pour(burn, 0.35f);
                 child.SawParentPour = true;
             }
-            if ((TickCount % LearnEvery) == 0)
+            if (Home == null && (TickCount % LearnEvery) == 0)
             {
                 if (night) Dream(child);
                 else Practice(child, same, other);
             }
             if ((TickCount % PerceiveEvery) == 0) Perceive(child, pain, smoke, cell);
             if ((TickCount % 40) == 0) child.Body.WriteRom(child.State.Muscles, DayIndex);
-            if (!night && routine == FamilyRoutine.Play)
+            if (Home == null && !night && routine == FamilyRoutine.Play)
             {
                 float speed = child.State.Walker.BestDistance / 4f;
                 if (speed < 0f) speed = 0f;
@@ -347,8 +391,10 @@ namespace DreamMachine.Sim
                 speed *= child.Body.WalkForceScale;
                 child.Yaw = child.Spec.Id == "daughter" ? 40f : -30f;
                 float rad = child.Yaw * 0.0174533f;
-                child.X += (float)Math.Sin(rad) * speed * Dt;
-                child.Z += (float)Math.Cos(rad) * speed * Dt;
+                float dx = (float)Math.Sin(rad) * speed * Dt, dz = (float)Math.Cos(rad) * speed * Dt;
+                float clear = YardClearance.MotionFraction(child.X, child.Z, dx, dz, 0.12f);
+                child.X += dx * clear;
+                child.Z += dz * clear;
             }
             if (child.X > 7.5f) child.X = 7.5f;
             if (child.X < -7.5f) child.X = -7.5f;
@@ -400,7 +446,7 @@ namespace DreamMachine.Sim
             }
             if (smoke > 0.15f) Remember(child, "smoke", "class:smoke");
             if (Elements.Steam[cell] > 0.1f) Remember(child, "steam", "class:steam");
-            if ((TickCount % 48) == 0 && child.Mind != null)
+            if (Home == null && (TickCount % 48) == 0 && child.Mind != null)
             {
                 var pool = HiddenRuleWorld.StandardPool();
                 int pick = (TickCount + child.Spec.BirthSeed) % pool.Count;
@@ -486,6 +532,44 @@ namespace DreamMachine.Sim
         public float WalkForceScale;
         public float NerveDelaySeconds;
 
+        internal void WriteCheckpoint(System.IO.BinaryWriter writer)
+        {
+            writer.Write(AgeDays);
+            writer.Write(Maturity);
+            writer.Write(HeartRate);
+            writer.Write(BreathingRate);
+            writer.Write(Energy);
+            writer.Write(Hunger);
+            writer.Write(Cortisol);
+            writer.Write(Oxytocin);
+            writer.Write(Melatonin);
+            writer.Write(Pain);
+            writer.Write(MeanActivation);
+            writer.Write(MeanForce);
+            writer.Write(MeanFatigue);
+            writer.Write(WalkForceScale);
+            writer.Write(NerveDelaySeconds);
+        }
+
+        internal void ReadCheckpoint(System.IO.BinaryReader reader)
+        {
+            AgeDays = reader.ReadSingle();
+            Maturity = reader.ReadSingle();
+            HeartRate = reader.ReadSingle();
+            BreathingRate = reader.ReadSingle();
+            Energy = reader.ReadSingle();
+            Hunger = reader.ReadSingle();
+            Cortisol = reader.ReadSingle();
+            Oxytocin = reader.ReadSingle();
+            Melatonin = reader.ReadSingle();
+            Pain = reader.ReadSingle();
+            MeanActivation = reader.ReadSingle();
+            MeanForce = reader.ReadSingle();
+            MeanFatigue = reader.ReadSingle();
+            WalkForceScale = reader.ReadSingle();
+            NerveDelaySeconds = reader.ReadSingle();
+        }
+
         public static PhysiologySample From(SimChild child, int day, string phase)
         {
             PhysiologyState body = child.Body;
@@ -521,11 +605,26 @@ namespace DreamMachine.Sim
         public bool Paused;
         public bool CatchingUp;
         public LifeStage CatchStage;
+        bool _singleStepPending;
+
+        public void RequestSingleStep()
+        {
+            Paused = true;
+            _singleStepPending = true;
+        }
+
+        public bool TakeSingleStep()
+        {
+            bool step = _singleStepPending && Paused;
+            _singleStepPending = false;
+            return step;
+        }
+
         public const int HardCap = 4000;
 
         public int Plan(float realDt, float fixedDt, int budgetTicks)
         {
-            if (Paused && !CatchingUp)
+            if (Paused)
             {
                 AchievedScale = 0f;
                 return 0;

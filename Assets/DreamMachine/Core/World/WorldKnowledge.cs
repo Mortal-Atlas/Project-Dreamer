@@ -86,9 +86,9 @@ namespace DreamMachine.World
                     Color = colors[i % 4],
                     Shape = shapes[(i / 4) % 4],
                     Mark = marks[(i / 2) % 3],
-                    WorldX = (i % 6) * 1.7f - 4.25f,
+                    WorldX = (i % YardClearance.Columns) * YardClearance.PropSpacing + YardClearance.PropStartX,
                     WorldY = 0.45f,
-                    WorldZ = (i / 6) * 1.7f - 1.5f
+                    WorldZ = (i / YardClearance.Columns) * YardClearance.PropSpacing + YardClearance.PropStartZ
                 });
             }
             return list;

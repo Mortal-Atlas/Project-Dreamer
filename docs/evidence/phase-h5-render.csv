@@ -1,0 +1,6 @@
+scenario,capture,cpu_submit_ms
+run,phase-h5-arthur-to-table-release,1.102
+run,phase-h5-alice-to-floor-release,0.964
+failure,phase-h5-arthur-light-loss-settled,1.637
+restart,phase-h5-arthur-after-restart-release,0.993
+feedback,phase-h5-arthur-feedback-release,1.252

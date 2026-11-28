@@ -90,11 +90,14 @@ namespace DreamMachine.UnityBridge
                 case KeyCode.Comma: key = Key.Comma; return true;
                 case KeyCode.Period: key = Key.Period; return true;
                 case KeyCode.Alpha1: key = Key.Digit1; return true;
+                case KeyCode.N: key = Key.N; return true;
                 case KeyCode.F1: key = Key.F1; return true;
                 case KeyCode.F2: key = Key.F2; return true;
                 case KeyCode.F3: key = Key.F3; return true;
                 case KeyCode.F4: key = Key.F4; return true;
                 case KeyCode.F5: key = Key.F5; return true;
+                case KeyCode.F6: key = Key.F6; return true;
+                case KeyCode.F7: key = Key.F7; return true;
                 default: key = Key.None; return false;
             }
         }

@@ -1,0 +1,48 @@
+# External research resources
+
+Reviewed November 27, 2026. Phase C.1.1 uses one force-plate record to check measurement units and interpretation. Other resources remain reference candidates. External data and the local VRMs stay outside project history. Record the source version, file, coordinate system, transformations and license when adding a numerical comparison.
+
+| Resource and citation | Terms and access | Format and storage | Project use |
+| --- | --- | --- | --- |
+| Human Balance Evaluation Database v1.0.0. Santos and Duarte, PeerJ Preprints e2162v1, 2016. Cite PhysioNet as listed at the source. [Record and citation](https://physionet.org/content/hbedb/1.0.0/) | Open Data Commons Attribution 1.0, public direct download. | WFDB binary `.dat` and text `.hea`. Complete listing 356.2 MB uncompressed. Selected trial data and header total 192,726 bytes. | Verify force, moment and measured CoP conventions on quiet standing data. |
+| Fukuchi, Fukuchi and Duarte, PeerJ 6:e4640, 2018. [Article](https://pmc.ncbi.nlm.nih.gov/articles/PMC5922232/) · [Dataset v6 metadata](https://api.figshare.com/v2/articles/5722711/versions/6) | CC BY 4.0 at Figshare. Cite authors, article and selected release. | C3D and ASCII, 687–818 MB per full archive. Metadata CSV 641 kB. | Select one barefoot overground pass, where available individually, for joint and contact timing. Adult gait is separate from infant milestones. |
+| OpenSim Models, SimTK/Stanford. Retain the individual model credits, such as the Gait reference in the source file. [Repository](https://github.com/opensim-org/opensim-models) · [Example terms](https://github.com/opensim-org/opensim-models/blob/master/Models/Gait10dof18musc/subject01.osim) | Model-specific terms. The inspected Gait example states CC BY 3.0. OpenSim engine has its own Apache 2.0 license. | XML `.osim` with referenced geometry and `.mot`, `.sto` or `.trc` in examples. Budget up to 1 MB for one model definition. Resolve asset licenses before using geometry. | Inspect frames, signs, muscle paths and joint coordinate conventions. Unity remains the native laboratory backend. |
+| MyoSuite. Caggiano et al., *MyoSuite: A contact-rich simulation suite for musculoskeletal motor control*, 2022. [Repository and citation](https://github.com/MyoHub/myosuite) | Apache 2.0 for the repository. Check bundled and downstream assets independently. | MuJoCo XML, meshes and Python environments. No local installation. A selected XML is the intended comparison unit. | Compare bounded actuation and reflex experiment structure after the stance baseline. |
+| Carnegie Mellon University Graphics Lab Motion Capture Database. Credit the CMU Graphics Lab as requested. [Database](https://mocap.cs.cmu.edu/) · [Formats and units](https://mocap.cs.cmu.edu/faqs.php) | Public research download under the site’s stated use terms. Check the applicable terms before redistributing any file. | ASF/AMC and Vicon VSK/V. Select one walking trial. No archive downloaded. | Inspect rest pose and gait timing for visual validation. |
+| MuJoCo. Todorov, Erez and Tassa, IROS 2012. [Project](https://github.com/google-deepmind/mujoco) · [License](https://github.com/google-deepmind/mujoco/blob/main/LICENSE) | Apache 2.0 engine. Individual model assets can have their own terms. | MJCF XML and supported URDF. Use a small source-only reference. No dependency installed. | Future independent contact and joint sign check. |
+| AddBiomechanics, Stanford FAIR Center. Credit the dataset and the contributing studies listed in `DATA_CITATIONS.txt`. [Dataset catalog](https://faircenter.stanford.edu/resources/datasets/) · [Download and terms](https://www.addbiomechanics.org/download_data.html) | Released data CC BY 4.0. Software GPL v3.0. Follow contributor and data-source credits. | Downloads include `.b3d` and source-specific movement files. The core includes thousands of trials and about 71 study hours. Obtain an individual trial before allocating storage for a whole release. | Future comparison of measured loads and foot contact under documented movements. |
+| WHO Motor Development Milestones. WHO Multicentre Growth Reference Study Group, *Windows of achievement for six gross motor development milestones*, 2006. [Milestone tables](https://www.who.int/toolkits/child-growth-standards/standards/motor-development-milestones) · [WHO terms](https://www.who.int/about/policies/publishing/copyright) | Public summary tables. Follow the terms on the specific publication for republication. | PDF tables and charts. Use the published small tables as references. | Interpret milestones as empirical ranges for developmental comparisons. |
+
+## Dynamic stability and gait initiation
+
+| Study | Application and limits |
+| --- | --- |
+| Hof, Gazendam and Sinke, *Journal of Biomechanics* (2005). [Abstract and DOI](https://pubmed.ncbi.nlm.nih.gov/15519333/) | Use COM position and velocity to estimate a signed margin relative to support edges under the linear inverted pendulum model. |
+| Lu, Amundsen Huffmaster, Harvey and MacKinnon, *Gait & Posture* (2017). [Primary study](https://pubmed.ncbi.nlm.nih.gov/28651215/) | Adult gait-initiation trials demonstrate variation in anticipatory pressure shifts. A single sequence is an engineered reference for this fixture. |
+| Honeine, Schieppati, Crisafulli and Do, *Frontiers in Human Neuroscience* (2016). [Primary study](https://doi.org/10.3389/fnhum.2016.00445) | Examine the initial pressure shift toward the swing foot, COM acceleration toward stance and coordination of knee and hip. |
+| Yiou et al., *World Journal of Orthopedics* (2017). [Review](https://pubmed.ncbi.nlm.nih.gov/29184756/) | Distinguish preparation, toe clearance and placement. Use these observations to choose physical transition evidence. |
+| Curtze, Buurke and McCrum, *Journal of Biomechanics* (2024). [Paper](https://doi.org/10.1016/j.jbiomech.2024.112045) | Treat the margin as an instantaneous model estimate. A negative margin can coexist with recovery by a later action. Articulation, variable COM height and external impulses limit interpretation. |
+
+Use the listed abstracts and publications as references. No external trajectory files or adult movement norms were imported for C.1.2.
+
+## Retention and replay
+
+| Study | Application and limits |
+| --- | --- |
+| Roediger and Karpicke, *Psychological Science* (2006). [Primary study](https://pubmed.ncbi.nlm.nih.gov/16507066/) | Motivates evaluating subsequent retrieval against matched exposure across defined delays. The human verbal recall task does not supply numerical targets for a three-socket puzzle. |
+| Diekelmann and Born, *Nature Reviews Neuroscience* (2010). [Review](https://pubmed.ncbi.nlm.nih.gov/20046194/) | Motivates controlling availability of replay and separating a derived plan from a remembered observation. The L.2 plan compilation is a computational intervention. |
+
+The L.2 study imports no paper data or externally trained model. [Experiment design](ACTIVE_LEARNING_L2.md#fixed-retention-comparison)
+
+## Active inspection and context
+
+| Study | Application and limits |
+| --- | --- |
+| Ruzena Bajcsy, *Proceedings of the IEEE* (1988). [Original paper](https://doi.org/10.1109/5.5968) | Informs the deliberate sensing step and the explicit time cost of acquiring a closer observation. The household sensor is a bounded abstract feature port. |
+| Godden and Baddeley, *British Journal of Psychology* (1975). [Original study](https://onlinelibrary.wiley.com/doi/abs/10.1111/j.2044-8295.1975.tb01468.x) | Motivates separating an experience's remembered context from present applicability. The L.4 board experiment tests action predictions under physical rearrangement. |
+
+These studies supply methods background. No external data, graphics or pretraining assets were imported for L.4. [Fixed L.4 protocol](ACTIVE_PERCEPTION_L4.md#prior-result-and-fixed-study)
+
+## Selected empirical sample
+
+Downloaded only `BDS00001.dat` and its WFDB header. The record contains 6,000 samples at 100 Hz. Decode the signed little-endian 32-bit samples using `(ADC − baseline) / gain` from the header. The 60 s mean vertical load is **537.879 N**. The two horizontal CoP peak-to-peak spans are **16.760 mm** and **8.367 mm**. The force platform reports whole-platform load and CoP. This establishes the millimetre-scale reference and the need for a measured pressure distribution. It does not establish per-foot loads or fixture acceptance limits. The file SHA-256 is `6EE4E19D4C57CE0DAF07AA8FB513A22B83C0CE575E5E50AF32BDDAFB2DD3DE26`. No raw human data or participant metadata is distributed in the project. [PhysioNet dataset and methods](https://physionet.org/content/hbedb/1.0.0/)

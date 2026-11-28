@@ -1,0 +1,836 @@
+using System;
+using System.Diagnostics;
+using DreamMachine.Body;
+using DreamMachine.Sim;
+using Unity.Collections;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+namespace DreamMachine.UnityBridge
+{
+    public enum GripPhase { Settle, Approach, Close, Lift, Hold, Lower, Release, Complete, Failed, Reposition, Transport, RestingObject, Withdraw }
+
+    public enum GraspExploration { Off, ForceOnly, Tactile }
+
+    public readonly struct HouseholdHandSetup
+    {
+        public readonly Vector3 Origin, Object, Target, Shelf;
+        public readonly Quaternion Rotation;
+        public readonly float PickupHeight;
+        public readonly float ShelfHalfWidth, SurfaceFriction, MotionScale;
+        public HouseholdHandSetup(Vector3 origin, Vector3 position, Quaternion rotation, Vector3 target, Vector3 shelf, float pickupHeight,
+            float shelfHalfWidth = HouseholdLife.BallShelfHalfWidth, float surfaceFriction = -1f, float motionScale = 1f)
+        {
+            if (!(shelfHalfWidth >= .065f && shelfHalfWidth <= .16f &&
+                (surfaceFriction == -1f || surfaceFriction >= .10f && surfaceFriction <= 1f) &&
+                motionScale >= .60f && motionScale <= 1.4f))
+                throw new ArgumentOutOfRangeException(nameof(shelfHalfWidth));
+            Origin = origin; Object = position; Rotation = rotation; Target = target; Shelf = shelf; PickupHeight = pickupHeight;
+            ShelfHalfWidth = shelfHalfWidth; SurfaceFriction = surfaceFriction; MotionScale = motionScale;
+        }
+    }
+
+    public enum HandObjectShape { Sphere, Box, Capsule }
+
+    public readonly struct HandObjectSetup
+    {
+        public readonly HandObjectShape Shape;
+        public readonly Vector3 Size, CentreOfMass;
+        public HandObjectSetup(HandObjectShape shape, Vector3 size, Vector3 centreOfMass = default)
+        {
+            Shape = shape;
+            Size = size;
+            CentreOfMass = centreOfMass;
+        }
+    }
+
+    public readonly struct GripPadSample
+    {
+        public readonly float NormalImpulse, TangentImpulse, ContactSeconds, RelativeSpeed;
+        public readonly bool Slip;
+        public readonly Vector3 Point;
+        public float NormalForce => GripCalibration.MeanForce(NormalImpulse, WorldSimulation.Dt);
+        public float TangentForce => GripCalibration.MeanForce(TangentImpulse, WorldSimulation.Dt);
+
+        internal GripPadSample(float normal, float tangent, float contactSeconds, float speed, bool slip, Vector3 point)
+        {
+            NormalImpulse = normal; TangentImpulse = tangent; ContactSeconds = contactSeconds;
+            RelativeSpeed = speed; Slip = slip; Point = point;
+        }
+    }
+
+    public readonly struct GripFrame
+    {
+        public readonly int Tick, HeldTicks;
+        public readonly GripPhase Phase;
+        public readonly Vector3 Palm, Object, ObjectVelocity, DriveForce;
+        public readonly Quaternion WristRotation, ObjectRotation;
+        public readonly float LeftTravel, RightTravel, LeftClosingForce, RightClosingForce, TravelTarget, Clearance,
+            SupportForce, Work, Penetration;
+        public readonly GripPadSample Left, Right;
+
+        internal GripFrame(NativeHandLab lab)
+        {
+            Tick = lab.Tick; HeldTicks = lab.HeldTicks; Phase = lab.Phase;
+            Palm = lab.PalmPosition; Object = lab.ObjectPosition; ObjectVelocity = lab.ObjectVelocity;
+            DriveForce = lab.DriveForce; WristRotation = lab.WristRotation; ObjectRotation = lab.ObjectRotation;
+            LeftTravel = lab.FingerTravel(0); RightTravel = lab.FingerTravel(1);
+            LeftClosingForce = lab.ClosingForce(0); RightClosingForce = lab.ClosingForce(1); TravelTarget = lab.TravelTarget;
+            Clearance = lab.Clearance; SupportForce = lab.SupportForce; Work = lab.Work;
+            Penetration = lab.Penetration; Left = lab.ReadPad(0); Right = lab.ReadPad(1);
+        }
+    }
+
+    // Reduced supported opposed-digit engineering fixture. PhysX owns the freely moving object.
+    public sealed partial class NativeHandLab : IDisposable
+    {
+        public const float PhysicsDt = .005f;
+        public const float PlacementX = -.060f, PlacementTolerance = .024f, PlacementHalfDepth = .039f;
+        const int Substeps = 10;
+        const float PickupY = .029f, StartZ = -.145f, ReachZ = -.065f, LiftY = .091f;
+        const float OpenTravel = 0f, ClosedTravel = .033f, GuideLimit = .037f;
+        readonly Scene _scene;
+        readonly PhysicsScene _physics;
+        readonly PhysicsMaterial _padMaterial, _objectMaterial, _surfaceMaterial;
+        readonly Rigidbody _carriage, _palm, _object;
+        readonly NativeArticulatedArm _arm;
+        readonly Vector3 _armRest;
+        readonly Rigidbody[] _fingers = new Rigidbody[2];
+        readonly Vector3[] _guideOrigin = new Vector3[2];
+        readonly Collider[] _pads = new Collider[2], _shafts = new Collider[2];
+        readonly Collider _table, _palmCollider;
+        readonly Collider _shelf;
+        readonly Collider _objectCollider;
+        readonly bool _researchObject;
+        readonly ContactGatedGrip _feedback;
+        readonly TactileGrasp _exploration;
+        readonly bool _placement;
+        readonly HouseholdHandSetup? _household;
+        readonly float _scale, _pickupY, _reachZ, _liftY, _radialGoal, _depthGoal;
+        string _pendingOutcome;
+        int _restedTicks;
+        bool _armReachRejected;
+        float _settleSupport, _measuredWeight;
+        int _settleSamples;
+        readonly PadAccumulator[] _reading = new PadAccumulator[2];
+        readonly GripPadSample[] _last = new GripPadSample[2];
+        readonly float[] _closingForce = new float[2];
+        readonly int _closeTicks;
+        float _verticalTarget = PickupY;
+        float _lateralTarget, _forwardOffset;
+        Vector3 _supportMoment, _releaseOrigin;
+        int _phaseTick, _releaseTicks, _otherContacts;
+        float _supportImpulse, _shelfImpulse;
+        bool _held, _disposed, _emergencyLower;
+        public const string FixtureId = "engineered.h1.opposed-digits";
+        public int Seed { get; }
+        public float Radius { get; }
+        public float MassKg => _object.mass;
+        public float Friction { get; }
+        public float GripCap { get; }
+        public int Tick { get; private set; }
+        public GripPhase Phase { get; private set; }
+        public string Outcome { get; private set; } = "in-progress";
+        public int HeldTicks { get; private set; }
+        public int SlipTicks { get; private set; }
+        public float PeakClearance { get; private set; }
+        public float PeakPadForce { get; private set; }
+        public float Work { get; private set; }
+        public float WristWork { get; private set; }
+        public float DigitEffort { get; private set; }
+        public float PeakPenetration { get; private set; }
+        public float MaxJointTravel { get; private set; }
+        public long CommandCpuTicks { get; private set; }
+        public long TrackingCpuTicks { get; private set; }
+        public long SensorCpuTicks { get; private set; }
+        public long PhysicsCpuTicks { get; private set; }
+        public bool Profile { get; set; }
+        public Vector3 PalmPosition => _palm.position;
+        public Vector3 PalmVelocity => _palm.linearVelocity;
+        public Vector3 PalmAngularVelocity => _palm.angularVelocity;
+        public Quaternion WristRotation => _palm.rotation;
+        public Vector3 ObjectPosition => _object.position;
+        public Vector3 ObjectVelocity => _object.linearVelocity;
+        public Vector3 ObjectAngularVelocity => _object.angularVelocity;
+        public Quaternion ObjectRotation => _object.rotation;
+        public float Clearance => (_researchObject ? _objectCollider.bounds.min.y : _object.position.y - Radius) -
+            (_household?.PickupHeight ?? 0f);
+        public float EffectiveGripCap => _exploration?.Cap ?? _feedback?.Cap ?? GripCap;
+        public int GripCorrections => _exploration?.Corrections ?? _feedback?.Corrections ?? 0;
+        public bool GripUncertain => _exploration?.Uncertain ?? _feedback?.Uncertain == true;
+        public int Repositions => _exploration?.Repositions ?? 0;
+        public float PitchTarget => _exploration?.Pitch ?? 0f;
+        public Vector3 GraspOffset => new Vector3(_exploration?.Lateral ?? 0f, _exploration?.Height ?? 0f, _exploration?.Forward ?? 0f);
+        public bool ControlledPlacement { get; private set; }
+        public int EarlyLowers { get; private set; }
+        public Vector3 SupportPoint => _supportImpulse > 0f ? _supportMoment / _supportImpulse : Vector3.zero;
+        public float SupportX => SupportPoint.x;
+        public int OtherContacts => _otherContacts;
+        public float SupportForce => GripCalibration.MeanForce(_supportImpulse, WorldSimulation.Dt);
+        public float Penetration { get; private set; }
+        public Vector3 DriveForce { get; private set; }
+        public bool OpposingContact => _last[0].NormalForce >= GripCalibration.ContactForce &&
+            _last[1].NormalForce >= GripCalibration.ContactForce;
+        public bool FreeObject => !_object.isKinematic && _object.useGravity && _object.constraints == RigidbodyConstraints.None &&
+            _object.transform.parent == null && _object.GetComponents<Joint>().Length == 0;
+        public bool Settled => Terminal && _releaseTicks >= 5;
+        public int ReleaseQualificationTicks => _releaseTicks;
+        public bool HouseholdSettled => _household.HasValue && Terminal && _restedTicks >= 8;
+        public bool Articulated => _arm != null;
+        public ArmReading ReadArm() => _arm == null ? default : new ArmReading(_arm);
+        public bool Seated => _arm?.Seated != null;
+        public PostureReading ReadPosture() => Seated ? _arm.Seated.Read(_arm.Shoulder) : default;
+        public long PostureCpuTicks { get; private set; }
+        public Vector3 ArmTorsoContactSeconds => _arm == null ? Vector3.zero :
+            new Vector3(_arm.UpperTorsoSeconds, _arm.ForearmTorsoSeconds, _arm.HandTorsoSeconds);
+        public (Vector3 Position, Quaternion Rotation, Vector3 Size) ReadArmPart(int index) => _arm.ReadPart(index);
+        public bool Terminal => Phase == GripPhase.Complete || Phase == GripPhase.Failed;
+        public float TravelTarget { get; private set; }
+
+        public NativeHandLab(int seed, float mass, float radius, float friction, float gripCap, int closeTicks = 12,
+            float orientation = 0f, HandObjectSetup? objectSetup = null, bool contactGated = false,
+            bool placement = false, GraspExploration exploration = GraspExploration.Off, Vector2 objectOffset = default,
+            HouseholdHandSetup? household = null, ArmBenchSetup? articulated = null, bool coordinated = false,
+            VisualBenchSetup? visual = null, SeatedBenchSetup? seated = null)
+        {
+            if (!Application.isPlaying) throw new InvalidOperationException("Native contact callbacks require Play Mode.");
+            _scale = household.HasValue ? HouseholdLife.BallRadius / .028f : 1f;
+            if (!(mass >= .035f && mass <= .20f && radius / _scale >= .021f && radius / _scale <= .036f && friction >= .10f && friction <= 1f &&
+                gripCap >= .08f && gripCap <= 7f && closeTicks >= 4 && closeTicks <= 30))
+                throw new ArgumentOutOfRangeException(nameof(mass), "Unsupported engineering fixture settings.");
+            if (!float.IsFinite(orientation)) throw new ArgumentOutOfRangeException(nameof(orientation));
+            if (!(objectOffset.sqrMagnitude <= .0025f) || (objectOffset != Vector2.zero && !objectSetup.HasValue))
+                throw new ArgumentOutOfRangeException(nameof(objectOffset));
+            if (!Enum.IsDefined(typeof(GraspExploration), exploration) ||
+                exploration != GraspExploration.Off && (!placement || contactGated))
+                throw new ArgumentOutOfRangeException(nameof(exploration));
+            _feedback = contactGated ? new ContactGatedGrip(gripCap) : null;
+            _exploration = exploration == GraspExploration.Off ? null : new TactileGrasp(gripCap, exploration == GraspExploration.Tactile);
+            _placement = placement;
+            if (household.HasValue && (!placement || objectSetup.HasValue || contactGated || exploration == GraspExploration.Tactile))
+                throw new ArgumentException("Household transfer requires the supported placement reference.", nameof(household));
+            if (articulated.HasValue && !household.HasValue)
+                throw new ArgumentException("The articulated bench requires household-scale geometry.", nameof(articulated));
+            if (coordinated && !articulated.HasValue)
+                throw new ArgumentException("Coordinated placement requires an articulated arm.", nameof(coordinated));
+            if (visual.HasValue && !coordinated)
+                throw new ArgumentException("Visual coordination requires the supported placement controller.", nameof(visual));
+            if (seated.HasValue && !visual.HasValue)
+                throw new ArgumentException("The seated fixture requires the embodied depth sensor.", nameof(seated));
+            _coordination = coordinated ? new PlacementCoordination() : null;
+            _household = household;
+            _researchObject = objectSetup.HasValue || household.HasValue;
+            if (objectSetup.HasValue)
+            {
+                var setup = objectSetup.Value;
+                if (!Enum.IsDefined(typeof(HandObjectShape), setup.Shape) ||
+                    !(setup.Size.x >= .040f && setup.Size.x <= .078f && setup.Size.y >= .040f && setup.Size.y <= .078f &&
+                        setup.Size.z >= .040f && setup.Size.z <= .078f) || !(setup.CentreOfMass.sqrMagnitude <= .000225f) ||
+                    (setup.Shape != HandObjectShape.Box && (setup.Size.x != 2f * radius || setup.Size.z != 2f * radius)) ||
+                    (setup.Shape == HandObjectShape.Sphere && setup.Size.y != 2f * radius) ||
+                    (setup.Shape == HandObjectShape.Capsule && setup.Size.y < 2f * radius))
+                    throw new ArgumentOutOfRangeException(nameof(objectSetup));
+            }
+            Seed = seed; Radius = radius; Friction = friction; GripCap = gripCap; _closeTicks = closeTicks;
+            _pickupY = PickupY * _scale + (household?.PickupHeight ?? 0f);
+            _verticalTarget = _pickupY;
+            _reachZ = ReachZ * _scale;
+            _liftY = articulated.HasValue ? .427f + .65f * household.Value.PickupHeight :
+                LiftY * _scale + Mathf.Max(household?.PickupHeight ?? 0f, household?.Target.y ?? 0f);
+            _radialGoal = household?.Target.x ?? PlacementX;
+            _depthGoal = household?.Target.z ?? 0f;
+            _scene = SceneManager.CreateScene("Supported hand " + Guid.NewGuid().ToString("N"),
+                new CreateSceneParameters(LocalPhysicsMode.Physics3D));
+            _physics = _scene.GetPhysicsScene();
+            _padMaterial = Material("Pad", friction);
+            _objectMaterial = Material("Object", friction);
+            if (household.HasValue && household.Value.SurfaceFriction >= 0f)
+                _surfaceMaterial = Material("Destination", household.Value.SurfaceFriction);
+            if (household.HasValue)
+            {
+                var h = household.Value;
+                _table = Box(New("Household play floor", new Vector3(-h.Origin.x, -.025f, 1.45f - h.Origin.z)),
+                    new Vector3(6.60f, .05f, 4.55f), Vector3.zero, _objectMaterial);
+                _shelf = Box(New("Household transfer table", h.Shelf - Vector3.up * HouseholdLife.BallShelfTop * .5f),
+                    new Vector3(2f * h.ShelfHalfWidth, HouseholdLife.BallShelfTop, 2f * HouseholdLife.BallShelfHalfDepth),
+                    Vector3.zero, _surfaceMaterial ?? _objectMaterial);
+            }
+            else _table = Box(New("Table", new Vector3(0, -.025f, .025f)), new Vector3(.40f, .05f, .50f), Vector3.zero, _objectMaterial);
+            _armRest = new Vector3(.106f, _pickupY + .035f, -.408f);
+            var startPalm = articulated.HasValue ? _armRest : new Vector3(0, _pickupY, StartZ * _scale);
+            if (articulated.HasValue)
+            {
+                _arm = new NativeArticulatedArm(articulated.Value, seed, startPalm, Body, _padMaterial, seated: seated);
+                _palm = _carriage = _arm.Palm;
+                if (articulated.Value.Obstruction)
+                    _arm.SetObstacle(Box(New("Reach probe obstruction", new Vector3(.085f, .302f, -.262f)),
+                        new Vector3(.071f, .22f, .075f), Vector3.zero, _objectMaterial));
+            }
+            else
+            {
+                _carriage = Body("Supported wrist carriage", startPalm, .85f);
+                var rail = _carriage.gameObject.AddComponent<ConfigurableJoint>();
+                rail.autoConfigureConnectedAnchor = false;
+                rail.connectedAnchor = _carriage.position;
+                rail.angularXMotion = rail.angularYMotion = rail.angularZMotion = ConfigurableJointMotion.Locked;
+                rail.xMotion = placement ? ConfigurableJointMotion.Limited : ConfigurableJointMotion.Locked;
+                rail.yMotion = rail.zMotion = ConfigurableJointMotion.Limited;
+                rail.linearLimit = new SoftJointLimit { limit = .155f * _scale, contactDistance = .001f };
+                _palm = Body("Palm and wrist", _carriage.position, .12f);
+                Hinge(_palm, _carriage, _palm.position, Vector3.right, -11f, 11f);
+            }
+            _palmCollider = Box(_palm.gameObject, new Vector3(.097f, .026f, .024f) * _scale, Vector3.zero, _padMaterial);
+            float objectHeight = objectSetup?.Size.y ?? 2f * radius;
+            _object = Body(household.HasValue ? HouseholdLife.BallId : "Free grasp object",
+                household?.Object ?? new Vector3(objectOffset.x, objectHeight * .5f + .001f, objectOffset.y), mass);
+            _object.rotation = household?.Rotation ?? Quaternion.Euler(0f, orientation, 0f);
+            if (household.HasValue) { _object.linearDamping = .27f; _object.angularDamping = .8f; }
+            _objectCollider = MakeObjectCollider(objectSetup, radius);
+            _objectCollider.contactOffset = .001f;
+            _objectCollider.providesContacts = true;
+            _objectCollider.sharedMaterial = _objectMaterial;
+            _object.ResetInertiaTensor();
+            if (objectSetup.HasValue) _object.centerOfMass = objectSetup.Value.CentreOfMass;
+            _object.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+
+            var hand = new HumanoidAnatomy(seed).AtAge(3f).Hand;
+            float separation = Mathf.Clamp(hand * .44f, .048f, .054f);
+            for (int i = 0; i < 2; i++)
+            {
+                float side = 2 * i - 1;
+                Vector3 anchor = _palm.position + _palm.rotation * (new Vector3(separation * side, 0f, .012f) * _scale);
+                var finger = _fingers[i] = Body(i == 0 ? "Opposing thumb" : "Index finger",
+                    anchor + _palm.rotation * (Vector3.forward * (.030f * _scale)), .045f);
+                if (_arm != null)
+                {
+                    finger.transform.rotation = _palm.rotation;
+                    finger.rotation = _palm.rotation;
+                }
+                _shafts[i] = Box(finger.gameObject, new Vector3(.012f, .019f, .048f) * _scale, Vector3.zero, _padMaterial);
+                _pads[i] = Box(finger.gameObject, new Vector3(.016f, GripCalibration.PadHeight, GripCalibration.PadLength) * _scale,
+                    new Vector3(0, 0, .027f) * _scale, _padMaterial);
+                _guideOrigin[i] = Quaternion.Inverse(_palm.rotation) * (finger.position - _palm.position);
+                finger.ResetInertiaTensor();
+                GuideFinger(finger, _palm, _guideOrigin[i], _scale);
+                BodySegment segment = i == 0 ? BodySegment.RightThumb : BodySegment.RightIndex;
+                bool excluded = AnatomyContacts.ExcludePair(BodySegment.RightHand, segment);
+                Physics.IgnoreCollision(_palmCollider, _pads[i], excluded);
+                Physics.IgnoreCollision(_palmCollider, _shafts[i], excluded);
+            }
+            _palm.ResetInertiaTensor();
+            _arm?.SetDistal(_palmCollider, _pads, _shafts);
+            if (visual.HasValue) InitializeVisual(visual.Value, articulated.Value);
+            Physics.ContactEvent += Contacts;
+        }
+
+        Collider MakeObjectCollider(HandObjectSetup? setup, float radius)
+        {
+            switch (setup?.Shape ?? HandObjectShape.Sphere)
+            {
+                case HandObjectShape.Box:
+                    return Box(_object.gameObject, setup.Value.Size, Vector3.zero, _objectMaterial);
+                case HandObjectShape.Capsule:
+                    var capsule = _object.gameObject.AddComponent<CapsuleCollider>();
+                    capsule.radius = radius;
+                    capsule.height = setup.Value.Size.y;
+                    return capsule;
+                default:
+                    var sphere = _object.gameObject.AddComponent<SphereCollider>();
+                    sphere.radius = radius;
+                    return sphere;
+            }
+        }
+
+        public GripFrame ReadFrame() => new GripFrame(this);
+        public GripPadSample ReadPad(int side) => _last[side];
+        public float ClosingForce(int side) => _closingForce[side];
+        public float FingerTravel(int side) => Vector3.Dot(_fingers[side].position -
+            (_palm.position + _palm.rotation * _guideOrigin[side]), Axis(side));
+        public float FingerVelocity(int side)
+        {
+            var finger = _fingers[side];
+            return Vector3.Dot(finger.linearVelocity - _palm.GetPointVelocity(finger.position), Axis(side));
+        }
+
+        Vector3 Axis(int side) => _palm.rotation * ((1 - 2 * side) * Vector3.right);
+
+        public (Vector3 Position, Quaternion Rotation, Vector3 Size) ReadPart(int part)
+        {
+            Collider geometry = part switch { 0 => _table, 1 => _palmCollider, 2 => _shafts[0], 3 => _pads[0],
+                4 => _shafts[1], 5 => _pads[1], 6 => _objectCollider, 7 when _shelf != null => _shelf,
+                _ => throw new ArgumentOutOfRangeException(nameof(part)) };
+            var t = geometry.transform;
+            if (geometry is BoxCollider box) return (t.TransformPoint(box.center), t.rotation, box.size);
+            var size = Vector3.one * (2f * Radius);
+            if (geometry is CapsuleCollider capsule) size.y = capsule.height;
+            return (t.position, t.rotation, size);
+        }
+
+        public void Step() => Step(Vector3.zero, Vector3.zero);
+
+        public void Step(Vector3 researchLoad, Vector3 researchImpulse) => Step(researchLoad, researchImpulse, null, null, 0f);
+
+        public void StepWithPosturalImpulse(Vector3 researchLoad, Vector3 torsoAngularImpulse)
+        {
+            if (!Seated || !(torsoAngularImpulse.sqrMagnitude <= .16f))
+                throw new ArgumentOutOfRangeException(nameof(torsoAngularImpulse));
+            if (!Terminal) _arm.Seated.Disturb(torsoAngularImpulse);
+            Step(researchLoad, Vector3.zero);
+        }
+
+        public void StepReachProbe(Vector3 target, float yaw, float wristLoad = 0f)
+        {
+            if (_arm == null || !float.IsFinite(target.sqrMagnitude) || target.sqrMagnitude > 4f ||
+                !float.IsFinite(yaw) || Mathf.Abs(yaw) > 40f || !(wristLoad >= 0f && wristLoad <= 1.5f))
+                throw new ArgumentOutOfRangeException(nameof(target));
+            Step(Vector3.zero, Vector3.zero, target, yaw, wristLoad);
+        }
+
+        void Step(Vector3 researchLoad, Vector3 researchImpulse, Vector3? reachProbe, float? probeYaw, float wristLoad)
+        {
+            if (_disposed) throw new ObjectDisposedException(nameof(NativeHandLab));
+            if (Terminal) return;
+            if (!(researchLoad.sqrMagnitude <= 16f && researchImpulse.sqrMagnitude <= .0025f))
+                throw new ArgumentOutOfRangeException(nameof(researchLoad));
+            bool closing = Phase >= GripPhase.Close && Phase <= GripPhase.Lower || Phase == GripPhase.Transport;
+            TravelTarget = (closing ? ClosedTravel : OpenTravel) * _scale;
+            float z = Phase == GripPhase.Settle ? StartZ * _scale : _reachZ;
+            float y = Phase == GripPhase.Lift || Phase == GripPhase.Hold || Phase == GripPhase.Transport ? _liftY : _pickupY;
+            float liftStep = (Phase == GripPhase.Lift && GripUncertain ? .0025f : .007f) * _scale;
+            if (_placement)
+            {
+                var offset = GraspOffset;
+                bool carrying = _held && (Phase == GripPhase.Transport || Phase == GripPhase.Lower || Phase == GripPhase.Release);
+                bool opening = Phase == GripPhase.Reposition && Tick - _phaseTick < 3;
+                if (!opening && !_emergencyLower)
+                {
+                    _lateralTarget = Mathf.MoveTowards(_lateralTarget, carrying ? _radialGoal : offset.x, .004f * _scale);
+                    _forwardOffset = Mathf.MoveTowards(_forwardOffset, carrying && _household.HasValue ? _depthGoal : offset.z, .003f * _scale);
+                }
+                z += _forwardOffset;
+                y += offset.y;
+                if (_held && Phase == GripPhase.Lower) y = (PickupY - .005f) * _scale + (_household?.Target.y ?? 0f);
+                if (_held && Phase == GripPhase.Release) y = _verticalTarget;
+                if (Phase == GripPhase.RestingObject)
+                {
+                    y = _liftY;
+                    z = StartZ * _scale;
+                }
+                if (_exploration != null && GripUncertain && (Phase == GripPhase.Lift || Phase == GripPhase.Transport))
+                {
+                    y = _verticalTarget;
+                    if (Phase == GripPhase.Transport) _lateralTarget = _carriage.position.x;
+                }
+                if (opening)
+                {
+                    // Open and back away before moving the pads around a supported object.
+                    y = _verticalTarget;
+                    z -= .012f;
+                }
+            }
+            _verticalTarget = Mathf.MoveTowards(_verticalTarget, y, liftStep);
+            var target = reachProbe ?? new Vector3(_lateralTarget, _verticalTarget, z);
+            if (_coordination != null && !reachProbe.HasValue) target = CoordinatedTarget(target);
+            if (_arm != null)
+            {
+                if (!reachProbe.HasValue && (Phase == GripPhase.Settle || Phase == GripPhase.RestingObject))
+                    target = _armRest;
+                _arm.Request(target, reachProbe.HasValue || Phase == GripPhase.Approach, probeYaw);
+            }
+            Array.Clear(_reading, 0, _reading.Length);
+            _supportImpulse = 0f; _shelfImpulse = 0f; _supportMoment = Vector3.zero;
+            _otherContacts = 0;
+            float cap = closing ? EffectiveGripCap : 3f;
+            bool openOnly = false;
+            if (_coordination != null && Phase == GripPhase.Release && ControlledPlacement)
+            {
+                int elapsed = Tick - _phaseTick;
+                cap = PlacementCoordination.ReleaseCap(GripCap, elapsed);
+                float opening = PlacementCoordination.Opening(elapsed);
+                openOnly = opening > 0f;
+                if (openOnly) cap += .48f * opening;
+                TravelTarget = ClosedTravel * _scale * (1f - opening);
+            }
+            if (researchImpulse != Vector3.zero) _object.AddForce(researchImpulse, ForceMode.Impulse);
+            for (int i = 0; i < Substeps; i++)
+            {
+                _reading[0].BeginSubstep(); _reading[1].BeginSubstep();
+                long start = Profile ? Stopwatch.GetTimestamp() : 0;
+                float left = FingerTravel(0), right = FingerTravel(1);
+                Vector3 before = _carriage.position;
+                Vector3 axis = _carriage.rotation * Vector3.right;
+                float wrist = 0f, torque = 0f;
+                if (_arm == null)
+                {
+                    DriveForce = Vector3.ClampMagnitude(240f * (target - before) - 27f * _carriage.linearVelocity +
+                        Vector3.up * (6.7f * -Physics.gravity.y / 6f), 22f);
+                    _carriage.AddForce(DriveForce);
+                    wrist = Vector3.SignedAngle(_carriage.rotation * Vector3.forward, _palm.rotation * Vector3.forward, axis);
+                    float wristSpeed = Vector3.Dot(_palm.angularVelocity - _carriage.angularVelocity, axis);
+                    torque = Mathf.Clamp((.24f * (PitchTarget - wrist) - .08f * wristSpeed) * _scale, -.9f * _scale, .9f * _scale);
+                    TorquePair(_palm, _carriage, axis * torque);
+                }
+                else _arm.Drive(PhysicsDt);
+                if (Seated)
+                {
+                    long postureStart = Profile ? Stopwatch.GetTimestamp() : 0;
+                    _arm.Seated.Drive(PhysicsDt, target, _held && closing ? WeightReference : 0f);
+                    if (Profile) PostureCpuTicks += Stopwatch.GetTimestamp() - postureStart;
+                }
+                DriveFinger(0, left, cap, openOnly);
+                DriveFinger(1, right, cap, openOnly);
+                if (_researchObject) DigitEffort += (Mathf.Abs(_closingForce[0]) + Mathf.Abs(_closingForce[1])) * PhysicsDt;
+                if (researchLoad != Vector3.zero) _object.AddForce(researchLoad);
+                if (wristLoad > 0f) _palm.AddForce(Vector3.down * wristLoad);
+                if (Profile) CommandCpuTicks += Stopwatch.GetTimestamp() - start;
+                long physicsStart = Profile ? Stopwatch.GetTimestamp() : 0;
+                _physics.Simulate(PhysicsDt);
+                if (Profile) PhysicsCpuTicks += Stopwatch.GetTimestamp() - physicsStart;
+                _arm?.EndSubstep(PhysicsDt);
+                _arm?.Seated?.EndSubstep(PhysicsDt);
+                if (_placement && _arm == null)
+                {
+                    float turn = Vector3.SignedAngle(_carriage.rotation * Vector3.forward, _palm.rotation * Vector3.forward, axis);
+                    WristWork += Mathf.Abs(torque * (turn - wrist) * Mathf.Deg2Rad);
+                }
+                Work += Mathf.Abs(Vector3.Dot(DriveForce, _carriage.position - before)) +
+                    Mathf.Abs(_closingForce[0] * (FingerTravel(0) - left)) + Mathf.Abs(_closingForce[1] * (FingerTravel(1) - right));
+            }
+
+            for (int i = 0; i < 2; i++) _last[i] = _reading[i].Finish();
+            PeakPadForce = Mathf.Max(PeakPadForce, _last[0].NormalForce, _last[1].NormalForce);
+            MaxJointTravel = Mathf.Max(MaxJointTravel, Mathf.Abs(FingerTravel(0)), Mathf.Abs(FingerTravel(1)));
+            Penetration = Mathf.Max(Overlap(_pads[0]), Overlap(_pads[1]), Overlap(_table), Overlap(_palmCollider),
+                Overlap(_shafts[0]), Overlap(_shafts[1]));
+            if (_shelf != null) Penetration = Mathf.Max(Penetration, Overlap(_shelf));
+            PeakPenetration = Mathf.Max(PeakPenetration, Penetration);
+            PeakClearance = Mathf.Max(PeakClearance, Clearance);
+            Tick++;
+            _arm?.Seated?.Sample(WorldSimulation.Dt);
+            if (reachProbe.HasValue) return;
+            bool suspended = Phase == GripPhase.Lift || Phase == GripPhase.Hold || Phase == GripPhase.Transport;
+            if (suspended && (_last[0].Slip || _last[1].Slip)) SlipTicks++;
+            if (_researchObject && Phase == GripPhase.Settle && Tick >= 12)
+            {
+                _settleSupport += SupportForce;
+                _measuredWeight = _settleSupport / ++_settleSamples;
+            }
+            if (_feedback != null && (Phase == GripPhase.Close || Phase == GripPhase.Lift || Phase == GripPhase.Hold))
+                _feedback.Observe(Sense(_last[0]), Sense(_last[1]), Phase != GripPhase.Close);
+            if (_exploration != null && (Phase == GripPhase.Close || suspended))
+                _exploration.Observe(Patch(0), Patch(1), suspended);
+            if (VisualCoordination) UpdateVisualEstimate();
+            else if (_coordination != null)
+            {
+                long start = Profile ? Stopwatch.GetTimestamp() : 0;
+                TrackPlacement();
+                if (Profile) TrackingCpuTicks += Stopwatch.GetTimestamp() - start;
+            }
+            Advance(Tick - _phaseTick);
+        }
+
+        static GripContactSense Sense(GripPadSample sample) =>
+            new GripContactSense(sample.NormalForce, sample.ContactSeconds, sample.RelativeSpeed, sample.Slip);
+
+        GraspPatch Patch(int side)
+        {
+            var sample = _last[side];
+            var point = _pads[side].transform.InverseTransformPoint(sample.Point) - ((BoxCollider)_pads[side]).center;
+            return new GraspPatch(Sense(sample), point.z, point.y);
+        }
+
+        float WeightReference => _researchObject ? Mathf.Max(.10f, _measuredWeight) : MassKg * -Physics.gravity.y;
+        bool AtDestination => Mathf.Abs(SupportPoint.x - _radialGoal) <= PlacementTolerance * _scale &&
+            Mathf.Abs(SupportPoint.z - _depthGoal) <= PlacementHalfDepth * _scale &&
+            (!_household.HasValue || (_household.Value.Target.y > 0f ? _shelfImpulse > 0f : _shelfImpulse == 0f));
+
+        void Advance(int elapsed)
+        {
+            if (_coordination != null && AdvanceCoordination(elapsed)) return;
+            switch (Phase)
+            {
+                case GripPhase.Settle:
+                    if (elapsed >= 18) Enter(GripPhase.Approach);
+                    break;
+                case GripPhase.Approach:
+                    if (_arm == null)
+                    {
+                        if (Mathf.Abs(_carriage.position.z - _reachZ) < .004f * _scale || elapsed >= 36) Enter(GripPhase.Close);
+                    }
+                    else if (Vector3.Distance(_palm.position, _arm.Target) < .034f && _palm.linearVelocity.magnitude < .16f)
+                        Enter(GripPhase.Close);
+                    else if (elapsed >= 55)
+                    {
+                        _armReachRejected = true;
+                        Enter(GripPhase.Release);
+                    }
+                    break;
+                case GripPhase.Close:
+                    if (_exploration != null)
+                    {
+                        if (elapsed >= _closeTicks && _exploration.Ready)
+                        {
+                            var left = Patch(0);
+                            var right = Patch(1);
+                            Enter(_exploration.PoorPlacement(left, right) && _exploration.Reposition(left, right)
+                                ? GripPhase.Reposition : GripPhase.Lift);
+                        }
+                        else if (elapsed >= _closeTicks + 6)
+                            Enter(_exploration.Reposition(Patch(0), Patch(1)) ? GripPhase.Reposition : GripPhase.Lower);
+                    }
+                    else if (_feedback == null)
+                    {
+                        if ((elapsed >= _closeTicks && OpposingContact) || elapsed >= _closeTicks + 8) Enter(GripPhase.Lift);
+                    }
+                    else if (elapsed >= _closeTicks && _feedback.Ready) Enter(GripPhase.Lift);
+                    else if (elapsed >= _closeTicks + 8) Enter(GripPhase.Lower);
+
+                    break;
+                case GripPhase.Reposition:
+                    if (elapsed >= 10) Enter(GripPhase.Close);
+                    break;
+                case GripPhase.Lift:
+                    if (Clearance >= GripCalibration.LiftClearance * _scale && OpposingContact && _otherContacts == 0)
+                        Enter(GripPhase.Hold);
+                    else if (_exploration?.Lower == true) EmergencyLower();
+                    else if (elapsed >= 28) Enter(GripPhase.Lower);
+                    break;
+                case GripPhase.Hold:
+                    HeldTicks = Clearance >= GripCalibration.LiftClearance * _scale && OpposingContact && _otherContacts == 0
+                        ? HeldTicks + 1 : 0;
+                    if (HeldTicks >= GripCalibration.HoldTicks) { _held = true; Enter(_placement ? GripPhase.Transport : GripPhase.Lower); }
+                    else if (_exploration?.Lower == true) EmergencyLower();
+                    else if (elapsed >= 30) Enter(GripPhase.Lower);
+                    break;
+                case GripPhase.Transport:
+                    if (_exploration?.Lower == true) EmergencyLower();
+                    else if ((Mathf.Abs(_carriage.position.x - _radialGoal) < .006f * _scale &&
+                        (!_household.HasValue || Mathf.Abs(_carriage.position.z - (_reachZ + _depthGoal)) < .008f * _scale) &&
+                        Mathf.Abs(_carriage.linearVelocity.x) < .035f) || elapsed >= 28) Enter(GripPhase.Lower);
+                    break;
+                case GripPhase.Lower:
+                    if (_placement && _held)
+                    {
+                        ControlledPlacement = OpposingContact && SupportForce >= .45f * WeightReference &&
+                            AtDestination && Mathf.Abs(_object.linearVelocity.y) < .06f;
+                        if (!ControlledPlacement && elapsed < 38) break;
+                        _releaseOrigin = _object.position;
+                        Enter(GripPhase.Release);
+                    }
+                    else if (elapsed >= 10 && SupportForce >= .2f * WeightReference || elapsed >= 34)
+                        Enter(GripPhase.Release);
+                    break;
+                case GripPhase.Release:
+                    bool released = !OpposingContact && _last[0].NormalForce < GripCalibration.ContactForce &&
+                        _last[1].NormalForce < GripCalibration.ContactForce && SupportForce >= .5f * WeightReference &&
+                        _object.linearVelocity.sqrMagnitude < .0025f &&
+                        (_household.HasValue && _held ? Mathf.Abs(_object.position.y - Radius - _household.Value.Target.y) < .006f
+                            : Clearance < .004f);
+                    if (_placement && _held)
+                        released &= AtDestination && new Vector2(_object.position.x - _releaseOrigin.x,
+                            _object.position.z - _releaseOrigin.z).sqrMagnitude < .000324f;
+                    _releaseTicks = released ? _releaseTicks + 1 : 0;
+                    if (_releaseTicks >= 5 || elapsed >= 30)
+                    {
+                        Outcome = _armReachRejected ? "articulated-reach-gate-failed" : !_held ? "hold-gate-failed" :
+                            _placement && !ControlledPlacement ? "placement-gate-failed" :
+                            _releaseTicks < 5 ? "release-gate-failed" :
+                            PeakPenetration > GripCalibration.MaximumPenetration ? "penetration-gate-failed" :
+                            MaxJointTravel > GuideLimit * _scale + .002f ? "joint-gate-failed" : "physical-lift-hold-release";
+                        if (_household.HasValue)
+                        {
+                            _pendingOutcome = Outcome == "physical-lift-hold-release" ? "physical-lift-hold-place-release" : Outcome;
+                            Outcome = "waiting-for-rest";
+                            Enter(_coordination != null && _held ? GripPhase.Withdraw : GripPhase.RestingObject);
+                            break;
+                        }
+                        if (Outcome == "physical-lift-hold-release")
+                        {
+                            if (_placement) Outcome = "physical-lift-hold-place-release";
+                            Enter(GripPhase.Complete);
+                        }
+                        else Enter(GripPhase.Failed);
+                    }
+                    break;
+                case GripPhase.RestingObject:
+                    bool still = SupportForce >= .5f * WeightReference && !OpposingContact && _otherContacts == 0 &&
+                        _object.linearVelocity.sqrMagnitude <= .000144f && _object.angularVelocity.sqrMagnitude <= .0225f;
+                    _restedTicks = still ? _restedTicks + 1 : 0;
+                    if (_restedTicks >= 8)
+                    {
+                        Outcome = _pendingOutcome;
+                        if (Outcome == "physical-lift-hold-place-release" && !AtDestination) Outcome = "settled-outside-destination";
+                        Enter(Outcome == "physical-lift-hold-place-release" ? GripPhase.Complete : GripPhase.Failed);
+                    }
+                    break;
+            }
+        }
+
+        void EmergencyLower()
+        {
+            _emergencyLower = true;
+            EarlyLowers++;
+            Enter(GripPhase.Lower);
+        }
+
+        void Enter(GripPhase phase)
+        {
+            Phase = phase; _phaseTick = Tick;
+            if (_coordination != null) EnterCoordination(phase);
+        }
+
+        void DriveFinger(int side, float travel, float cap, bool openOnly)
+        {
+            var finger = _fingers[side];
+            Vector3 axis = Axis(side);
+            float speed = FingerVelocity(side);
+            const float stiffness = 480f, damping = 8f;
+            float effectiveDamping = damping + stiffness * PhysicsDt;
+            float request = (stiffness * (TravelTarget - travel) - effectiveDamping * speed) /
+                (1f + effectiveDamping * PhysicsDt / finger.mass);
+            _closingForce[side] = Mathf.Clamp(request, -cap, openOnly ? 0f : cap);
+            Vector3 force = axis * _closingForce[side];
+            finger.AddForce(force);
+            _palm.AddForceAtPosition(-force, finger.position);
+        }
+
+        static void GuideFinger(Rigidbody digit, Rigidbody palm, Vector3 origin, float scale)
+        {
+            var joint = digit.gameObject.AddComponent<ConfigurableJoint>();
+            joint.connectedBody = palm;
+            joint.autoConfigureConnectedAnchor = false;
+            joint.connectedAnchor = origin;
+            joint.xMotion = ConfigurableJointMotion.Limited;
+            joint.yMotion = joint.zMotion = joint.angularXMotion = joint.angularYMotion =
+                joint.angularZMotion = ConfigurableJointMotion.Locked;
+            joint.linearLimit = new SoftJointLimit { limit = GuideLimit * scale, contactDistance = .001f };
+        }
+
+        static void TorquePair(Rigidbody child, Rigidbody parent, Vector3 torque)
+        {
+            child.AddTorque(torque);
+            parent.AddTorque(-torque);
+        }
+
+        void Contacts(PhysicsScene scene, NativeArray<ContactPairHeader>.ReadOnly headers)
+        {
+            if (scene != _physics) return;
+            long start = Profile ? Stopwatch.GetTimestamp() : 0;
+            int target = _objectCollider.GetInstanceID();
+            foreach (var header in headers)
+            for (int index = 0; index < header.pairCount; index++)
+            {
+                var pair = header.GetContactPair(index);
+                if (_arm?.IsMonitoredContact(pair.colliderInstanceID, pair.otherColliderInstanceID) == true)
+                    for (int j = 0; j < pair.contactCount; j++)
+                    {
+                        var contact = pair.GetContactPoint(j);
+                        _arm.ObserveContact(pair.colliderInstanceID, pair.otherColliderInstanceID,
+                            Mathf.Abs(Vector3.Dot(contact.impulse, contact.normal)));
+                    }
+                int other = pair.colliderInstanceID == target ? pair.otherColliderInstanceID :
+                    pair.otherColliderInstanceID == target ? pair.colliderInstanceID : 0;
+                if (other == 0) continue;
+                int side = other == _pads[0].GetInstanceID() ? 0 : other == _pads[1].GetInstanceID() ? 1 : -1;
+                for (int j = 0; j < pair.contactCount; j++)
+                {
+                    var cp = pair.GetContactPoint(j);
+                    float normal = Mathf.Abs(Vector3.Dot(cp.impulse, cp.normal));
+                    if (normal <= .000002f) continue;
+                    if (side >= 0)
+                    {
+                        Vector3 velocity = _object.GetPointVelocity(cp.position) - _fingers[side].GetPointVelocity(cp.position);
+                        _reading[side].Add(normal, Vector3.ProjectOnPlane(cp.impulse, cp.normal).magnitude,
+                            Vector3.ProjectOnPlane(velocity, cp.normal).magnitude, cp.position);
+                    }
+                    else if (other == _table.GetInstanceID() || (_shelf != null && other == _shelf.GetInstanceID()))
+                    {
+                        _supportImpulse += normal;
+                        if (_shelf != null && other == _shelf.GetInstanceID()) _shelfImpulse += normal;
+                        if (_placement) _supportMoment += cp.position * normal;
+                    }
+                    else _otherContacts++;
+                }
+            }
+            if (Profile) SensorCpuTicks += Stopwatch.GetTimestamp() - start;
+        }
+
+        float Overlap(Collider other) => Physics.ComputePenetration(_objectCollider, _object.position, _object.rotation,
+            other, other.transform.position, other.transform.rotation, out _, out float depth) ? depth : 0f;
+
+        static PhysicsMaterial Material(string name, float friction) => new PhysicsMaterial(name)
+        {
+            staticFriction = friction, dynamicFriction = .9f * friction, frictionCombine = PhysicsMaterialCombine.Minimum,
+            bounciness = 0f
+        };
+
+        GameObject New(string name, Vector3 at)
+        {
+            var obj = new GameObject(name);
+            SceneManager.MoveGameObjectToScene(obj, _scene);
+            obj.transform.position = at;
+            return obj;
+        }
+
+        Rigidbody Body(string name, Vector3 position, float mass)
+        {
+            var body = New(name, position).AddComponent<Rigidbody>();
+            body.mass = mass;
+            body.sleepThreshold = 0f;
+            body.linearDamping = .06f;
+            body.angularDamping = .22f;
+            body.solverIterations = 32;
+            body.solverVelocityIterations = 12;
+            return body;
+        }
+
+        static BoxCollider Box(GameObject owner, Vector3 size, Vector3 center, PhysicsMaterial material)
+        {
+            var box = owner.AddComponent<BoxCollider>();
+            box.size = size; box.center = center; box.contactOffset = .001f; box.sharedMaterial = material;
+            return box;
+        }
+
+        static void Hinge(Rigidbody body, Rigidbody parent, Vector3 anchor, Vector3 axis, float min, float max)
+        {
+            var joint = body.gameObject.AddComponent<HingeJoint>();
+            joint.connectedBody = parent;
+            joint.autoConfigureConnectedAnchor = false;
+            joint.axis = axis;
+            joint.anchor = body.transform.InverseTransformPoint(anchor);
+            joint.connectedAnchor = parent.transform.InverseTransformPoint(anchor);
+            joint.limits = new JointLimits { min = min, max = max, contactDistance = 1f };
+            joint.useLimits = true;
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            Physics.ContactEvent -= Contacts;
+            if (_scene.isLoaded) SceneManager.UnloadSceneAsync(_scene);
+            UnityEngine.Object.Destroy(_padMaterial);
+            UnityEngine.Object.Destroy(_objectMaterial);
+            if (_surfaceMaterial != null) UnityEngine.Object.Destroy(_surfaceMaterial);
+        }
+
+        struct PadAccumulator
+        {
+            public float Normal, Tangent, Speed;
+            public Vector3 Moment;
+            int _contactSteps, _movingSteps;
+            bool _contact, _moving;
+            public void BeginSubstep() { _contact = false; _moving = false; }
+            public void Add(float normal, float tangent, float speed, Vector3 point)
+            {
+                Normal += normal; Tangent += tangent; Moment += point * normal;
+                Speed = Mathf.Max(speed, Speed);
+                if (!_contact) { _contactSteps++; _contact = true; }
+                if (!_moving && speed >= GripCalibration.SlipSpeed) { _movingSteps++; _moving = true; }
+            }
+            public GripPadSample Finish() => new GripPadSample(Normal, Tangent, _contactSteps * PhysicsDt, Speed,
+                GripCalibration.Slipping(GripCalibration.MeanForce(Normal, WorldSimulation.Dt), Speed, _movingSteps),
+                Normal > 0f ? Moment / Normal : Vector3.zero);
+        }
+    }
+}

@@ -90,6 +90,10 @@ crashlytics-build.properties
 # TestRunner generated files
 InitTestScene*.unity*
 
+# Private VRM sources, import products, and scene previews.
+/Assets/DreamMachineLocalAvatars/
+/Assets/DreamMachineLocalAvatars.meta
+
 # Addressables default ignores, before user customizations
 /ServerData
 /[Aa]ssets/StreamingAssets/aa*
