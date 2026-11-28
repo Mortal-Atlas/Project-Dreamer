@@ -85,7 +85,13 @@ Across completed cases, median PhysX time was 0.631 ms per shared tick for H8 an
 
 The closed Arthur Unity run, including trace instrumentation, used 1.581 ms per tick. PhysX took 0.784 ms, posture 0.016 ms, depth 0.140 ms and fusion 0.006 ms. The open run used 3.965 ms per tick while taking two explicit DX12 captures, so the difference includes screenshot work. Live and replay render submissions measured 1.072 and 0.864 ms respectively. The open run's peak whole-editor working set was 3.52 GB. This measures the loaded project and Unity process, not the incremental allocation for the fixture.
 
-Arthur's 23,309-byte H9 checkpoint matched the size of his H8 settled checkpoint. The H9 tape was 181,695 bytes, compared with the 145,736-byte H8 tape. The failed H9 return produced a 25,890-byte checkpoint and 409,945-byte tape. The household runs one native H9 station at a time. A simultaneous multi-learner native-body benchmark remains open.
+Arthur's 23,309-byte H9 checkpoint matched the size of his H8 settled checkpoint. The H9 tape was 181,695 bytes, compared with the 145,736-byte H8 tape. The failed H9 return produced a 25,890-byte checkpoint and 409,945-byte tape. Fresh-process publication and validation took 29.75 ms for the success and 28.25 ms for the failed return. The household runs one native H9 station at a time. A simultaneous multi-learner native-body benchmark remains open.
+
+The shared kernel was benchmarked separately from Unity with the native station inactive. In 16 alternating pairs, four-person Living medians were 53,058 ticks/s for H8 and 53,229 for H9. Eight alternating 12-agent pairs measured 31,477 and 31,036 ticks/s respectively. The observed ranges overlapped in both populations. The four-person runs allocated 390,120 bytes over 2,000 measured ticks and produced 27,575-byte checkpoints on both revisions. [Paired kernel samples](evidence/phase-h9-kernel-paired.csv)
+
+## Automated verification
+
+Release .NET passed 134/134 and Unity Edit Mode passed 135/135. All eight H9 household checks passed in separate Unity processes. Both H9 rigid and passive modes completed in the household. The rigid torso stayed at 0° and the passive torso reached 17.76°. The observer, independent learner, and replay checks verified actual recorded head transforms and the continuation of each learner's own spatial record. The reactive success and the failed floor return both restored with matching world bytes, replay poses, and persistent Ball placement. The DX12 live, replay, rigid, and passive captures were inspected. Native regressions passed for the H8 success and failed return, H7 success, H6 recorded failed release and H5 success/failure restores. The archived H5–H8 project evidence matched its prior Git state. The guarded launcher rejects an unsupported seated cohort before starting Unity.
 
 ## Next dependency
 

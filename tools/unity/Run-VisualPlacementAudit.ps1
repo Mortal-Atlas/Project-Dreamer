@@ -8,6 +8,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+if ($Study -eq 'Seated' -and $Phase -eq 'Supplement') {
+    throw 'The seated study has Development and HeldOut cohorts.'
+}
 $source = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $scratch = (Resolve-Path -LiteralPath $ProjectPath).Path
 $product = 'ProjectSettings/ProjectSettings.asset'
