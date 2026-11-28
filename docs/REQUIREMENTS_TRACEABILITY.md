@@ -455,6 +455,16 @@ The clock checkpoint extends K evidence for §§5–7, 116, 124, 133 and 169. Pa
 | H4 sections 13–14 | Independent research archives and firsthand Library III records | Verified in isolation | Arthur and Alice trained separate scalar archives and reloaded in another process. Alice has no household practice integration. Library I is linked via scalar evidence and Library II has engineered proposal traces. Generalized belief and Babel integration are open. [Retention and provenance](PHYSICAL_PLACEMENT_H4.md#retention-and-provenance) |
 | H4 section 15 | Existing Unity hand lab, object queue, live placement and native replay | Verified in isolation | DX12 confirmed load, regrasp, controlled placement and playback. H2 keeps the existing household route. [Unity smoke](../tools/unity/HandBrowserSmoke.cs) |
 
+## Phase H5 persistent household transfer
+
+| Requirement | Implementation | Status | Evidence and dependencies |
+| --- | --- | --- | --- |
+| H5 sections 1–5, 8–9, 19–20 | Existing Ball item, supported native body and settled commit | Verified and integrated | Successful transfers and off-table displacement update the scene and same household item. [Native runner](../tools/unity/HouseholdBallSmoke.cs) [H5 results](HOUSEHOLD_TRANSFER_H5.md#physical-results-and-restart) |
+| H5 sections 6–7 | Bounded carriage, wrist and digit guides, quantized pickup observation and explicit destination | Partially implemented | Surface load, pitch and physical effort measured. Dynamic arm and torso, eye alignment and full environment colliders are open. [Physics bridge](../Assets/DreamMachine/Unity/NativeHandLab.cs) |
+| H5 sections 10–13 | Separate sighting and attempt histories, append-only lived evidence, v7 settled persistence | Verified and integrated | Arthur and Alice use independent state. Fresh success and failure saves restore exact bytes. Library I projection and H4-to-H5 calibration still have explicit limits. [World object and observations](../Assets/DreamMachine/Core/Sim/HouseholdBallTransfer.cs) |
+| H5 sections 14–15 | Once managed, actual object consequences remain in Living | Partially implemented | Shared authority permits later containers, furniture and cleanup. Independent reaching and motivation remain open. [H5 dependencies](HOUSEHOLD_TRANSFER_H5.md#unity-workflow-and-dependencies) |
+| H5 sections 16–18 | Existing physical and Simulation trays, native playback, dated performance evidence | Verified and integrated | Paired observer/camera run, save, restores, UI and benchmark. [H5 report](HOUSEHOLD_TRANSFER_H5.md) |
+
 ## Physical development and motor vocabulary addendum
 
 The [nervous-system audit](PHYSICAL_NERVOUS_SYSTEM_SPECIFICATION.md#existing-system-audit) identifies existing fixture evidence and integration gaps. The [acceptance plan](PHYSICAL_NERVOUS_SYSTEM_SPECIFICATION.md#experimental-acceptance) records matched tests and scope for the related master requirements §§5–6, 12–21, 46–49, 56–57, 62–64, 92, 128–132, 137, 156–158, 170, 172 and 175.

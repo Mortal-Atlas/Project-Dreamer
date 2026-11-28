@@ -809,7 +809,7 @@ namespace DreamMachine.UnityBridge
                 if (_sim.Home?.BallTransferRunning == true || _sim.PhysicalPractice?.AttemptRunning == true ||
                     _sim.PhysicalPractice?.Active == true && _practiceHand != null && !_practiceHand.Settled)
                 {
-                    _practiceStatus = "Save when the object has settled on the table.";
+                    _practiceStatus = "Save after the physical interaction settles.";
                     RefreshPractice();
                     return;
                 }

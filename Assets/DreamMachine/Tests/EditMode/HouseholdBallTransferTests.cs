@@ -70,5 +70,29 @@ namespace DreamMachine.Tests
             Assert.That(home.InspectBall(2, true), Is.True);
             Assert.That(home.ReadBallBelief(2).X, Is.EqualTo(unforeseen.X).Within(.002f));
         }
+
+        [Test]
+        public void SettledTransferCheckpointAlsoRetainsExistingSphereAcquisition()
+        {
+            var world = Create();
+            var home = world.Home;
+            Assert.That(home.StartBallTransfer(3, HouseholdGripPolicy.Light), Is.True);
+            world.Tick();
+            var before = home.ReadBallPose();
+            var transfer = home.CompleteBallTransfer(before, false, 0, "hold-gate-failed", Trace);
+            Assert.That(world.EnterPhysicalPractice(), Is.True);
+            Assert.That(world.StartGripAttempt(), Is.True);
+            world.Tick();
+            world.Tick();
+            var grip = world.CompleteGripAttempt(2, 0, .01f, false, "hold-gate-failed", Trace, 0f, .028f, 0f);
+            Assert.That(world.LeavePhysicalPractice(), Is.True);
+
+            var restored = WorldSimulation.RestoreCheckpoint(world.CaptureCheckpoint());
+            Assert.That(restored.PhysicalPractice.Cap, Is.GreaterThan(.18f));
+            Assert.That(restored.PhysicalPractice.Cap, Is.EqualTo(world.PhysicalPractice.Cap));
+            Assert.That(restored.Home.BallTransfer(0).Tape, Is.EqualTo(Trace));
+            Assert.That(restored.Find("son").State.Library.GetOrNull(grip.MemoryId)?.Source, Is.EqualTo("firsthand-supported-grip"));
+            Assert.That(restored.Find("daughter").State.Library.GetOrNull(transfer.MemoryId)?.Source, Is.EqualTo("firsthand-ball-transfer"));
+        }
     }
 }

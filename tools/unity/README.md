@@ -1,5 +1,22 @@
 # Isolated Unity observer experiment
 
+## H5 household ball verification
+
+Copy **HouseholdBallSmoke.cs** to **Assets/Editor** in the product named **Dreamer Audit Isolated Smoke**. The harness verifies the product name and writes that scratch product’s primary world checkpoint. Preserve the scratch checkpoint before reusing it for other studies. The harness creates a **world.checkpoint.before-h5** backup on the first H5 run when a prior primary exists.
+
+Use separate Unity 6000.3.19f1 DX12 processes with **-executeMethod** and the following entry points in order.
+
+1. **HouseholdBallSmoke.Run**
+2. **HouseholdBallSmoke.Unobserved**
+3. **HouseholdBallSmoke.Failure**
+4. **HouseholdBallSmoke.Restart**
+5. **HouseholdBallSmoke.RestartFailure**
+6. **HouseholdBallSmoke.Feedback**
+
+The two restart commands use saved H5 checkpoint archives. Compare the Run and Unobserved CSV and checkpoint hashes. Inspect **H5_ATTEMPT**, **H5_TIMING**, **H5_OBSERVATION**, **H5_SAVE**, and **H5_RESTORE** in the logs. Keep full native traces, checkpoint files, motion tapes and private rendered captures local. [H5 protocol and results](../../docs/HOUSEHOLD_TRANSFER_H5.md)
+
+## Earlier experiments
+
 `ClockSmoke.cs` exercises the same embedded world with and without observer controls. Use a disposable Git checkout or project copy. Set its Unity product name to `Dreamer Audit Isolated Smoke`, then copy the script to `Assets/Editor/ClockSmoke.cs` in that copy. The script intentionally overwrites checkpoint and workspace data in that exact isolated product's persistent directory. Never reuse a directory with data you intend to keep.
 
 Run separate Unity 6000.3.19f1 processes for each condition and seed:

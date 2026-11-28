@@ -130,6 +130,7 @@ namespace DreamMachine.UnityBridge
         public float MaxJointTravel { get; private set; }
         public long CommandCpuTicks { get; private set; }
         public long SensorCpuTicks { get; private set; }
+        public long PhysicsCpuTicks { get; private set; }
         public bool Profile { get; set; }
         public Vector3 PalmPosition => _palm.position;
         public Quaternion WristRotation => _palm.rotation;
@@ -377,7 +378,9 @@ namespace DreamMachine.UnityBridge
                 if (_researchObject) DigitEffort += (Mathf.Abs(_closingForce[0]) + Mathf.Abs(_closingForce[1])) * PhysicsDt;
                 if (researchLoad != Vector3.zero) _object.AddForce(researchLoad);
                 if (Profile) CommandCpuTicks += Stopwatch.GetTimestamp() - start;
+                long physicsStart = Profile ? Stopwatch.GetTimestamp() : 0;
                 _physics.Simulate(PhysicsDt);
+                if (Profile) PhysicsCpuTicks += Stopwatch.GetTimestamp() - physicsStart;
                 if (_placement)
                 {
                     float turn = Vector3.SignedAngle(_carriage.rotation * Vector3.forward, _palm.rotation * Vector3.forward, axis);

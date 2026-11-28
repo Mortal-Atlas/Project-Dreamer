@@ -123,7 +123,7 @@ namespace DreamMachine.Sim
         {
             int tick = _world.TickCount;
             AdvanceSearchFixture(tick);
-            var ball = _items[1];
+            var ball = _items[BallItem];
             if (Math.Abs(ball.V) > .001f)
             {
                 float next = ball.X + ball.V * WorldSimulation.Dt;
@@ -224,7 +224,7 @@ namespace DreamMachine.Sim
             foreach (var candidate in Play)
             {
                 int item = candidate.Item;
-                if (item == BallItem && BallManaged || !Available(index, item) || (item == ToyBin && _items[2].Value == 0)) continue;
+                if ((item == BallItem && BallManaged) || !Available(index, item) || (item == ToyBin && _items[2].Value == 0)) continue;
                 Item target = _items[item];
                 int preference = (p.Spec.BirthSeed + 3 * item) & 7;
                 float novelty = p.Practice[item] == 0 ? .30f : 0f;

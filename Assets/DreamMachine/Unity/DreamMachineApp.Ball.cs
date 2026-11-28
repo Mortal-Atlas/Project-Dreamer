@@ -103,8 +103,11 @@ namespace DreamMachine.UnityBridge
                 _practiceStatus = hand.Outcome;
                 hand.Dispose();
                 _practiceHand = null;
+                var last = _practiceFrames[^1];
+                _practiceFrames.Clear();
+                _practiceFrames.Add(last);
             }
-            catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
+            catch (Exception error) when (error is IOException || error is InvalidDataException || error is UnauthorizedAccessException)
             {
                 _practiceStatus = "The live result is settled. Select Transfer ball to retry archiving.";
                 Debug.LogError(error, this);
@@ -132,7 +135,7 @@ namespace DreamMachine.UnityBridge
                 _practiceRecordIndex = index;
                 SeekPracticeFrame(0);
             }
-            catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
+            catch (Exception error) when (error is IOException || error is InvalidDataException || error is UnauthorizedAccessException)
             {
                 _practiceStatus = "The recorded ball trajectory is unavailable.";
                 RefreshPractice();
@@ -167,7 +170,10 @@ namespace DreamMachine.UnityBridge
             var belief = home.ReadBallBelief(_ballActor);
             var settled = home.ReadBallPose();
             var ball = home.BallIntent;
-            int index = _practiceReplay != null ? _practiceRecordIndex : home.BallTransferCount - 1;
+            int index = _practiceReplay != null ? _practiceRecordIndex : -1;
+            if (!ball.HasValue && _practiceReplay == null)
+                for (int n = home.BallTransferCount - 1; n >= 0; n--)
+                    if (home.BallTransfer(n).Intent.Actor == _ballActor) { index = n; break; }
             BallTransferRecord? record = index >= 0 ? home.BallTransfer(index) : null;
             string name = LivingName(_sim.Population.Find(home.PersonId(_ballActor)));
             string beliefText = belief.LastSeen < 0 ? "no sighting" :
@@ -179,7 +185,11 @@ namespace DreamMachine.UnityBridge
                 actual = $"Live ball  {current.x:F3}, {current.y:F3}, {current.z:F3}";
             }
             _practiceText.text = $"Household ball  |  {name}\n{actual}\nLast sighting  {beliefText}\n";
-            if (_practiceReplay != null) _practiceText.text += $"Recorded preview  |  frame {_practiceFrameIndex}\n";
+            if (_practiceReplay != null)
+            {
+                string author = LivingName(_sim.Population.Find(home.PersonId(record.Value.Intent.Actor)));
+                _practiceText.text += $"Recorded preview  |  {author}  |  frame {_practiceFrameIndex}\n";
+            }
             var intention = ball ?? record?.Intent;
             if (intention.HasValue) _practiceText.text += $"Assigned destination  {intention.Value.TargetX:F2}, {intention.Value.TargetZ:F2}  |  {intention.Value.Policy}\n";
             var pose = _practiceReplay != null ? _practiceReplay[_practiceFrameIndex] : _practiceFrames.Count > 0 ? _practiceFrames[^1] : null;

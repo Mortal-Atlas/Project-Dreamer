@@ -223,6 +223,7 @@ internal static class HouseholdBallSmoke
         var hand = Get<NativeHandLab>(app, "_practiceHand");
         if (!world.Home.BallTransferRunning || hand == null || !hand.FreeObject) throw new InvalidOperationException("Live ball binding missing: " + label);
         if (world.Home.BallIntent.Value.Actor != Get<int>(app, "_ballActor")) throw new InvalidOperationException("Mismatched physical actor.");
+        hand.Profile = true;
         var camera = Camera.main;
         if (!rendering) { Click("Physical development"); camera.enabled = false; }
         bool placement = false;
@@ -251,6 +252,9 @@ internal static class HouseholdBallSmoke
         var record = world.Home.BallTransfer(world.Home.BallTransferCount - 1);
         if (!rendering) { camera.enabled = true; Click("Physical development"); }
         Debug.Log(FormattableString.Invariant($"H5_ATTEMPT {label} before={record.Intent.Before.X:F5}/{record.Intent.Before.Y:F5}/{record.Intent.Before.Z:F5} after={record.After.X:F5}/{record.After.Y:F5}/{record.After.Z:F5} goal={record.Intent.TargetX:F5}/{record.Intent.TargetTop:F5}/{record.Intent.TargetZ:F5} result={record.Outcome} controlled_place={placement} ticks={hand.Tick} tick_ms={cpu * 1000d / Stopwatch.Frequency / hand.Tick:F3}"));
+        double scale = 1000d / Stopwatch.Frequency / hand.Tick;
+        long bytes = new FileInfo(Path.Combine(Application.persistentDataPath, "motor-trajectories", record.Tape + ".h5")).Length;
+        Debug.Log(FormattableString.Invariant($"H5_TIMING {label} physics_ms={hand.PhysicsCpuTicks * scale:F3} sensors_ms={hand.SensorCpuTicks * scale:F3} drive_ms={hand.CommandCpuTicks * scale:F3} tape_bytes={bytes}"));
         return record;
     }
 
