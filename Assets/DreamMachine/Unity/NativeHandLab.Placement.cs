@@ -42,6 +42,7 @@ namespace DreamMachine.UnityBridge
                 if (AtDestination && fraction >= .30f)
                     target.y = _coordination.Position.Y + Mathf.Clamp((fraction - .94f) * .0024f, -.0014f, .0022f);
                 speed = .067f * _household.Value.MotionScale;
+                if (VisualCoordination) target = ApplyVisualDescent(target, ref speed);
             }
             if (Phase == GripPhase.Withdraw)
             {
@@ -61,7 +62,7 @@ namespace DreamMachine.UnityBridge
                     _palm.linearVelocity.magnitude < .13f;
                 if (arrived || elapsed >= 85)
                 {
-                    if (_freshTracking)
+                    if (!VisualCoordination && _freshTracking)
                         _approachCorrection = new Vector3(Mathf.Clamp(_radialGoal - _trackedBall.x, -.052f, .052f), 0f,
                             Mathf.Clamp(_depthGoal - _trackedBall.z, -.040f, .040f));
                     Enter(GripPhase.Lower);
@@ -78,7 +79,7 @@ namespace DreamMachine.UnityBridge
                 _sampledWrist = _palm.rotation;
                 _coordination.Observe(new PlacementSense(_freshTracking, AtDestination, OpposingContact,
                     _last[0].Slip || _last[1].Slip || _palm.linearVelocity.sqrMagnitude > .01f,
-                    SupportForce / WeightReference, palmSpeed, palmSpin, _trackedSpeed, _trackedSpin));
+                    SupportForce / WeightReference, palmSpeed, palmSpin, _trackedSpeed, _trackedSpin, !VisualCoordination));
                 if (_coordination.Ready || elapsed >= 170)
                 {
                     ControlledPlacement = _coordination.Ready;

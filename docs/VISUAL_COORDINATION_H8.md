@@ -1,0 +1,28 @@
+# H8 · embodied depth and hand-eye coordination
+
+## Frozen protocol
+
+This paired native Unity 6000.3.19f1 comparison uses a separate four-case development set and 15 held-out cases. Each case runs four policies in rotating order with the same physical inputs and a fresh supported fixture. Stop at physical settlement or 700 shared ticks. Keep every outcome. The native H7 release scorer still requires five consecutive qualified samples, disengaged digits, safe support, low speed and less than 18 mm window drift. Completion also requires the established contact, joint and settled-destination gates. Report drift from release through settlement and final distance from the assigned center separately.
+
+| Policy | Sensing and steering |
+| --- | --- |
+| H7 | Original researcher destination, original targeted Ball sighting, and H7 motor logic |
+| Measure only | Same H8 depth samples and release admission as the other H8 policies. Nominal researcher horizontal steering plus native proprioception and contact. |
+| Visual only | Repeated Ball position and surface-height corrections from recent measured depth. Missing samples suspend correction updates and reduce approach speed. |
+| Fused | Visual only plus bounded prediction, joint-derived wrist displacement, and a visual–proprioceptive hand discrepancy term. |
+
+The H8 physical scorer is unchanged. H8's release admission uses linear motion from fresh depth and retains tactile support and wrist limits. H7's instrumented seam-spin check has no equivalent H8 measurement. This changes sensing before admission, not the outcome scorer.
+
+The baseline uses Arthur (303), a 0.080 kg Ball on the floor, and a destination at (−0.272, 0.050, 0.003) m in bench space. In addition to the clear control, the study filters the hand or Ball depth channel using a checkerboard for 22 ticks, fully withholds the hand for 15 ticks or the Ball for 21 ticks, and withholds both for 31 ticks. The windows start four ticks into descent, with observations resuming according to cadence and latency. One 26-tick combined window applies an external 0.012 N·s impulse in its first half. A separate obstructed destination case withholds surface depth for 30 ticks. The delay case samples every four ticks with three ticks of delivery latency and a 9° viewing offset. Another case uses Alice (404), a 12 mm pickup offset, a different target, a −9° viewpoint, a 4° wrist offset and different developmental dimensions. The load case applies 0.30 N downward for up to five ticks after four ticks of hold. The four H7 diagnostic variants use the narrow shelf, far diagonal, 0.117 kg Ball and lateral arm. The precise inputs are frozen in the [native study](../tools/unity/VisualPlacementStudy.cs).
+
+The masks represent occlusion as a controlled loss of available depth returns from a labeled surface. They sit after the nearest-hit test and never reveal what lies behind the discarded ray. Natural blockers in the scene still occlude rays. There is no added physical obstacle from a mask. Absolute observer transforms provide outcome scoring and error estimates only. Cases test generalization within one bench and one Ball geometry.
+
+## What the learner receives
+
+A synthetic 29×23 active-depth grid casts nearest-surface rays from an anatomy-bound, fixed bench eye, with a 74° horizontal by 62° vertical field and 1.45 m range. The simulated eye does not follow the presentation camera and is never aimed from the actual Ball, hand or destination transform. Hit identity supplies an explicit geometry label. The visible Ball surface normal and calibrated radius reconstruct its center. Visible palm surface samples approximate its center by a fixed geometry offset. Upward support hits estimate a plane height. Positions are binned at 4 mm. Ray count and depth set confidence. Occlusion reduces available returns. Hand orientation, digits, seam spin, lighting, image recognition, gaze choice, arbitrary obstacle recognition and mirrors remain open. The task still supplies the destination horizontally. The sensor contract accepts samples from other viewpoints with capture time and source.
+
+Physics and tactile contacts update at 5 ms. The control loop and joint-derived wrist sample run at 50 ms. Normal vision captures at 100 ms with 50 ms delivery delay. Each learner's attempt owns its own visual inbox and tracks. Capture time survives delivery. Joint-chain forward kinematics uses calibrated limb lengths and sensed link orientations. It approximates a joint sensor with ideal segment rotations and does not read the palm's position. While contact remains opposed without slip, the Ball prediction can follow wrist displacement. Within a 12-tick horizon, missing observations preserve a decaying estimate, and later measurements correct it. In descent, the servo incorporates current Ball error, the hand–wrist discrepancy and surface height. Its target correction is bounded and freezes when the table begins taking load. Actual motion arises from PhysX and the existing actuators.
+
+## Reproduction and evidence integrity
+
+Run `tools/unity/Run-VisualPlacementAudit.ps1` with the guarded `Dreamer Audit Isolated Smoke` project, `-Phase Development` or `-Phase HeldOut`, and `-LogFile`. The launcher synchronizes project source, native physics, clock, layer, package and relevant rendering settings by SHA-256. Unity checks them again after startup and writes the verified manifest with the result. The held-out launcher rejects uncommitted modifications in these inputs. Keep the full per-tick files local. H7 source audits, data, and learner histories remain available independently.

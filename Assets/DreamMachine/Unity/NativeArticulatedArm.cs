@@ -56,6 +56,8 @@ namespace DreamMachine.UnityBridge
         public Vector3 Target { get; private set; }
         public Vector3 ProposedElbow { get; private set; }
         public bool WithinEnvelope { get; private set; }
+        public Vector3 ProprioceptiveWrist => Shoulder + _upper.rotation * (Vector3.forward * _length) +
+            Forearm.rotation * (Vector3.forward * _forearmLength);
         public Vector3 TorqueMagnitude { get; private set; }
         public Vector3 JointSpeed { get; private set; }
         public Vector3 JointDegrees { get; private set; }

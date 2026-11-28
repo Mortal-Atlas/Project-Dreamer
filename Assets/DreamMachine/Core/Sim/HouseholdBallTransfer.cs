@@ -6,7 +6,7 @@ using DreamMachine.Body;
 
 namespace DreamMachine.Sim
 {
-    public enum HouseholdGripPolicy : byte { Fixed, Light, Feedback, Articulated, CoordinatedPlacement }
+    public enum HouseholdGripPolicy : byte { Fixed, Light, Feedback, Articulated, CoordinatedPlacement, VisualCoordination }
 
     public readonly struct HouseholdBallPose
     {
@@ -98,21 +98,29 @@ namespace DreamMachine.Sim
 
         bool RecordBallLook(int actor, float x, float z, float window)
         {
-            var previous = ReadBallBelief(actor);
             var ball = ReadBallPose();
             bool seen = BallInSight(_people[actor], ball, x, z, window);
             int tick = _world.TickCount;
-            var observation = new BallLocationBelief(seen ? QuantizeBallSight(ball.X) : previous.X,
-                seen ? QuantizeBallSight(ball.Z) : previous.Z, seen ? tick : previous.LastSeen,
+            RecordBallSighting(actor, ball.X, ball.Z, seen ? tick : -1,
+                FormattableString.Invariant($"Looked at ({x:F3}, {z:F3}) with a {window:F3} m window."));
+            return seen;
+        }
+
+        void RecordBallSighting(int actor, float x, float z, int seenTick, string evidence)
+        {
+            var previous = ReadBallBelief(actor);
+            bool seen = seenTick >= 0;
+            int tick = _world.TickCount;
+            var observation = new BallLocationBelief(seen ? QuantizeBallSight(x) : previous.X,
+                seen ? QuantizeBallSight(z) : previous.Z, seen ? seenTick : previous.LastSeen,
                 tick, previous.Sequence + 1, !seen);
             string found = seen ? FormattableString.Invariant($"Sighting ({observation.X:F3}, {observation.Z:F3}).")
                 : "No ball in the window.";
             _people[actor].Child.State.Library.RecordExperience(BallSightingId(observation.Sequence),
                 seen ? "Saw household ball" : "Household ball absent in the inspected area",
-                FormattableString.Invariant($"{BallId}. Looked at ({x:F3}, {z:F3}) with a {window:F3} m window. {found}"),
+                $"{BallId}. {evidence} {found}",
                 tick, "firsthand-ball-observation");
             _ballBeliefs[actor - 2] = observation;
-            return seen;
         }
 
         public bool InspectBall(int actor, bool searchArea)
@@ -163,7 +171,8 @@ namespace DreamMachine.Sim
         }
 
         public BallTransferRecord CompleteBallTransfer(HouseholdBallPose actual, bool success, int corrections, string outcome,
-            string tape, PlacementObservation releaseObservation = PlacementObservation.None)
+            string tape, PlacementObservation releaseObservation = PlacementObservation.None,
+            VisualPoseEstimate? finalVision = null)
         {
             if (!_ballIntent.HasValue) throw new InvalidOperationException("No live ball transfer.");
             var intent = _ballIntent.Value;
@@ -173,9 +182,17 @@ namespace DreamMachine.Sim
             var p = _people[intent.Actor];
             string memory = BallTransferMemoryId(_ballRecords.Count + 1);
             if (p.Child.State.Library.GetOrNull(memory) != null) throw new InvalidDataException("Duplicate ball transfer evidence.");
-            bool seen = BallInSight(p, actual, intent.TargetX, intent.TargetZ, .65f);
-            string observed = seen ? FormattableString.Invariant($"Saw resulting area at ({QuantizeBallSight(actual.X):F3}, {QuantizeBallSight(actual.Z):F3}).")
-                : "No final position sighting.";
+            bool visual = intent.Policy == HouseholdGripPolicy.VisualCoordination;
+            var sample = finalVision.GetValueOrDefault();
+            bool measured = finalVision.HasValue && sample.Source == VisualEstimateSource.GeometryObservation &&
+                sample.ObservationTick >= 0 && sample.ObservationTick <= _world.TickCount - intent.Start &&
+                sample.Confidence >= .17f && float.IsFinite(sample.Position.X) && float.IsFinite(sample.Position.Z);
+            bool seen = visual ? measured : BallInSight(p, actual, intent.TargetX, intent.TargetZ, .65f);
+            string observed = visual
+                ? seen ? FormattableString.Invariant($"Bench depth saw the Ball at local tick {sample.ObservationTick}, confidence {sample.Confidence:F2}; {releaseObservation}.")
+                    : "Ball uncertain in the final bench view."
+                : seen ? FormattableString.Invariant($"Saw resulting area at ({QuantizeBallSight(actual.X):F3}, {QuantizeBallSight(actual.Z):F3}).")
+                    : "No final position sighting.";
             if (intent.Policy == HouseholdGripPolicy.CoordinatedPlacement && releaseObservation != PlacementObservation.None)
                 observed += " Settled bench tracking: " + releaseObservation + ".";
             p.Child.State.Library.RecordExperience(memory, "Supported household ball transfer",
@@ -187,7 +204,10 @@ namespace DreamMachine.Sim
             var record = new BallTransferRecord(intent, actual, _world.TickCount, corrections, success, seen, tape, outcome, memory);
             _ballRecords.Add(record);
             _ballIntent = null;
-            RecordBallLook(intent.Actor, intent.TargetX, intent.TargetZ, .65f);
+            if (visual)
+                RecordBallSighting(intent.Actor, intent.X + sample.Position.X, intent.Z + sample.Position.Z,
+                    seen ? intent.Start + sample.ObservationTick : -1, observed);
+            else RecordBallLook(intent.Actor, intent.TargetX, intent.TargetZ, .65f);
             return record;
         }
 

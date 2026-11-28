@@ -57,6 +57,7 @@ namespace DreamMachine.UnityBridge
             _sphereActions = AddPracticeRow(area, .19f, .29f, ("Enter station", EnterPractice), ("Try grasp", BeginPracticeAttempt),
                 ("Return to Living", LeavePractice));
             _ballActions = AddPracticeRow(area, .19f, .29f, ("Transfer ball", () => BeginBallTransfer(HouseholdGripPolicy.Fixed)),
+                ("Visual coordination", () => BeginBallTransfer(HouseholdGripPolicy.VisualCoordination)),
                 ("Light grip", () => BeginBallTransfer(HouseholdGripPolicy.Light)),
                 ("Grip feedback", () => BeginBallTransfer(HouseholdGripPolicy.Feedback)), ("Inspect sighting", () => LookForBall(false)),
                 ("Search nearby", () => LookForBall(true)));
@@ -372,7 +373,7 @@ namespace DreamMachine.UnityBridge
             using var stream = new MemoryStream();
             using var writer = new BinaryWriter(stream);
             var first = _practiceFrames[0];
-            int version = ball ? (first.Placement != null ? 5 : first.Arm != null ? 4 : 3) : 2;
+            int version = ball ? (first.Vision.HasValue ? 6 : first.Placement != null ? 5 : first.Arm != null ? 4 : 3) : 2;
             writer.Write(version);
             writer.Write(_practiceFrames.Count);
             foreach (var frame in _practiceFrames) frame.Write(writer, version);
@@ -394,13 +395,13 @@ namespace DreamMachine.UnityBridge
         static PracticeFrame[] ReadPracticeTape(string hash, bool ball = false)
         {
             var path = PracticePath(hash, ball);
-            if (!File.Exists(path) || new FileInfo(path).Length > (ball ? 950000 : 100000))
+            if (!File.Exists(path) || new FileInfo(path).Length > (ball ? 1250000 : 100000))
                 throw new InvalidDataException("Missing or oversized grip trajectory.");
             byte[] bytes = File.ReadAllBytes(path);
             if (PracticeHash(bytes) != hash) throw new InvalidDataException("Grip trajectory checksum failed.");
             using var reader = new BinaryReader(new MemoryStream(bytes, false));
             int version = reader.ReadInt32();
-            if (ball ? version < 3 || version > 5 : version != 1 && version != 2) throw new InvalidDataException("Unsupported grip trajectory.");
+            if (ball ? version < 3 || version > 6 : version != 1 && version != 2) throw new InvalidDataException("Unsupported grip trajectory.");
             int count = reader.ReadInt32();
             if (count <= 0 || count > (ball ? BallFrameLimit : 240)) throw new InvalidDataException("Invalid grip trajectory frame count.");
             var frames = new PracticeFrame[count];
@@ -420,6 +421,7 @@ namespace DreamMachine.UnityBridge
             public readonly int Tick, Corrections;
             public readonly PracticeArmFrame Arm;
             public readonly PracticePlacementFrame Placement;
+            public readonly VisualPlacementReading? Vision;
             public readonly bool Slip;
             public readonly Vector3 LeftPoint, RightPoint;
 
@@ -434,6 +436,7 @@ namespace DreamMachine.UnityBridge
                 LinearVelocity = f.ObjectVelocity; AngularVelocity = lab.ObjectAngularVelocity;
                 if (lab.Articulated) Arm = new PracticeArmFrame(lab);
                 if (lab.Coordinated) Placement = new PracticePlacementFrame(lab);
+                if (lab.VisualCoordination) Vision = lab.VisualReading;
                 for (int i = 0; i < Positions.Length; i++)
                 {
                     var part = lab.ReadPart(i);
@@ -459,6 +462,9 @@ namespace DreamMachine.UnityBridge
                 }
                 if (version >= 4) Arm = new PracticeArmFrame(reader);
                 if (version >= 5) Placement = new PracticePlacementFrame(reader);
+                if (version >= 6)
+                    Vision = new VisualPlacementReading(ReadEstimate(reader), ReadEstimate(reader), ReadEstimate(reader),
+                        ReadVector(reader), ReadVector(reader), reader.ReadInt32(), reader.ReadSingle(), (BenchOcclusion)reader.ReadByte());
             }
 
             public void Write(BinaryWriter output, int version)
@@ -480,6 +486,29 @@ namespace DreamMachine.UnityBridge
                 }
                 if (version >= 4) Arm.Write(output);
                 if (version >= 5) Placement.Write(output);
+                if (version >= 6)
+                {
+                    var visual = Vision.Value;
+                    WriteEstimate(output, visual.Hand); WriteEstimate(output, visual.Ball); WriteEstimate(output, visual.Surface);
+                    WriteVector(output, visual.ProprioceptiveWrist); WriteVector(output, visual.Correction);
+                    output.Write(visual.CorrectionTick); output.Write(visual.ExpectedContactSeconds); output.Write((byte)visual.Occlusion);
+                }
+            }
+
+            static VisualPoseEstimate ReadEstimate(BinaryReader input)
+            {
+                var position = new System.Numerics.Vector3(input.ReadSingle(), input.ReadSingle(), input.ReadSingle());
+                var velocity = new System.Numerics.Vector3(input.ReadSingle(), input.ReadSingle(), input.ReadSingle());
+                return new VisualPoseEstimate(position, velocity, input.ReadInt32(), input.ReadInt32(), input.ReadInt32(),
+                    input.ReadSingle(), input.ReadSingle(), (VisualEstimateSource)input.ReadByte());
+            }
+
+            static void WriteEstimate(BinaryWriter output, VisualPoseEstimate value)
+            {
+                output.Write(value.Position.X); output.Write(value.Position.Y); output.Write(value.Position.Z);
+                output.Write(value.Velocity.X); output.Write(value.Velocity.Y); output.Write(value.Velocity.Z);
+                output.Write(value.ObservationTick); output.Write(value.Age); output.Write(value.VisibleRays);
+                output.Write(value.Confidence); output.Write(value.PredictionError); output.Write((byte)value.Source);
             }
 
             internal static Vector3 ReadVector(BinaryReader reader) => new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());

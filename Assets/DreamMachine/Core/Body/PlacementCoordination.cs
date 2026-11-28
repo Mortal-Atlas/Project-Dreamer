@@ -7,15 +7,16 @@ namespace DreamMachine.Body
 
     public readonly struct PlacementSense
     {
-        public readonly bool Tracked, AtDestination, Opposed, Slip;
+        public readonly bool Tracked, AtDestination, Opposed, Slip, ObservedSpin;
         public readonly float SupportFraction, PalmSpeed, PalmSpin, BallSpeed, BallSpin;
 
         public PlacementSense(bool tracked, bool atDestination, bool opposed, bool slip, float supportFraction,
-            float palmSpeed, float palmSpin, float ballSpeed, float ballSpin)
+            float palmSpeed, float palmSpin, float ballSpeed, float ballSpin, bool observedSpin = true)
         {
             Tracked = tracked; AtDestination = atDestination; Opposed = opposed; Slip = slip;
             SupportFraction = supportFraction; PalmSpeed = palmSpeed; PalmSpin = palmSpin;
             BallSpeed = ballSpeed; BallSpin = ballSpin;
+            ObservedSpin = observedSpin;
         }
     }
 
@@ -64,7 +65,7 @@ namespace DreamMachine.Body
             bool stable = sense.Tracked && sense.AtDestination && sense.Opposed && !sense.Slip &&
                 sense.SupportFraction >= .72f && sense.SupportFraction <= 1.28f &&
                 sense.PalmSpeed <= .043f && sense.PalmSpin <= .60f &&
-                sense.BallSpeed <= .045f && sense.BallSpin <= .34f;
+                sense.BallSpeed <= .045f && (!sense.ObservedSpin || sense.BallSpin <= .34f);
             StableTicks = stable ? Math.Min(RequiredStableTicks, StableTicks + 1) : 0;
         }
 

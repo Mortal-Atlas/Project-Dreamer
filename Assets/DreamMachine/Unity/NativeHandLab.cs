@@ -187,7 +187,8 @@ namespace DreamMachine.UnityBridge
         public NativeHandLab(int seed, float mass, float radius, float friction, float gripCap, int closeTicks = 12,
             float orientation = 0f, HandObjectSetup? objectSetup = null, bool contactGated = false,
             bool placement = false, GraspExploration exploration = GraspExploration.Off, Vector2 objectOffset = default,
-            HouseholdHandSetup? household = null, ArmBenchSetup? articulated = null, bool coordinated = false)
+            HouseholdHandSetup? household = null, ArmBenchSetup? articulated = null, bool coordinated = false,
+            VisualBenchSetup? visual = null)
         {
             if (!Application.isPlaying) throw new InvalidOperationException("Native contact callbacks require Play Mode.");
             _scale = household.HasValue ? HouseholdLife.BallRadius / .028f : 1f;
@@ -209,6 +210,8 @@ namespace DreamMachine.UnityBridge
                 throw new ArgumentException("The articulated bench requires household-scale geometry.", nameof(articulated));
             if (coordinated && !articulated.HasValue)
                 throw new ArgumentException("Coordinated placement requires an articulated arm.", nameof(coordinated));
+            if (visual.HasValue && !coordinated)
+                throw new ArgumentException("Visual coordination requires the supported placement controller.", nameof(visual));
             _coordination = coordinated ? new PlacementCoordination() : null;
             _household = household;
             _researchObject = objectSetup.HasValue || household.HasValue;
@@ -311,6 +314,7 @@ namespace DreamMachine.UnityBridge
             }
             _palm.ResetInertiaTensor();
             _arm?.SetDistal(_palmCollider, _pads, _shafts);
+            if (visual.HasValue) InitializeVisual(visual.Value, articulated.Value);
             Physics.ContactEvent += Contacts;
         }
 
@@ -494,7 +498,8 @@ namespace DreamMachine.UnityBridge
                 _feedback.Observe(Sense(_last[0]), Sense(_last[1]), Phase != GripPhase.Close);
             if (_exploration != null && (Phase == GripPhase.Close || suspended))
                 _exploration.Observe(Patch(0), Patch(1), suspended);
-            if (_coordination != null)
+            if (VisualCoordination) UpdateVisualEstimate();
+            else if (_coordination != null)
             {
                 long start = Profile ? Stopwatch.GetTimestamp() : 0;
                 TrackPlacement();

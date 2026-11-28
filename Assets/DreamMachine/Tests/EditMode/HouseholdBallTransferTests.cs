@@ -1,4 +1,6 @@
 using System.IO;
+using System.Numerics;
+using DreamMachine.Body;
 using DreamMachine.Sim;
 using DreamMachine.Social;
 using NUnit.Framework;
@@ -15,6 +17,30 @@ namespace DreamMachine.Tests
         }
 
         static readonly string Trace = new string('a', 64);
+
+        [TestCase(VisualEstimateSource.Predicted, false)]
+        [TestCase(VisualEstimateSource.GeometryObservation, true)]
+        public void VisualTransferCommitsPhysicsAndOnlyTheActorsMeasuredSighting(VisualEstimateSource source, bool seen)
+        {
+            var world = Create();
+            var home = world.Home;
+            Assert.That(home.StartBallTransfer(2, HouseholdGripPolicy.VisualCoordination), Is.True);
+            var intent = home.BallIntent.Value;
+            var lastSeen = home.ReadBallBelief(2).LastSeen;
+            world.Tick();
+            var actual = new HouseholdBallPose(intent.TargetX, intent.TargetTop + HouseholdLife.BallRadius, intent.TargetZ);
+            var offset = new Vector3(.016f, 0f, .024f);
+            var visual = new VisualPoseEstimate(offset, default, 1, 0, 7, .50f, 0f, source);
+            var result = home.CompleteBallTransfer(actual, true, 0, "physical-lift-hold-place-release", Trace,
+                PlacementObservation.StillAtDestination, visual);
+            Assert.That(result.Seen, Is.EqualTo(seen));
+            Assert.That(home.ReadBallPose(), Is.EqualTo(actual));
+            Assert.That(home.ReadBallBelief(2).X, Is.EqualTo(intent.X + (seen ? .016f : 0f)).Within(.002f));
+            Assert.That(home.ReadBallBelief(2).LastSeen, Is.EqualTo(seen ? intent.Start + 1 : lastSeen));
+            Assert.That(home.ReadBallBelief(3).LastSeen, Is.EqualTo(-1));
+            var save = world.CaptureCheckpoint();
+            Assert.That(WorldSimulation.RestoreCheckpoint(save).CaptureCheckpoint(), Is.EqualTo(save));
+        }
 
         [Test]
         public void SettledNativeResultPersistsAndLeavesAnotherLearnersSightingStale()

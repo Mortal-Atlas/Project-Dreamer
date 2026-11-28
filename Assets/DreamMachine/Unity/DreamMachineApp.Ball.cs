@@ -69,13 +69,15 @@ namespace DreamMachine.UnityBridge
                 new Vector3(home.BallBenchX + HouseholdLife.BallShelfOffset, HouseholdLife.BallShelfTop, home.BallBenchZ) - _ballOrigin,
                 intent.TargetTop == 0f ? HouseholdLife.BallShelfTop : 0f);
             int seed = _sim.Find(home.PersonId(intent.Actor)).Spec.BirthSeed;
-            bool coordinated = policy == HouseholdGripPolicy.CoordinatedPlacement;
+            bool visual = policy == HouseholdGripPolicy.VisualCoordination;
+            bool coordinated = visual || policy == HouseholdGripPolicy.CoordinatedPlacement;
             bool articulated = coordinated || policy == HouseholdGripPolicy.Articulated;
             _practiceHand = new NativeHandLab(seed, HouseholdLife.BallMass, HouseholdLife.BallRadius, HouseholdLife.BallFriction,
                 policy == HouseholdGripPolicy.Fixed || articulated
                     ? GripAcquisition.ReferenceCap : GripAcquisition.InitialCap, placement: true,
                 exploration: policy == HouseholdGripPolicy.Feedback ? GraspExploration.ForceOnly : GraspExploration.Off, household: setup,
-                articulated: articulated ? new ArmBenchSetup(true) : null, coordinated: coordinated);
+                articulated: articulated ? new ArmBenchSetup(true) : null, coordinated: coordinated,
+                visual: visual ? new VisualBenchSetup(VisualFeedback.Fused) : null);
             _practiceFrames.Add(new PracticeFrame(_practiceHand));
             _practiceStatus = "Researcher-assigned transfer. Use the Simulation controls to run or step.";
             DrawLiving(WorldSimulation.Dt);
@@ -104,7 +106,8 @@ namespace DreamMachine.UnityBridge
                 var q = hand.ObjectRotation.normalized;
                 var actual = new HouseholdBallPose(p.x, p.y, p.z, q.x, q.y, q.z, q.w);
                 _sim.Home.CompleteBallTransfer(actual, hand.Phase == GripPhase.Complete,
-                    hand.GripCorrections + hand.ReadArm().Corrections, hand.Outcome, tape, hand.PlacementObservation);
+                    hand.GripCorrections + hand.ReadArm().Corrections, hand.Outcome, tape, hand.PlacementObservation,
+                    hand.VisualCoordination ? hand.FinalBallVisualSample : null);
                 _practiceStatus = hand.Outcome;
                 hand.Dispose();
                 _practiceHand = null;
@@ -183,11 +186,11 @@ namespace DreamMachine.UnityBridge
             string name = LivingName(_sim.Population.Find(home.PersonId(_ballActor)));
             string beliefText = belief.LastSeen < 0 ? "no sighting" :
                 $"{belief.X:F2}, {belief.Z:F2} at tick {belief.LastSeen}{(belief.Uncertain ? " | uncertain" : "")}";
-            string actual = $"Settled ball  {settled.X:F3}, {settled.Y:F3}, {settled.Z:F3}";
+            string actual = $"Research · settled Ball  {settled.X:F3}, {settled.Y:F3}, {settled.Z:F3}";
             if (ball.HasValue && _practiceHand != null)
             {
                 var current = _ballOrigin + _practiceHand.ObjectPosition;
-                actual = $"Live ball  {current.x:F3}, {current.y:F3}, {current.z:F3}";
+                actual = $"Research · actual Ball  {current.x:F3}, {current.y:F3}, {current.z:F3}";
             }
             _practiceText.text = $"Household ball  |  {name}\n{actual}\nLast sighting  {beliefText}\n";
             if (_practiceReplay != null)
@@ -198,17 +201,24 @@ namespace DreamMachine.UnityBridge
             var intention = ball ?? record?.Intent;
             if (intention.HasValue)
             {
-                string policy = intention.Value.Policy == HouseholdGripPolicy.CoordinatedPlacement ? "Coordinated placement" : intention.Value.Policy.ToString();
+                string policy = intention.Value.Policy switch
+                {
+                    HouseholdGripPolicy.CoordinatedPlacement => "Coordinated placement",
+                    HouseholdGripPolicy.VisualCoordination => "H8 visual coordination",
+                    _ => intention.Value.Policy.ToString()
+                };
                 _practiceText.text += $"Assigned destination  {intention.Value.TargetX:F2}, {intention.Value.TargetZ:F2}  |  {policy}\n";
             }
             var pose = _practiceReplay != null ? _practiceReplay[_practiceFrameIndex] : _practiceFrames.Count > 0 ? _practiceFrames[^1] : null;
             if (pose != null)
                 _practiceText.text += $"{pose.Phase} at tick {pose.Tick}  |  pads {pose.LeftForce:F2} / {pose.RightForce:F2} N\n" +
                     $"Support {pose.Support:F2} N  |  cap {pose.Cap:F2} N  |  corrections {pose.Corrections}\n";
-            if (pose?.Arm != null)
+            if (pose?.Arm != null && !pose.Vision.HasValue)
                 _practiceText.text += $"Elbow {pose.Arm.Joints.y:F0}°  |  wrist error {Vector3.Distance(pose.Arm.Target, pose.Positions[1]) * 1000f:F0} mm\n" +
                     $"Torso contact {pose.Arm.ContactSeconds:F2} s  |  depth {pose.Arm.Penetration * 1000f:F1} mm\n";
-            if (pose?.Placement != null)
+            if (pose?.Vision is VisualPlacementReading visual)
+                _practiceText.text += FormatVisual(visual, pose);
+            else if (pose?.Placement != null)
             {
                 var placement = pose.Placement;
                 string movement = placement.Tracked ? $"Ball estimate {placement.EstimatedSpeed:F2} m/s" : "Ball occluded";
@@ -227,6 +237,25 @@ namespace DreamMachine.UnityBridge
             if (record.HasValue) _practiceText.text += $"{record.Value.Outcome}  |  {record.Value.MemoryId}\n";
             if (record?.Outcome != _practiceStatus || !record.HasValue)
                 _practiceText.text += _practiceStatus ?? "Choose a learner, transfer the ball or inspect a sighting.";
+        }
+
+        static string FormatVisual(VisualPlacementReading v, PracticeFrame pose)
+        {
+            string Expected(float seconds) => seconds < 0f ? "unknown" : $"{seconds:F2} s";
+            string plane = v.Surface.Confidence > 0f ? $"surface {v.Surface.Position.Y:F2} m" : "surface uncertain";
+            return $"Depth view  |  {v.Occlusion}  |  {plane}  |  contact {Expected(v.ExpectedContactSeconds)}\n" +
+                $"{EstimateText("Hand", v.Hand)}\n{EstimateText("Ball", v.Ball)}\n" +
+                $"Joint-sensed elbow {pose.Arm.Joints.y:F0}°  |  Ball velocity {v.Ball.Velocity.Length():F2} m/s\n" +
+                $"Prediction error {v.Ball.PredictionError * 1000f:F0} mm  |  correction tick {v.CorrectionTick}\n" +
+                $"Correction {v.Correction.magnitude * 1000f:F0} mm  |  drift {pose.Placement.Drift * 1000f:F0} mm\n";
+        }
+
+        static string EstimateText(string label, VisualPoseEstimate estimate)
+        {
+            if (estimate.Source == VisualEstimateSource.Unavailable) return $"{label} uncertain  |  last tick {estimate.ObservationTick}";
+            string source = estimate.Source == VisualEstimateSource.Predicted ? "Predicted" : "Depth";
+            var point = estimate.Position;
+            return $"{label} {source}  {point.X:F2}, {point.Y:F2}, {point.Z:F2}  |  tick {estimate.ObservationTick}, age {estimate.Age}  |  {estimate.Confidence:F2}";
         }
     }
 }
