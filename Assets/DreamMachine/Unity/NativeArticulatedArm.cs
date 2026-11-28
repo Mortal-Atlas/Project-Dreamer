@@ -113,7 +113,11 @@ namespace DreamMachine.UnityBridge
         public void SetDistal(Collider palm, Collider[] pads, Collider[] digits)
         { _distal[0] = palm; _distal[1] = pads[0]; _distal[2] = pads[1]; _distal[3] = digits[0]; _distal[4] = digits[1]; }
 
-        public void SetObstacle(Collider obstacle) => _obstacleId = obstacle.GetInstanceID();
+        public void SetObstacle(Collider obstacle)
+        {
+            obstacle.providesContacts = true;
+            _obstacleId = obstacle.GetInstanceID();
+        }
         public bool IsMonitoredContact(int a, int b) =>
             a == _torsoId || b == _torsoId || a == _upperId || b == _upperId ||
             (_obstacleId != 0 && (a == _obstacleId || b == _obstacleId));
