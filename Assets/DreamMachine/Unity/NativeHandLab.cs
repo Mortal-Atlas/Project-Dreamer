@@ -10,6 +10,20 @@ namespace DreamMachine.UnityBridge
 {
     public enum GripPhase { Settle, Approach, Close, Lift, Hold, Lower, Release, Complete, Failed }
 
+    public enum HandObjectShape { Sphere, Box, Capsule }
+
+    public readonly struct HandObjectSetup
+    {
+        public readonly HandObjectShape Shape;
+        public readonly Vector3 Size, CentreOfMass;
+        public HandObjectSetup(HandObjectShape shape, Vector3 size, Vector3 centreOfMass = default)
+        {
+            Shape = shape;
+            Size = size;
+            CentreOfMass = centreOfMass;
+        }
+    }
+
     public readonly struct GripPadSample
     {
         public readonly float NormalImpulse, TangentImpulse, ContactSeconds, RelativeSpeed;
@@ -62,7 +76,11 @@ namespace DreamMachine.UnityBridge
         readonly Vector3[] _guideOrigin = new Vector3[2];
         readonly Collider[] _pads = new Collider[2], _shafts = new Collider[2];
         readonly Collider _table, _palmCollider;
-        readonly SphereCollider _objectCollider;
+        readonly Collider _objectCollider;
+        readonly bool _researchObject;
+        readonly ContactGatedGrip _feedback;
+        float _settleSupport, _measuredWeight;
+        int _settleSamples;
         readonly PadAccumulator[] _reading = new PadAccumulator[2];
         readonly GripPadSample[] _last = new GripPadSample[2];
         readonly float[] _closingForce = new float[2];
@@ -85,6 +103,7 @@ namespace DreamMachine.UnityBridge
         public float PeakClearance { get; private set; }
         public float PeakPadForce { get; private set; }
         public float Work { get; private set; }
+        public float DigitEffort { get; private set; }
         public float PeakPenetration { get; private set; }
         public float MaxJointTravel { get; private set; }
         public long CommandCpuTicks { get; private set; }
@@ -95,7 +114,10 @@ namespace DreamMachine.UnityBridge
         public Vector3 ObjectPosition => _object.position;
         public Vector3 ObjectVelocity => _object.linearVelocity;
         public Quaternion ObjectRotation => _object.rotation;
-        public float Clearance => _object.position.y - Radius;
+        public float Clearance => _researchObject ? _objectCollider.bounds.min.y : _object.position.y - Radius;
+        public float EffectiveGripCap => _feedback?.Cap ?? GripCap;
+        public int GripCorrections => _feedback?.Corrections ?? 0;
+        public bool GripUncertain => _feedback?.Uncertain == true;
         public float SupportForce => GripCalibration.MeanForce(_supportImpulse, WorldSimulation.Dt);
         public float Penetration { get; private set; }
         public Vector3 DriveForce { get; private set; }
@@ -108,12 +130,26 @@ namespace DreamMachine.UnityBridge
         public float TravelTarget { get; private set; }
 
         public NativeHandLab(int seed, float mass, float radius, float friction, float gripCap, int closeTicks = 12,
-            float orientation = 0f)
+            float orientation = 0f, HandObjectSetup? objectSetup = null, bool contactGated = false)
         {
             if (!Application.isPlaying) throw new InvalidOperationException("Native contact callbacks require Play Mode.");
             if (!(mass >= .035f && mass <= .20f && radius >= .021f && radius <= .036f && friction >= .10f && friction <= 1f &&
                 gripCap >= .08f && gripCap <= 7f && closeTicks >= 4 && closeTicks <= 30))
                 throw new ArgumentOutOfRangeException(nameof(mass), "Unsupported engineering fixture settings.");
+            if (!float.IsFinite(orientation)) throw new ArgumentOutOfRangeException(nameof(orientation));
+            _feedback = contactGated ? new ContactGatedGrip(gripCap) : null;
+            _researchObject = objectSetup.HasValue;
+            if (objectSetup.HasValue)
+            {
+                var setup = objectSetup.Value;
+                if (!Enum.IsDefined(typeof(HandObjectShape), setup.Shape) ||
+                    !(setup.Size.x >= .040f && setup.Size.x <= .078f && setup.Size.y >= .040f && setup.Size.y <= .078f &&
+                        setup.Size.z >= .040f && setup.Size.z <= .078f) || !(setup.CentreOfMass.sqrMagnitude <= .000225f) ||
+                    (setup.Shape != HandObjectShape.Box && (setup.Size.x != 2f * radius || setup.Size.z != 2f * radius)) ||
+                    (setup.Shape == HandObjectShape.Sphere && setup.Size.y != 2f * radius) ||
+                    (setup.Shape == HandObjectShape.Capsule && setup.Size.y < 2f * radius))
+                    throw new ArgumentOutOfRangeException(nameof(objectSetup));
+            }
             Seed = seed; Radius = radius; Friction = friction; GripCap = gripCap; _closeTicks = closeTicks;
             _scene = SceneManager.CreateScene("Supported hand " + Guid.NewGuid().ToString("N"),
                 new CreateSceneParameters(LocalPhysicsMode.Physics3D));
@@ -131,14 +167,15 @@ namespace DreamMachine.UnityBridge
             _palm = Body("Palm and wrist", _carriage.position, .12f);
             _palmCollider = Box(_palm.gameObject, new Vector3(.097f, .026f, .024f), Vector3.zero, _padMaterial);
             Hinge(_palm, _carriage, _palm.position, Vector3.right, -11f, 11f);
-            _object = Body("Free grasp object", new Vector3(0, radius + .001f, 0), mass);
+            float objectHeight = objectSetup?.Size.y ?? 2f * radius;
+            _object = Body("Free grasp object", new Vector3(0, objectHeight * .5f + .001f, 0), mass);
             _object.rotation = Quaternion.Euler(0f, orientation, 0f);
-            _objectCollider = _object.gameObject.AddComponent<SphereCollider>();
-            _objectCollider.radius = radius;
+            _objectCollider = MakeObjectCollider(objectSetup, radius);
             _objectCollider.contactOffset = .001f;
             _objectCollider.providesContacts = true;
             _objectCollider.sharedMaterial = _objectMaterial;
             _object.ResetInertiaTensor();
+            if (objectSetup.HasValue) _object.centerOfMass = objectSetup.Value.CentreOfMass;
             _object.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
 
             var hand = new HumanoidAnatomy(seed).AtAge(3f).Hand;
@@ -163,11 +200,35 @@ namespace DreamMachine.UnityBridge
             Physics.ContactEvent += Contacts;
         }
 
+        Collider MakeObjectCollider(HandObjectSetup? setup, float radius)
+        {
+            switch (setup?.Shape ?? HandObjectShape.Sphere)
+            {
+                case HandObjectShape.Box:
+                    return Box(_object.gameObject, setup.Value.Size, Vector3.zero, _objectMaterial);
+                case HandObjectShape.Capsule:
+                    var capsule = _object.gameObject.AddComponent<CapsuleCollider>();
+                    capsule.radius = radius;
+                    capsule.height = setup.Value.Size.y;
+                    return capsule;
+                default:
+                    var sphere = _object.gameObject.AddComponent<SphereCollider>();
+                    sphere.radius = radius;
+                    return sphere;
+            }
+        }
+
         public GripFrame ReadFrame() => new GripFrame(this);
         public GripPadSample ReadPad(int side) => _last[side];
         public float ClosingForce(int side) => _closingForce[side];
         public float FingerTravel(int side) => Vector3.Dot(_fingers[side].position -
             (_palm.position + _palm.rotation * _guideOrigin[side]), Axis(side));
+        public float FingerVelocity(int side)
+        {
+            var finger = _fingers[side];
+            return Vector3.Dot(finger.linearVelocity - _palm.GetPointVelocity(finger.position), Axis(side));
+        }
+
         Vector3 Axis(int side) => _palm.rotation * ((1 - 2 * side) * Vector3.right);
 
         public (Vector3 Position, Quaternion Rotation, Vector3 Size) ReadPart(int part)
@@ -175,23 +236,32 @@ namespace DreamMachine.UnityBridge
             Collider geometry = part switch { 0 => _table, 1 => _palmCollider, 2 => _shafts[0], 3 => _pads[0],
                 4 => _shafts[1], 5 => _pads[1], 6 => _objectCollider, _ => throw new ArgumentOutOfRangeException(nameof(part)) };
             var t = geometry.transform;
-            return geometry is BoxCollider box ? (t.TransformPoint(box.center), t.rotation, box.size) :
-                (t.position, t.rotation, Vector3.one * (2f * Radius));
+            if (geometry is BoxCollider box) return (t.TransformPoint(box.center), t.rotation, box.size);
+            var size = Vector3.one * (2f * Radius);
+            if (geometry is CapsuleCollider capsule) size.y = capsule.height;
+            return (t.position, t.rotation, size);
         }
 
-        public void Step()
+        public void Step() => Step(Vector3.zero, Vector3.zero);
+
+        public void Step(Vector3 researchLoad, Vector3 researchImpulse)
         {
             if (_disposed) throw new ObjectDisposedException(nameof(NativeHandLab));
             if (Terminal) return;
+            if (!(researchLoad.sqrMagnitude <= 16f && researchImpulse.sqrMagnitude <= .0025f))
+                throw new ArgumentOutOfRangeException(nameof(researchLoad));
             bool closing = Phase >= GripPhase.Close && Phase <= GripPhase.Lower;
             TravelTarget = closing ? ClosedTravel : OpenTravel;
             float z = Phase == GripPhase.Settle ? StartZ : ReachZ;
             float y = Phase == GripPhase.Lift || Phase == GripPhase.Hold ? LiftY : PickupY;
-            _verticalTarget = Mathf.MoveTowards(_verticalTarget, y, .007f);
+            float liftStep = Phase == GripPhase.Lift && GripUncertain ? .0025f : .007f;
+            _verticalTarget = Mathf.MoveTowards(_verticalTarget, y, liftStep);
             var target = new Vector3(0f, _verticalTarget, z);
             Array.Clear(_reading, 0, _reading.Length);
             _supportImpulse = 0f;
             _otherContacts = 0;
+            float cap = closing ? EffectiveGripCap : 3f;
+            if (researchImpulse != Vector3.zero) _object.AddForce(researchImpulse, ForceMode.Impulse);
             for (int i = 0; i < Substeps; i++)
             {
                 _reading[0].BeginSubstep(); _reading[1].BeginSubstep();
@@ -205,8 +275,10 @@ namespace DreamMachine.UnityBridge
                 float wrist = Vector3.SignedAngle(_carriage.rotation * Vector3.forward, _palm.rotation * Vector3.forward, axis);
                 float wristSpeed = Vector3.Dot(_palm.angularVelocity - _carriage.angularVelocity, axis);
                 TorquePair(_palm, _carriage, axis * Mathf.Clamp(-.24f * wrist - .08f * wristSpeed, -.9f, .9f));
-                DriveFinger(0, left, closing ? GripCap : 3f);
-                DriveFinger(1, right, closing ? GripCap : 3f);
+                DriveFinger(0, left, cap);
+                DriveFinger(1, right, cap);
+                if (_researchObject) DigitEffort += (Mathf.Abs(_closingForce[0]) + Mathf.Abs(_closingForce[1])) * PhysicsDt;
+                if (researchLoad != Vector3.zero) _object.AddForce(researchLoad);
                 if (Profile) CommandCpuTicks += Stopwatch.GetTimestamp() - start;
                 _physics.Simulate(PhysicsDt);
                 Work += Mathf.Abs(Vector3.Dot(DriveForce, _carriage.position - before)) +
@@ -222,8 +294,20 @@ namespace DreamMachine.UnityBridge
             PeakClearance = Mathf.Max(PeakClearance, Clearance);
             Tick++;
             if ((Phase == GripPhase.Lift || Phase == GripPhase.Hold) && (_last[0].Slip || _last[1].Slip)) SlipTicks++;
+            if (_researchObject && Phase == GripPhase.Settle && Tick >= 12)
+            {
+                _settleSupport += SupportForce;
+                _measuredWeight = _settleSupport / ++_settleSamples;
+            }
+            if (_feedback != null && (Phase == GripPhase.Close || Phase == GripPhase.Lift || Phase == GripPhase.Hold))
+                _feedback.Observe(Sense(_last[0]), Sense(_last[1]), Phase != GripPhase.Close);
             Advance(Tick - _phaseTick);
         }
+
+        static GripContactSense Sense(GripPadSample sample) =>
+            new GripContactSense(sample.NormalForce, sample.ContactSeconds, sample.RelativeSpeed, sample.Slip);
+
+        float WeightReference => _researchObject ? Mathf.Max(.10f, _measuredWeight) : MassKg * -Physics.gravity.y;
 
         void Advance(int elapsed)
         {
@@ -236,7 +320,13 @@ namespace DreamMachine.UnityBridge
                     if (Mathf.Abs(_carriage.position.z - ReachZ) < .004f || elapsed >= 36) Enter(GripPhase.Close);
                     break;
                 case GripPhase.Close:
-                    if ((elapsed >= _closeTicks && OpposingContact) || elapsed >= _closeTicks + 8) Enter(GripPhase.Lift);
+                    if (_feedback == null)
+                    {
+                        if ((elapsed >= _closeTicks && OpposingContact) || elapsed >= _closeTicks + 8) Enter(GripPhase.Lift);
+                    }
+                    else if (elapsed >= _closeTicks && _feedback.Ready) Enter(GripPhase.Lift);
+                    else if (elapsed >= _closeTicks + 8) Enter(GripPhase.Lower);
+
                     break;
                 case GripPhase.Lift:
                     if (Clearance >= GripCalibration.LiftClearance && OpposingContact && _otherContacts == 0)
@@ -250,12 +340,12 @@ namespace DreamMachine.UnityBridge
                     else if (elapsed >= 30) Enter(GripPhase.Lower);
                     break;
                 case GripPhase.Lower:
-                    if (elapsed >= 10 && SupportForce >= .2f * MassKg * -Physics.gravity.y || elapsed >= 34)
+                    if (elapsed >= 10 && SupportForce >= .2f * WeightReference || elapsed >= 34)
                         Enter(GripPhase.Release);
                     break;
                 case GripPhase.Release:
                     bool released = !OpposingContact && _last[0].NormalForce < GripCalibration.ContactForce &&
-                        _last[1].NormalForce < GripCalibration.ContactForce && SupportForce >= .5f * MassKg * -Physics.gravity.y &&
+                        _last[1].NormalForce < GripCalibration.ContactForce && SupportForce >= .5f * WeightReference &&
                         _object.linearVelocity.sqrMagnitude < .0025f && Clearance < .004f;
                     _releaseTicks = released ? _releaseTicks + 1 : 0;
                     if (_releaseTicks >= 5 || elapsed >= 30)
@@ -275,7 +365,7 @@ namespace DreamMachine.UnityBridge
         {
             var finger = _fingers[side];
             Vector3 axis = Axis(side);
-            float speed = Vector3.Dot(finger.linearVelocity - _palm.GetPointVelocity(finger.position), axis);
+            float speed = FingerVelocity(side);
             const float stiffness = 480f, damping = 8f;
             float effectiveDamping = damping + stiffness * PhysicsDt;
             float request = (stiffness * (TravelTarget - travel) - effectiveDamping * speed) /
