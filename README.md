@@ -25,6 +25,8 @@ You should see one house, four people, and a panel of beliefs and feelings. The 
 
 To watch supported physical Ball placement, open **Physical development → Ball / switch learner → Coordinated placement**. Use **Earlier attempt** and **Next frame** to inspect a saved attempt. **Articulated arm** and **Transfer ball** run the H6 and H5 reference policies. [Phase H7 workflow and measured results](docs/SENSORIMOTOR_PLACEMENT_H7.md)
 
+Choose **Visual coordination** in the same tray to see H8's timestamped hand and Ball estimates, uncertainty and corrections during descent. [Phase H8 workflow and measured results](docs/VISUAL_COORDINATION_H8.md)
+
 The rest of this file is the research notes for the kernel, the experiment, and the limits of the prototype.
 
 A research prototype of a small cognitive architecture. Six baby agents live in one yard with six mentor characters. The babies try to learn two things at once:
