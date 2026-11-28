@@ -445,6 +445,16 @@ The clock checkpoint extends K evidence for §§5–7, 116, 124, 133 and 169. Pa
 | H3 sections 4-7, 15-17 and M06/M12/M45 | Matched native object presets, bounded pad-sensed response and controlled trials | Verified in isolation | Fixed 6/10, trained scalar 4/10, online feedback 3/10. Fresh/reset ablation reproduced feedback exactly. [Protocol, failure modes and raw compact telemetry](PHYSICAL_HAND_H3.md) |
 | H3 sections 8-14 and M02/M09/M15-M18 | Native object setup and force interface with learner-bound H2 settled evidence | Partially implemented | Shared fixture contract and actual H2 records. Household transporting, chairs, collision/material fidelity, Alice, generalized library indexing and creative tools remain dependent. [M01-M46 register](MASTER_WORKSTREAM_TRACEABILITY.md) |
 
+## Phase H4 tactile exploration and controlled placement
+
+| Requirement | Implementation | Status | Evidence and dependencies |
+| --- | --- | --- | --- |
+| H4 sections 1–3, 9–10, 17 | Matched H3 mechanical references, development, frozen cases and scoring | Verified in isolation | H3 unchanged. Fourteen reference diagnoses, 84 development and 82 post-restart attempts. [H4 experiment](PHYSICAL_PLACEMENT_H4.md) |
+| H4 sections 4–8 | Contact-local proposals, bounded effort, lateral and vertical carriage targets, wrist pitch and finite lowering | Experimental | Held-out Tactile 10/11 matched same-cap ForceOnly 10/11. Applied-load case passed; offset capsule remains open. Independent finger effort, wrist yaw and hand-eye estimates remain outstanding. [Policy](../Assets/DreamMachine/Core/Body/TactileGrasp.cs) |
+| H4 sections 11–12, 16 | Actual support centroid, load transfer and settled release within a destination region | Verified in isolation | Native carriage and free object. Persistent household object binding, balance, joints, garment integrity, carrying and arbitrary native restoration are open. [Placement and dependencies](PHYSICAL_PLACEMENT_H4.md#unity-workflow-and-remaining-work) |
+| H4 sections 13–14 | Independent research archives and firsthand Library III records | Verified in isolation | Arthur and Alice trained separate scalar archives and reloaded in another process. Alice has no household practice integration. Library I is linked via scalar evidence and Library II has engineered proposal traces. Generalized belief and Babel integration are open. [Retention and provenance](PHYSICAL_PLACEMENT_H4.md#retention-and-provenance) |
+| H4 section 15 | Existing Unity hand lab, object queue, live placement and native replay | Verified in isolation | DX12 confirmed load, regrasp, controlled placement and playback. H2 keeps the existing household route. [Unity smoke](../tools/unity/HandBrowserSmoke.cs) |
+
 ## Physical development and motor vocabulary addendum
 
 The [nervous-system audit](PHYSICAL_NERVOUS_SYSTEM_SPECIFICATION.md#existing-system-audit) identifies existing fixture evidence and integration gaps. The [acceptance plan](PHYSICAL_NERVOUS_SYSTEM_SPECIFICATION.md#experimental-acceptance) records matched tests and scope for the related master requirements §§5–6, 12–21, 46–49, 56–57, 62–64, 92, 128–132, 137, 156–158, 170, 172 and 175.
